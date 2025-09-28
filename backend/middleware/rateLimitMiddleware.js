@@ -27,6 +27,10 @@ class RateLimitMiddleware {
       },
       standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
       legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+      skip: (req) => {
+        // Skip rate limiting for OAuth callback endpoints
+        return req.path === '/auth/callback' || req.path === '/api/auth/callback';
+      },
       handler: (req, res) => {
         console.log(`🚫 Rate limit exceeded for IP: ${req.ip}`);
         res.status(429).json({

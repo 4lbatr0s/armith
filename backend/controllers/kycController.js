@@ -1,6 +1,4 @@
 import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
-import fs from 'fs';
 import { createError, determineStatus } from '../error-codes.js';
 import { 
   IdCheckRequestSchema,
@@ -14,7 +12,6 @@ import {
   SELFIE_PROMPT, 
 } from '../prompts.js';
 import storageService from '../services/storageService.js';
-import multer from 'multer';
 import { readDatabase, writeDatabase } from '../utils/database.js';
 import llmService from '../services/llmService.js';
 
@@ -80,171 +77,7 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
   }
 };
 
-// Create multer middleware for local uploads
-const createLocalUploadMiddleware = () => {
-  const uploadPath = process.env.LOCAL_UPLOAD_PATH || './uploads/kyc-uploads';
-  
-  // Ensure directory exists
-  if (!fs.existsSync(uploadPath)) {
-    fs.mkdirSync(uploadPath, { recursive: true });
-  }
-  
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-      const fileExtension = path.extname(file.originalname) || '.jpg';
-      const fileName = `${uuidv4()}${fileExtension}`;
-      cb(null, fileName);
-    }
-  });
-  
-  return multer({
-    storage: storage,
-    limits: {
-      fileSize: 10 * 1024 * 1024 // 10MB limit
-    },
-    fileFilter: (req, file, cb) => {
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-      if (allowedTypes.includes(file.mimetype)) {
-        cb(null, true);
-      } else {
-        cb(new Error('Invalid file type. Only JPEG and PNG are allowed.'), false);
-      }
-    }
-  }).single('file');
-};
 
-// Local file upload endpoint (for local storage mode)
-export const localUpload = async (req, res) => {
-  try {
-    console.log('🔍 Creating local upload middleware...');
-    console.log('📋 Request details:', {
-      method: req.method,
-      url: req.url,
-      contentType: req.get('Content-Type'),
-      contentLength: req.get('Content-Length'),
-      userAgent: req.get('User-Agent')
-    });
-    const uploadMiddleware = createLocalUploadMiddleware();
-    console.log('✅ Local upload middleware created successfully');
-    
-    uploadMiddleware(req, res, async (err) => {
-      if (err) {
-        console.error('Local upload error:', err);
-        return res.status(400).json({
-          status: 'failed',
-          errors: [{
-            code: 'UPLOAD_ERROR',
-            message: err.message || 'File upload failed'
-          }]
-        });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({
-          status: 'failed',
-          errors: [{
-            code: 'NO_FILE',
-            message: 'No file provided'
-          }]
-        });
-      }
-
-      const fileName = req.file.filename;
-      console.log('📁 File uploaded successfully:', {
-        originalName: req.file.originalname,
-        filename: fileName,
-        mimetype: req.file.mimetype,
-        size: req.file.size
-      });
-
-      const downloadUrl = `${process.env.BASE_URL || 'http://localhost:3001'}/kyc/files/${fileName}`;
-
-      res.json({
-        success: true,
-        fileName: fileName, // Just the filename, not the full path
-        downloadUrl,
-        storageType: 'local'
-      });
-    });
-  } catch (error) {
-    console.error('Local upload endpoint error:', error);
-    res.status(500).json({
-      status: 'failed',
-      errors: [createError('INTERNAL_SERVER_ERROR')]
-    });
-  }
-};
-
-// Serve local files
-export const serveFile = async (req, res) => {
-  try {
-    const { fileName } = req.params;
-    const config = storageService.getConfig();
-    
-    if (config.storageType !== 'local') {
-      return res.status(404).json({
-        status: 'failed',
-        errors: [{
-          code: 'FILE_NOT_FOUND',
-          message: 'Local storage not enabled'
-        }]
-      });
-    }
-
-    const filePath = path.join(config.localUploadPath, fileName);
-    
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        status: 'failed',
-        errors: [{
-          code: 'FILE_NOT_FOUND',
-          message: 'File not found'
-        }]
-      });
-    }
-
-    // Set CORS headers to allow cross-origin requests
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    
-    // Set appropriate content type based on file extension
-    const ext = path.extname(fileName).toLowerCase();
-    let contentType = 'application/octet-stream';
-    
-    switch (ext) {
-      case '.jpg':
-      case '.jpeg':
-        contentType = 'image/jpeg';
-        break;
-      case '.png':
-        contentType = 'image/png';
-        break;
-      case '.gif':
-        contentType = 'image/gif';
-        break;
-      case '.webp':
-        contentType = 'image/webp';
-        break;
-    }
-    
-    res.header('Content-Type', contentType);
-    res.header('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-    
-    // Serve the file
-    res.sendFile(path.resolve(filePath));
-  } catch (error) {
-    console.error('File serving error:', error);
-    res.status(500).json({
-      status: 'failed',
-      errors: [createError('INTERNAL_SERVER_ERROR')]
-    });
-  }
-};
 
 // Generate presigned upload URL
 export const generateUploadUrl = async (req, res) => {
@@ -261,7 +94,7 @@ export const generateUploadUrl = async (req, res) => {
     console.error('Upload URL generation error:', error);
     res.status(500).json({
       status: 'failed',
-      errors: [createError('INTERNAL_SERVER_ERROR')]
+    errors: [createError('INTERNAL_SERVER_ERROR')]
     });
   }
 };

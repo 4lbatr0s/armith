@@ -1,226 +1,279 @@
-import AWS from 'aws-sdk';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Configure AWS SDK
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION || 'us-east-1'
-});
-
-const s3 = new AWS.S3();
-const BUCKET_NAME = process.env.AWS_S3_BUCKET;
-const PRESIGNED_URL_EXPIRY = 300; // 5 minutes for upload
-const DOWNLOAD_URL_EXPIRY = 86400; // 24 hours for download (AI processing)
-
-// Storage configuration
-const STORAGE_TYPE = process.env.STORAGE_TYPE || 'local'; // 's3' or 'local'
-const LOCAL_UPLOAD_PATH = process.env.LOCAL_UPLOAD_PATH || './uploads/kyc-uploads';
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
-
-// Ensure local upload directory exists
-if (STORAGE_TYPE === 'local') {
-  if (!fs.existsSync(LOCAL_UPLOAD_PATH)) {
-    fs.mkdirSync(LOCAL_UPLOAD_PATH, { recursive: true });
-  }
-}
-
 /**
- * Storage Service for handling file operations
- * Supports both AWS S3 and local file storage
+ * Storage Service - Cloudflare R2
+ * Handles file uploads, downloads, and management using Cloudflare R2
  */
 class StorageService {
   constructor() {
-    this.s3 = s3;
-    this.bucketName = BUCKET_NAME;
-    this.presignedUrlExpiry = PRESIGNED_URL_EXPIRY;
-    this.downloadUrlExpiry = DOWNLOAD_URL_EXPIRY;
-    this.storageType = STORAGE_TYPE;
-    this.localUploadPath = LOCAL_UPLOAD_PATH;
-    this.baseUrl = BASE_URL;
-    
-    // Configure multer for local storage
+    this.client = null;
+    this.bucketName = process.env.R2_BUCKET_NAME;
+    this.region = process.env.R2_REGION || 'auto';
+    this.presignedUrlExpiry = 300; // 5 minutes for upload
+    this.downloadUrlExpiry = 86400; // 24 hours for download
+    this.initialize();
+  }
+
+  initialize() {
     try {
-      this.multerConfig = multer.diskStorage({
-        destination: (req, file, cb) => {
-          cb(null, this.localUploadPath);
-        },
-        filename: (req, file, cb) => {
-          const fileExtension = path.extname(file.originalname);
-          const fileName = `${uuidv4()}${fileExtension}`;
-          cb(null, fileName);
-        }
-      });
+      // Validate required environment variables
+      const requiredEnvVars = [
+        'R2_ACCESS_KEY_ID',
+        'R2_SECRET_ACCESS_KEY',
+        'R2_BUCKET_NAME',
+        'R2_ENDPOINT'
+      ];
+
+      const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
       
-      this.upload = multer({ 
-        storage: this.multerConfig,
-        limits: {
-          fileSize: 10 * 1024 * 1024 // 10MB limit
+      if (missingVars.length > 0) {
+        console.warn(`⚠️  Missing R2 environment variables: ${missingVars.join(', ')}`);
+        console.warn('R2 storage service will not be available');
+        return;
+      }
+
+      // Initialize S3 client for R2
+      this.client = new S3Client({
+        region: this.region,
+        endpoint: process.env.R2_ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
         },
-        fileFilter: (req, file, cb) => {
-          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-          if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-          } else {
-            cb(new Error('Invalid file type. Only JPEG and PNG are allowed.'), false);
-          }
-        }
+        forcePathStyle: true, // Required for R2
       });
-      
-      console.log('✅ Multer configured successfully for local storage');
+
+      console.log('✅ Storage service initialized with R2');
     } catch (error) {
-      console.error('❌ Failed to configure multer:', error);
-      this.upload = null;
+      console.error('❌ Failed to initialize R2 storage service:', error);
     }
   }
 
   /**
-   * Generate upload URL (S3 presigned or local endpoint)
-   * @param {string} fileType - MIME type of the file
-   * @returns {Promise<Object>} Upload data with URLs and metadata
+   * Check if R2 service is available
    */
-  async generatePresignedUploadUrl(fileType) {
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(fileType)) {
-      throw new Error('Invalid file type. Only JPEG and PNG are allowed.');
-    }
-
-    // Generate unique filename
-    const fileExtension = fileType.split('/')[1];
-    
-    if (this.storageType === 's3') {
-      const fileName = `kyc-uploads/${uuidv4()}.${fileExtension}`;
-      return await this._generateS3UploadUrl(fileType, fileName);
-    } else {
-      const fileName = `${uuidv4()}.${fileExtension}`; // Just filename for local storage
-      return await this._generateLocalUploadUrl(fileType, fileName);
-    }
+  isAvailable() {
+    return this.client !== null && this.bucketName;
   }
 
   /**
-   * Generate S3 presigned upload URL
-   * @private
+   * Get R2 configuration
    */
-  async _generateS3UploadUrl(fileType, fileName) {
-    if (!this.bucketName) {
-      throw new Error('S3 bucket name not configured');
-    }
-
-    try {
-      // Generate presigned URL for upload (PUT)
-      const uploadUrl = await this.s3.getSignedUrlPromise('putObject', {
-        Bucket: this.bucketName,
-        Key: fileName,
-        ContentType: fileType,
-        Expires: this.presignedUrlExpiry, // URL expires in 5 minutes
-        Metadata: {
-          uploadedAt: new Date().toISOString(),
-          service: 'kyc-flow'
-        }
-      });
-
-      // Generate temporary download URL (expires in 24 hours for AI processing)
-      const downloadUrl = await this.s3.getSignedUrlPromise('getObject', {
-        Bucket: this.bucketName,
-        Key: fileName,
-        Expires: this.downloadUrlExpiry // 24 hours - enough time for AI processing
-      });
-
-      return {
-        uploadUrl,
-        downloadUrl,
-        fileName,
-        expiresIn: this.presignedUrlExpiry,
-        storageType: 's3'
-      };
-    } catch (error) {
-      console.error('Error generating S3 presigned URL:', error);
-      throw new Error('Failed to generate S3 upload URL');
-    }
-  }
-
-  /**
-   * Generate local upload URL (endpoint)
-   * @private
-   */
-  async _generateLocalUploadUrl(fileType, fileName) {
-    const uploadUrl = `${this.baseUrl}/kyc/local-upload`;
-    const downloadUrl = `${this.baseUrl}/kyc/files/${fileName}`;
-
+  getConfig() {
     return {
-      uploadUrl,
-      downloadUrl,
-      fileName,
-      expiresIn: this.presignedUrlExpiry,
-      storageType: 'local'
+      storageType: 'r2',
+      bucketName: this.bucketName,
+      region: this.region,
+      isAvailable: this.isAvailable()
     };
   }
 
   /**
-   * Validate image URL format
-   * @param {string} url - URL to validate
-   * @returns {boolean} Whether the URL is valid
+   * Generate a unique filename
+   */
+  generateFileName(originalName, prefix = 'kyc-uploads') {
+    const fileExtension = path.extname(originalName) || '.jpg';
+    const timestamp = Date.now();
+    const uuid = uuidv4();
+    return `${prefix}/${timestamp}-${uuid}${fileExtension}`;
+  }
+
+  /**
+   * Generate presigned upload URL
+   */
+  async generatePresignedUploadUrl(fileType = 'image/jpeg', fileName = null) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
+    try {
+      // Generate unique filename if not provided
+      if (!fileName) {
+        const fileExtension = fileType.split('/')[1];
+        fileName = `kyc-uploads/${uuidv4()}.${fileExtension}`;
+      }
+      const contentType = this.getContentType(fileType);
+      
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName,
+        ContentType: contentType,
+        Metadata: {
+          'upload-timestamp': new Date().toISOString(),
+          'upload-source': 'kyc-flow'
+        }
+      });
+
+      // Generate presigned URL for upload
+      const presignedUrl = await getSignedUrl(this.client, command, { 
+        expiresIn: this.presignedUrlExpiry
+      });
+
+      // Generate presigned download URL for immediate access
+      const downloadCommand = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName
+      });
+      
+      const presignedDownloadUrl = await getSignedUrl(this.client, downloadCommand, { 
+        expiresIn: this.downloadUrlExpiry
+      });
+
+      return {
+        uploadUrl: presignedUrl,
+        fileName: fileName,
+        downloadUrl: presignedDownloadUrl,
+        expiresIn: this.presignedUrlExpiry,
+        contentType: contentType,
+        storageType: 'r2'
+      };
+    } catch (error) {
+      console.error('Error generating presigned upload URL:', error);
+      throw new Error('Failed to generate upload URL');
+    }
+  }
+
+  /**
+   * Generate presigned download URL
+   */
+  async generatePresignedDownloadUrl(fileName, expiresIn = 3600) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName
+      });
+
+      const presignedUrl = await getSignedUrl(this.client, command, { 
+        expiresIn: expiresIn
+      });
+
+      return {
+        downloadUrl: presignedUrl,
+        expiresIn: expiresIn
+      };
+    } catch (error) {
+      console.error('Error generating presigned download URL:', error);
+      throw new Error('Failed to generate download URL');
+    }
+  }
+
+  /**
+   * Generate secure download URL (for AI processing)
+   */
+  async generateSecureDownloadUrl(fileName) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
+    try {
+      // Generate a short-lived URL for AI processing (5 minutes)
+      const result = await this.generatePresignedDownloadUrl(fileName, 300);
+      
+      return {
+        downloadUrl: result.downloadUrl,
+        expiresIn: result.expiresIn
+      };
+    } catch (error) {
+      console.error('Error generating secure download URL:', error);
+      throw new Error('Failed to generate secure download URL');
+    }
+  }
+
+  /**
+   * Generate presigned URL for an existing file
+   * @param {string} fileName - File name/key
+   * @param {number} expiresIn - Expiration time in seconds (default: 1 hour)
+   * @returns {Promise<Object>} Presigned URL data
+   */
+  async generatePresignedUrl(fileName, expiresIn = 3600) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName
+      });
+
+      const presignedUrl = await getSignedUrl(this.client, command, { 
+        expiresIn: expiresIn
+      });
+
+      return {
+        downloadUrl: presignedUrl,
+        expiresIn: expiresIn
+      };
+    } catch (error) {
+      console.error('Error generating presigned URL:', error);
+      throw new Error('Failed to generate presigned URL');
+    }
+  }
+
+  /**
+   * Get public URL for a file (if custom domain is configured)
+   * Note: This should only be used for public files, prefer presigned URLs for security
+   */
+  getPublicUrl(fileName) {
+    if (!this.publicUrl) {
+      throw new Error('R2 public URL not configured. Use presigned URLs for secure access.');
+    }
+    
+    // Remove trailing slash from public URL if present
+    const baseUrl = this.publicUrl.replace(/\/$/, '');
+    return `${baseUrl}/${fileName}`;
+  }
+
+  /**
+   * Validate if a URL is a valid R2 URL
    */
   isValidImageUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return false;
+    }
+
+    // Check if it's a valid URL
     try {
       const urlObj = new URL(url);
-      // Check if URL is accessible (basic format validation)
-      return urlObj.protocol === 'https:' || urlObj.protocol === 'http:';
-    } catch {
+      
+      // Check if it's from our R2 domain
+      if (this.publicUrl) {
+        const publicUrlObj = new URL(this.publicUrl);
+        return urlObj.hostname === publicUrlObj.hostname;
+      }
+      
+      // Fallback: check if it's a valid HTTP/HTTPS URL
+      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+    } catch (error) {
       return false;
     }
   }
 
   /**
-   * Get multer middleware for local uploads
-   * @returns {Function} Multer middleware
-   */
-  getMulterMiddleware() {
-    if (!this.upload) {
-      console.error('❌ Multer not initialized. Creating fallback middleware...');
-      // Create a simple fallback multer instance
-      this.upload = multer({ 
-        storage: multer.memoryStorage(),
-        limits: {
-          fileSize: 10 * 1024 * 1024 // 10MB limit
-        },
-        fileFilter: (req, file, cb) => {
-          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-          if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-          } else {
-            cb(new Error('Invalid file type. Only JPEG and PNG are allowed.'), false);
-          }
-        }
-      });
-      console.log('✅ Fallback multer middleware created');
-    }
-    return this.upload.single('file');
-  }
-
-  /**
-   * Delete file from S3
-   * @param {string} fileName - S3 object key
-   * @returns {Promise<Object>} Deletion result
+   * Delete a file from R2
    */
   async deleteFile(fileName) {
-    if (!this.bucketName) {
-      throw new Error('S3 bucket name not configured');
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
     }
 
     try {
-      await this.s3.deleteObject({
+      const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
         Key: fileName
-      }).promise();
+      });
 
+      await this.client.send(command);
       return { success: true };
     } catch (error) {
       console.error('Error deleting file:', error);
@@ -229,72 +282,145 @@ class StorageService {
   }
 
   /**
-   * Check if file exists (S3 or local)
-   * @param {string} fileName - File name/path
-   * @returns {Promise<boolean>} Whether file exists
+   * Get content type based on file type
+   */
+  getContentType(fileType) {
+    const contentTypes = {
+      'image/jpeg': 'image/jpeg',
+      'image/jpg': 'image/jpeg',
+      'image/png': 'image/png',
+      'image/gif': 'image/gif',
+      'image/webp': 'image/webp'
+    };
+
+    return contentTypes[fileType] || 'application/octet-stream';
+  }
+
+  /**
+   * Get file info (metadata) with presigned download URL
+   */
+  async getFileInfo(fileName, downloadUrlExpiresIn = 3600) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName
+      });
+
+      const response = await this.client.send(command);
+      
+      // Generate presigned download URL
+      const downloadData = await this.generatePresignedUrl(fileName, downloadUrlExpiresIn);
+      
+      return {
+        fileName: fileName,
+        contentType: response.ContentType,
+        contentLength: response.ContentLength,
+        lastModified: response.LastModified,
+        metadata: response.Metadata || {},
+        downloadUrl: downloadData.downloadUrl,
+        downloadUrlExpiresIn: downloadData.expiresIn
+      };
+    } catch (error) {
+      console.error('Error getting file info:', error);
+      throw new Error('Failed to get file info');
+    }
+  }
+
+  /**
+   * List files in a prefix with presigned download URLs
+   */
+  async listFiles(prefix = 'kyc-uploads', maxKeys = 100, downloadUrlExpiresIn = 3600) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
+    try {
+      const { ListObjectsV2Command } = await import('@aws-sdk/client-s3');
+      
+      const command = new ListObjectsV2Command({
+        Bucket: this.bucketName,
+        Prefix: prefix,
+        MaxKeys: maxKeys
+      });
+
+      const response = await this.client.send(command);
+      
+      // Generate presigned URLs for each file
+      const filesWithUrls = await Promise.all(
+        (response.Contents || []).map(async (file) => {
+          try {
+            const downloadData = await this.generatePresignedUrl(file.Key, downloadUrlExpiresIn);
+            return {
+              ...file,
+              downloadUrl: downloadData.downloadUrl,
+              downloadUrlExpiresIn: downloadData.expiresIn
+            };
+          } catch (error) {
+            console.warn(`Failed to generate presigned URL for ${file.Key}:`, error);
+            return {
+              ...file,
+              downloadUrl: null,
+              downloadUrlExpiresIn: 0
+            };
+          }
+        })
+      );
+      
+      return {
+        files: filesWithUrls,
+        isTruncated: response.IsTruncated || false,
+        nextContinuationToken: response.NextContinuationToken
+      };
+    } catch (error) {
+      console.error('Error listing files:', error);
+      throw new Error('Failed to list files');
+    }
+  }
+
+  /**
+   * Check if file exists
    */
   async fileExists(fileName) {
-    if (this.storageType === 's3') {
-      return await this._s3FileExists(fileName);
-    } else {
-      return await this._localFileExists(fileName);
-    }
-  }
-
-  /**
-   * Check if file exists in S3
-   * @private
-   */
-  async _s3FileExists(fileName) {
-    if (!this.bucketName) {
-      throw new Error('S3 bucket name not configured');
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
     }
 
     try {
-      await this.s3.headObject({
+      const command = new HeadObjectCommand({
         Bucket: this.bucketName,
         Key: fileName
-      }).promise();
+      });
 
+      await this.client.send(command);
       return true;
     } catch (error) {
-      if (error.code === 'NotFound') {
+      if (error.name === 'NotFound') {
         return false;
       }
-      console.error('Error checking S3 file existence:', error);
-      throw new Error('Failed to check S3 file existence');
+      console.error('Error checking file existence:', error);
+      throw new Error('Failed to check file existence');
     }
   }
 
   /**
-   * Check if file exists locally
-   * @private
-   */
-  async _localFileExists(fileName) {
-    try {
-      const filePath = path.join(this.localUploadPath, fileName);
-      return fs.existsSync(filePath);
-    } catch (error) {
-      console.error('Error checking local file existence:', error);
-      throw new Error('Failed to check local file existence');
-    }
-  }
-
-  /**
-   * Get file metadata from S3
-   * @param {string} fileName - S3 object key
-   * @returns {Promise<Object>} File metadata
+   * Get file metadata
    */
   async getFileMetadata(fileName) {
-    if (!this.bucketName) {
-      throw new Error('S3 bucket name not configured');
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
     }
 
     try {
-      const result = await this.s3.headObject({
+      const command = new HeadObjectCommand({
         Bucket: this.bucketName,
         Key: fileName
-      }).promise();
+      });
+
+      const result = await this.client.send(command);
 
       return {
         size: result.ContentLength,
@@ -309,93 +435,23 @@ class StorageService {
   }
 
   /**
-   * Generate presigned download URL for private files
-   * @param {string} fileName - S3 object key
-   * @param {number} expiresIn - Expiration time in seconds
-   * @returns {Promise<Object>} Download URL data
-   */
-  async generatePresignedDownloadUrl(fileName, expiresIn = this.downloadUrlExpiry) {
-    if (!this.bucketName) {
-      throw new Error('S3 bucket name not configured');
-    }
-
-    try {
-      // Verify file exists before generating URL
-      const exists = await this.fileExists(fileName);
-      if (!exists) {
-        throw new Error('File not found');
-      }
-
-      const downloadUrl = await this.s3.getSignedUrlPromise('getObject', {
-        Bucket: this.bucketName,
-        Key: fileName,
-        Expires: expiresIn
-      });
-
-      return {
-        downloadUrl,
-        expiresIn
-      };
-    } catch (error) {
-      console.error('Error generating download URL:', error);
-      throw new Error('Failed to generate download URL');
-    }
-  }
-
-  /**
-   * Generate secure download URL for AI processing
-   * @param {string} fileName - S3 object key
-   * @returns {Promise<Object>} Secure download URL data
-   */
-  async generateSecureDownloadUrl(fileName) {
-    if (!this.bucketName) {
-      throw new Error('S3 bucket name not configured');
-    }
-
-    try {
-      // Verify file exists and is in kyc-uploads directory
-      if (!fileName.startsWith('kyc-uploads/')) {
-        throw new Error('Invalid file path');
-      }
-
-      const exists = await this.fileExists(fileName);
-      if (!exists) {
-        throw new Error('File not found');
-      }
-
-      // Generate short-lived URL for AI processing (2 hours)
-      const downloadUrl = await this.s3.getSignedUrlPromise('getObject', {
-        Bucket: this.bucketName,
-        Key: fileName,
-        Expires: 7200 // 2 hours - enough for AI processing
-      });
-
-      return {
-        downloadUrl,
-        expiresIn: 7200
-      };
-    } catch (error) {
-      console.error('Error generating secure download URL:', error);
-      throw new Error('Failed to generate secure download URL');
-    }
-  }
-
-  /**
-   * Clean up old files from S3
-   * @param {number} daysOld - Number of days old to consider for cleanup
-   * @returns {Promise<Object>} Cleanup result
+   * Clean up old files
    */
   async cleanupOldFiles(daysOld = 7) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-      const listParams = {
+      const listCommand = new ListObjectsV2Command({
         Bucket: this.bucketName,
         Prefix: 'kyc-uploads/'
-      };
+      });
 
-      const listedObjects = await this.s3.listObjectsV2(listParams).promise();
+      const listedObjects = await this.client.send(listCommand);
       
       if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
         return { deleted: 0, message: 'No files to clean up' };
@@ -409,14 +465,14 @@ class StorageService {
         return { deleted: 0, message: 'No old files found' };
       }
 
-      const deleteParams = {
+      const deleteCommand = new DeleteObjectsCommand({
         Bucket: this.bucketName,
         Delete: {
           Objects: objectsToDelete
         }
-      };
+      });
 
-      const deleteResult = await this.s3.deleteObjects(deleteParams).promise();
+      const deleteResult = await this.client.send(deleteCommand);
       
       return {
         deleted: deleteResult.Deleted.length,
@@ -430,9 +486,7 @@ class StorageService {
   }
 
   /**
-   * Extract S3 key from URL
-   * @param {string} url - S3 URL
-   * @returns {string|null} S3 key or null if invalid
+   * Extract key from URL
    */
   extractKeyFromUrl(url) {
     try {
@@ -445,19 +499,32 @@ class StorageService {
   }
 
   /**
-   * Get service configuration
-   * @returns {Object} Service configuration
+   * Health check for R2 service
    */
-  getConfig() {
-    return {
-      storageType: this.storageType,
-      bucketName: this.bucketName,
-      presignedUrlExpiry: this.presignedUrlExpiry,
-      downloadUrlExpiry: this.downloadUrlExpiry,
-      localUploadPath: this.localUploadPath,
-      baseUrl: this.baseUrl,
-      region: process.env.AWS_REGION || 'us-east-1'
-    };
+  async healthCheck() {
+    if (!this.isAvailable()) {
+      return {
+        status: 'unavailable',
+        message: 'R2 service not configured'
+      };
+    }
+
+    try {
+      // Try to list objects to test connectivity
+      const result = await this.listFiles('health-check', 1);
+      
+      return {
+        status: 'healthy',
+        message: 'R2 service is working',
+        bucketName: this.bucketName,
+        region: this.region
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        message: `R2 service error: ${error.message}`
+      };
+    }
   }
 }
 
@@ -471,18 +538,17 @@ export default storageService;
 // Also export individual functions for backward compatibility
 export const {
   generatePresignedUploadUrl,
+  generatePresignedDownloadUrl,
+  generateSecureDownloadUrl,
+  generatePresignedUrl,
   isValidImageUrl,
   deleteFile,
   fileExists,
   getFileMetadata,
-  generatePresignedDownloadUrl,
-  generateSecureDownloadUrl,
+  getFileInfo,
+  listFiles,
   cleanupOldFiles,
   extractKeyFromUrl,
-  getMulterMiddleware
+  healthCheck,
+  getConfig
 } = storageService;
-
-export {
-  PRESIGNED_URL_EXPIRY,
-  DOWNLOAD_URL_EXPIRY
-};

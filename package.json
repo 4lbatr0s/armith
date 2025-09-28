@@ -12,10 +12,20 @@
     "start:backend": "cd backend && npm start",
     "start:frontend": "cd frontend && npm start",
     "build": "cd frontend && npm run build",
-    "test": "concurrently \"cd backend && npm test\" \"cd frontend && npm test\""
+    "test": "concurrently \"cd backend && npm test\" \"cd frontend && npm test\"",
+    "db:generate": "cd backend && npx prisma generate",
+    "db:push": "cd backend && npx prisma db push",
+    "db:migrate": "cd backend && npx prisma migrate dev",
+    "db:studio": "cd backend && npx prisma studio",
+    "db:seed": "cd backend && node prisma/seed.js",
+    "db:reset": "cd backend && npx prisma migrate reset --force && npm run db:seed"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "prisma": "^5.7.1"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.1"
   },
   "keywords": [
     "kyc",

@@ -1,6 +1,17 @@
 import React from 'react';
+import { useKindeAuth } from '@kinde-oss/kinde-auth-react';
 
 export const Layout = ({ children }) => {
+  const { user, isAuthenticated, isLoading, logout } = useKindeAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col fallback-min-h-screen fallback-bg fallback-flex-col">
       {/* Header */}
@@ -16,26 +27,65 @@ export const Layout = ({ children }) => {
               </a>
             </div>
             
-            <nav className="flex space-x-8">
-              <a 
-                href="/" 
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Home
-              </a>
-              <a 
-                href="/test-kyc-flow" 
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Test KYC
-              </a>
-              <a 
-                href="/admin" 
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Admin
-              </a>
-            </nav>
+            <div className="flex items-center space-x-4">
+              <nav className="flex space-x-8">
+                <a 
+                  href="/" 
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Home
+                </a>
+                {isAuthenticated && (
+                  <a 
+                    href="/test-kyc-flow" 
+                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Test KYC
+                  </a>
+                )}
+                <a 
+                  href="/test-auth" 
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Test Auth
+                </a>
+                <a 
+                  href="/admin" 
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Admin
+                </a>
+              </nav>
+
+              {/* User Menu */}
+              {isLoading ? (
+                <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+              ) : isAuthenticated ? (
+                <div className="flex items-center space-x-3">
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.given_name || user?.family_name || user?.email}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {user?.email}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <a 
+                  href="/auth" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Sign In
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </header>

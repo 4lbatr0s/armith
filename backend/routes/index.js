@@ -2,11 +2,15 @@ import express from 'express';
 import healthRoutes from './healthRoutes.js';
 import kycRoutes from './kycRoutes.js';
 import adminRoutes from './adminRoutes.js';
+import authRoutes from './authRoutes.js';
 
 const router = express.Router();
 
 // Mount health routes
 router.use('/', healthRoutes);
+
+// Mount auth routes
+router.use('/auth', authRoutes);
 
 // Mount KYC routes
 router.use('/kyc', kycRoutes);

@@ -9,12 +9,14 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Important for Kinde session-based auth
 });
 
 // Request interceptor
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`);
+    
     return config;
   },
   (error) => {
@@ -38,6 +40,24 @@ export const apiService = {
   healthCheck: async () => {
     const response = await apiClient.get('/health');
     return response.data;
+  },
+
+  // Authentication methods
+  auth: {
+    callback: async () => {
+      const response = await apiClient.post('/auth/callback');
+      return response.data;
+    },
+    
+    getProfile: async () => {
+      const response = await apiClient.get('/auth/profile');
+      return response.data;
+    },
+    
+    checkStatus: async () => {
+      const response = await apiClient.get('/auth/status');
+      return response.data;
+    }
   },
 
   // Get supported countries

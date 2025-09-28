@@ -43,6 +43,7 @@ class CorsMiddleware {
     };
 
     app.use(cors(corsOptions));
+    
     console.log(`✅ ${this.name} configured successfully`);
   }
 }
