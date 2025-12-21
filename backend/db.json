@@ -1,8 +1,197 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": "d291b05e-a33a-4910-9d10-4899952410b9",
+      "country": "tr",
+      "idResult": {
+        "fullName": null,
+        "identityNumber": null,
+        "dateOfBirth": null,
+        "expiryDate": null,
+        "gender": null,
+        "nationality": null,
+        "serialNumber": null,
+        "mrz": null,
+        "address": null,
+        "documentCondition": "poor",
+        "countryCode": "tr",
+        "fullNameConfidence": 0,
+        "identityNumberConfidence": 0,
+        "dateOfBirthConfidence": 0,
+        "expiryDateConfidence": 0,
+        "imageQuality": 0,
+        "errors": [],
+        "status": "approved",
+        "rejectionReasons": []
+      },
+      "selfieResult": null,
+      "status": "approved",
+      "createdAt": "2025-12-21T21:36:05.945Z",
+      "frontImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/kyc-uploads/8afb5138-b7e1-415f-bc0b-bfa077253e57.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T213602Z&X-Amz-Expires=86400&X-Amz-Signature=2656d8c8c602cec0ac5f5e8b45de7aa053dcdaeffacca6107e49f7e3ddd34fbe&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+      "backImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/kyc-uploads/b9f71a0b-c687-4092-adc7-1c677f5ea3c3.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T213603Z&X-Amz-Expires=86400&X-Amz-Signature=e38a142653585a487039c581095a2cd7c0a893f9408f9d245005dfe87342ef62&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "id": "a17f993c-e88c-433c-b5cf-4c961a586836",
+      "country": "tr",
+      "idResult": {
+        "fullName": "TEST TEST",
+        "identityNumber": "12345678901",
+        "dateOfBirth": "2020-01-01",
+        "expiryDate": "2030-01-01",
+        "gender": "M",
+        "nationality": "TR",
+        "serialNumber": "A01E12345",
+        "mrz": "I<URA01T123456<12345678901<<<1234567M1234567TUR<<<<<<<<<<<0TEST<<TEST<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "address": null,
+        "documentCondition": "good",
+        "countryCode": "tr",
+        "confidence": {
+          "fullName": 1,
+          "identityNumber": 1,
+          "dateOfBirth": 1,
+          "expiryDate": 1,
+          "imageQuality": 0.9
+        },
+        "status": "rejected",
+        "errors": [
+          {
+            "code": "INVALID_IDENTITY_NUMBER",
+            "message": "Identity number format or checksum is invalid."
+          },
+          {
+            "code": "INVALID_DOB_LOGIC",
+            "message": "Date of birth logic is invalid (age constraints)."
+          }
+        ],
+        "rejectionReasons": [
+          "Identity number format or checksum is invalid.",
+          "Date of birth logic is invalid (age constraints)."
+        ]
+      },
+      "selfieResult": null,
+      "status": "rejected",
+      "createdAt": "2025-12-21T21:53:18.962Z",
+      "frontImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/kyc-uploads/c221f7e2-7577-4b40-8390-5eb49fe24f22.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T215315Z&X-Amz-Expires=86400&X-Amz-Signature=4ec6a5f907a41878a6d089d96968981ccb557619dc3c3f943e6164b87b8c24cf&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+      "backImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/kyc-uploads/ab01737d-20b6-42b8-b56c-418fe7978c26.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T215316Z&X-Amz-Expires=86400&X-Amz-Signature=2f442d83fa61023b5230dd0326b4811578f0698a426e0b7a5dbc6a59b980ef02&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "id": "3bcc9e9e-8cfe-4894-a611-3535872cdd2c",
+      "country": "tr",
+      "idResult": {
+        "fullName": "TEST TEST",
+        "identityNumber": "12345678901",
+        "dateOfBirth": "2020-01-01",
+        "expiryDate": "2030-01-01",
+        "gender": "M",
+        "nationality": "TR",
+        "serialNumber": "A01E12345",
+        "mrz": "I<URA01T123456<12345678901<<<1234567M1234567TUR<<<<<<<<<<<0TEST<<TEST<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "address": null,
+        "documentCondition": "good",
+        "countryCode": "tr",
+        "confidence": {
+          "fullName": 1,
+          "identityNumber": 1,
+          "dateOfBirth": 1,
+          "expiryDate": 1,
+          "imageQuality": 0.9
+        },
+        "status": "rejected",
+        "errors": [
+          {
+            "code": "INVALID_IDENTITY_NUMBER",
+            "message": "Identity number format or checksum is invalid."
+          },
+          {
+            "code": "INVALID_DOB_LOGIC",
+            "message": "Date of birth logic is invalid (age constraints)."
+          }
+        ],
+        "rejectionReasons": [
+          "Identity number format or checksum is invalid.",
+          "Date of birth logic is invalid (age constraints)."
+        ]
+      },
+      "selfieResult": null,
+      "status": "rejected",
+      "createdAt": "2025-12-21T21:55:36.292Z",
+      "frontImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/kyc-uploads/72a2e014-80c1-4864-ac46-eb373e7bde25.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T215531Z&X-Amz-Expires=86400&X-Amz-Signature=b8dd7c099e1341953045392f75f68c0d995c2e3579e7c96486018954406884b9&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+      "backImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/kyc-uploads/eb3b82a4-8818-49c7-8f87-c853fec2085b.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T215533Z&X-Amz-Expires=86400&X-Amz-Signature=e98347e42a5a500d2db29a69e52e4397c787fcb054eff43ced224a8a0e92fedb&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "id": "c8736fe6-6b34-4d58-b697-b2dff7de66a1",
+      "country": "tr",
+      "idResult": {
+        "fullName": "TEST TEST",
+        "identityNumber": "12345678901",
+        "dateOfBirth": "2020-01-01",
+        "expiryDate": "2030-01-01",
+        "gender": "M",
+        "nationality": "T.C./TUR",
+        "serialNumber": "A01E12345",
+        "mrz": "I<URA01T123456<12345678901<<<1234567M1234567TUR<<<<<<<<<<<0TEST<<TEST<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "address": null,
+        "documentCondition": "good",
+        "countryCode": "tr",
+        "confidence": {
+          "fullName": 1,
+          "identityNumber": 1,
+          "dateOfBirth": 1,
+          "expiryDate": 1,
+          "imageQuality": 0.9
+        },
+        "status": "rejected",
+        "errors": [
+          {
+            "code": "INVALID_IDENTITY_NUMBER",
+            "message": "Identity number format or checksum is invalid."
+          },
+          {
+            "code": "INVALID_DOB_LOGIC",
+            "message": "Date of birth logic is invalid (age constraints)."
+          }
+        ],
+        "rejectionReasons": [
+          "Identity number format or checksum is invalid.",
+          "Date of birth logic is invalid (age constraints)."
+        ]
+      },
+      "selfieResult": {
+        "isMatch": false,
+        "matchConfidence": 0,
+        "spoofingRisk": 0,
+        "faceCount": 1,
+        "lightingCondition": "poor",
+        "faceSize": "adequate",
+        "faceCoverage": "clear",
+        "faceDetectionConfidence": 1,
+        "imageQuality": 0.8,
+        "imageQualityIssues": [
+          "poor_lighting"
+        ],
+        "status": "pending",
+        "errors": [
+          "LOW_MATCH_CONFIDENCE",
+          {
+            "code": "LOW_MATCH_CONFIDENCE",
+            "message": "Face match confidence is below acceptable threshold."
+          }
+        ],
+        "rejectionReasons": [
+          null,
+          "Face match confidence is below acceptable threshold."
+        ]
+      },
+      "status": "rejected",
+      "createdAt": "2025-12-21T23:00:29.662Z",
+      "frontImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/users/user_37AhW15APZQ68hZMVxMPXNahNsX/id-front.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T230025Z&X-Amz-Expires=86400&X-Amz-Signature=ac57a3a494c724e1b5eee272d17a24fac77b5091118587dd9c8dda5b7ea5bdb4&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+      "backImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/users/user_37AhW15APZQ68hZMVxMPXNahNsX/id-back.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T230027Z&X-Amz-Expires=86400&X-Amz-Signature=9dee8215ddbfd8d072b9132a122f7aa190747a9afad65ce3ffbe98e3c51a870b&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+      "selfieImageUrl": "https://b7f727225432125a9f4fafaa33594eea.r2.cloudflarestorage.com/g0m/users/user_37AhW15APZQ68hZMVxMPXNahNsX/selfie.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=3bd8adace55603af2480879f522316a3%2F20251221%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251221T230045Z&X-Amz-Expires=86400&X-Amz-Signature=c6fcfeb9136a56d7f01a792828d9f1566e1a145b3dba5d6af39985afc8f62733&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    }
+  ],
   "metadata": {
     "version": "1.0.0",
     "createdAt": "2024-01-01T00:00:00.000Z",
-    "lastUpdated": "2024-01-01T00:00:00.000Z"
+    "lastUpdated": "2025-12-21T23:00:46.691Z"
   }
-} 
+}

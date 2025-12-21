@@ -1,5 +1,5 @@
 import express from 'express';
-import { protectRoute, getUser } from '@kinde-oss/kinde-node-express';
+import { requireAuth } from '@clerk/express';
 import { 
   getSupportedCountries,
   generateUploadUrl,
@@ -12,15 +12,15 @@ import {
 
 const router = express.Router();
 
-// Public routes (no authentication required)
+// Public routes
 router.get('/countries', getSupportedCountries);
 router.get('/llm-status', getLLMStatus);
 
-// Protected routes (authentication required)
-router.post('/upload-url', protectRoute, getUser, generateUploadUrl);
-router.post('/secure-download-url', protectRoute, getUser, generateSecureDownloadUrlEndpoint);
-router.post('/id-check', protectRoute, getUser, verifyId);
-router.post('/selfie-check', protectRoute, getUser, verifySelfie);
-router.get('/status/:userId', protectRoute, getUser, getUserStatus);
+// Protected routes
+router.post('/upload-url', requireAuth(), generateUploadUrl);
+router.post('/secure-download-url', requireAuth(), generateSecureDownloadUrlEndpoint);
+router.post('/id-check', requireAuth(), verifyId);
+router.post('/selfie-check', requireAuth(), verifySelfie);
+router.get('/status/:userId', requireAuth(), getUserStatus);
 
-export default router; 
+export default router;

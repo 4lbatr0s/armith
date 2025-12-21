@@ -1,152 +1,118 @@
-import axios from 'axios';
-
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-// Create axios instance with default config
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000,
-  headers: {
+// Helper to get Clerk token - will be set by ClerkProvider context
+let getToken = null;
+
+export const setTokenGetter = (tokenGetter) => {
+  getToken = tokenGetter;
+};
+
+const request = async (url, options = {}) => {
+  const headers = {
     'Content-Type': 'application/json',
-  },
-  withCredentials: true, // Important for Kinde session-based auth
-});
+    ...options.headers
+  };
 
-// Request interceptor
-apiClient.interceptors.request.use(
-  async (config) => {
-    console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`);
-    
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+  // Add Clerk token if available
+  if (getToken) {
+    try {
+      const token = await getToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.warn('Failed to get Clerk token:', error);
+    }
   }
-);
 
-// Response interceptor
-apiClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    console.error('API Error:', error.response?.data || error.message);
-    return Promise.reject(error);
+  const config = {
+    credentials: 'include',
+    headers,
+    ...options
+  };
+
+  const response = await fetch(`${API_BASE_URL}${url}`, config);
+  
+  // Handle non-JSON responses
+  let data;
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text || 'Request failed' };
+    }
   }
-);
+
+  if (!response.ok) {
+    console.error('API Error:', data);
+    throw new Error(data.error || data.message || 'Request failed');
+  }
+
+  return data;
+};
 
 export const apiService = {
-  // Health check
-  healthCheck: async () => {
-    const response = await apiClient.get('/health');
-    return response.data;
-  },
+  healthCheck: () => request('/health'),
 
-  // Authentication methods
-  auth: {
-    callback: async () => {
-      const response = await apiClient.post('/auth/callback');
-      return response.data;
-    },
-    
-    getProfile: async () => {
-      const response = await apiClient.get('/auth/profile');
-      return response.data;
-    },
-    
-    checkStatus: async () => {
-      const response = await apiClient.get('/auth/status');
-      return response.data;
-    }
-  },
+  getSupportedCountries: () => request('/kyc/countries'),
 
-  // Get supported countries
-  getSupportedCountries: async () => {
-    const response = await apiClient.get('/kyc/countries');
-    return response.data;
-  },
+  generateUploadUrl: (fileType, userId = null, documentType = null) => request('/kyc/upload-url', {
+    method: 'POST',
+    body: JSON.stringify({ fileType, userId, documentType })
+  }),
 
-  // Generate presigned upload URL
-  generateUploadUrl: async (fileType) => {
-    const response = await apiClient.post('/kyc/upload-url', { fileType });
-    
-    return response.data;
-  },
-
-  // Local file upload method (FormData)
-  uploadFileLocal: async (file, uploadUrl) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await axios.post(uploadUrl, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  uploadFile: async (file, uploadUrl) => {
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'Content-Type': file.type }
     });
-    
-    return response.data;
+
+    if (!response.ok) throw new Error('Upload failed');
+    return true;
   },
 
-  // ID verification
-  verifyId: async (request) => {
-    const response = await apiClient.post('/kyc/id-check', request);
-    return response.data;
+  verifyId: (data) => request('/kyc/id-check', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+
+  verifySelfie: (data) => request('/kyc/selfie-check', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+
+  getUserStatus: (userId) => request(`/kyc/status/${userId}`),
+
+  getVerifications: (page = 1, limit = 10, status) => {
+    const params = new URLSearchParams({ page, limit });
+    if (status) params.append('status', status);
+    return request(`/admin/verifications?${params}`);
   },
 
-  // Selfie verification
-  verifySelfie: async (request) => {
-    const response = await apiClient.post('/kyc/selfie-check', request);
-    return response.data;
-  },
+  getStats: () => request('/admin/stats'),
 
-  // Get user verification status
-  getUserStatus: async (userId) => {
-    const response = await apiClient.get(`/kyc/status/${userId}`);
-    return response.data;
-  },
-
-  // Admin: Get all verifications
-  getVerifications: async (page = 1, limit = 10, status) => {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-    
-    if (status) {
-      params.append('status', status);
-    }
-
-    const response = await apiClient.get(`/admin/verifications?${params}`);
-    return response.data;
-  },
+  // Settings
+  getSettings: () => request('/admin/settings'),
+  
+  updateSettings: (settings) => request('/admin/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings)
+  }),
+  
+  resetSettings: () => request('/admin/settings/reset', {
+    method: 'POST'
+  })
 };
 
-// Helper function to handle file upload process
 export const uploadFileHelper = async (file) => {
-  try {
-    // Get presigned URL
-    const uploadData = await apiService.generateUploadUrl(file.type);
-    
-    // Upload file to S3
-    await apiService.uploadFile(file, uploadData.uploadUrl);
-    
-    // Return the download URL
-    return uploadData.downloadUrl;
-  } catch (error) {
-    console.error('File upload failed:', error);
-    throw new Error('Failed to upload file');
-  }
+  const uploadData = await apiService.generateUploadUrl(file.type);
+  await apiService.uploadFile(file, uploadData.uploadUrl);
+  return uploadData.downloadUrl;
 };
 
-// Helper function to handle multiple file uploads
-export const uploadMultipleFiles = async (files) => {
-  try {
-    const uploadPromises = files.map(file => uploadFileHelper(file));
-    return await Promise.all(uploadPromises);
-  } catch (error) {
-    console.error('Multiple file upload failed:', error);
-    throw new Error('Failed to upload files');
-  }
-};
-
-export default apiService; 
+export default apiService;

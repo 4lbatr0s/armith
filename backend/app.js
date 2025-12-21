@@ -1,58 +1,108 @@
 import express from 'express';
-import session from 'express-session';
-
-// Load environment variables
+import helmet from 'helmet';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import { clerkMiddleware } from '@clerk/express';
 import dotenv from 'dotenv';
-dotenv.config();
-
-// Import Kinde authentication
-import { setupKinde, protectRoute, getUser, GrantType } from '@kinde-oss/kinde-node-express';
-
-// Import middleware pipeline and routes
-import MiddlewarePipeline from './middleware/middlewarePipeline.js';
 import routes from './routes/index.js';
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Configure session middleware (required for Kinde)
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false } // Set to true in production with HTTPS
+// Security headers
+app.use(helmet());
+
+// Rate limiting
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { success: false, error: 'Too many requests, please try again later' }
 }));
 
-// Configure Kinde authentication
-const kindeConfig = {
-  clientId: process.env.KINDE_SERVER_CLIENT_ID,        
-  issuerBaseUrl: process.env.KINDE_SERVER_ISSUER_URL,
-  siteUrl: process.env.KINDE_SITE_URL,
-  secret: process.env.KINDE_SECRET,
-  redirectUrl: process.env.KINDE_REDIRECT_URL || "http://localhost:3000/callback",
-  scope: process.env.KINDE_SCOPE,
-  grantType: GrantType.AUTHORIZATION_CODE  ,
-  unAuthorisedUrl: process.env.KINDE_UNAUTHORISED_URL,
-  postLogoutRedirectUrl: process.env.KINDE_POST_LOGOUT_REDIRECT_URL
-};
+// CORS configuration - must be before Clerk middleware
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000'
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // In development, allow all origins
+      if (process.env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 
-setupKinde(kindeConfig, app);
+// Handle preflight requests explicitly
+app.options('*', cors());
 
-// Configure middleware pipeline (similar to C#'s Configure method)
-const middlewarePipeline = MiddlewarePipeline.createDefault(); //butun middllewareler listeye eklenmis oluyo.
+// Cookie parser
+app.use(cookieParser());
 
-middlewarePipeline.configure(app, routes);
+// Body parser
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// Note: Error handling and 404 handling are now managed by the middleware pipeline
+// Clerk middleware - skip for OPTIONS requests (CORS preflight)
+const clerkAuth = clerkMiddleware();
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+  return clerkAuth(req, res, next);
+});
+
+// Routes
+app.use('/', routes);
+
+// Error handling
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Not found'
+  });
+});
 
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 KYC Flow API running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/health`);
-  console.log(`🤖 AI Provider: Groq (Llama 4 Scout 17Bx16E)`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔧 Middleware Pipeline:`);
-  middlewarePipeline.getConfiguration().forEach(({ name, order }) => {
-    console.log(`   ${order}. ${name}`);
-  });
-}); 
+});

@@ -10,23 +10,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Profile model - represents a person in the KYC flow
+// User model - represents API users who authenticate with Clerk
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Clerk Authentication
+  clerkId         String   @unique // Clerk user ID
+  email           String?
+  emailVerified   Boolean  @default(false)
+  lastLoginAt     DateTime?
+  
+  // OAuth Provider Data (JSON for flexibility)
+  providerData    Json? // Store provider-specific data (firstName, lastName, imageUrl, etc.)
+
+  // Relationships - profiles created by this API user
+  profiles Profile[]
+
+  @@map("users")
+}
+
+// Profile model - represents a person in the KYC flow (end customers)
 model Profile {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Authentication (Provider Agnostic)
-  userId          String   @unique
-  email           String?
-  phoneNumber     String?
-  emailVerified   Boolean  @default(false)
-  phoneVerified   Boolean  @default(false)
-  provider        String? // oauth provider (kinde, firebase, auth0, etc.)
-  lastLoginAt     DateTime?
-  
-  // OAuth Provider Data (JSON for flexibility)
-  providerData    Json? // Store provider-specific data (names, picture, etc.)
+  // Owner of this profile (API user)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // Basic profile information
   fullName       String?
@@ -35,6 +48,10 @@ model Profile {
   gender         String?
   nationality    String?
   country        String?
+
+  // Contact information (optional)
+  email       String?
+  phoneNumber String?
 
   // Profile status
   status ProfileStatus @default(PENDING)

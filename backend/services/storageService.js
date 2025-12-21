@@ -31,7 +31,7 @@ class StorageService {
       ];
 
       const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-      
+
       if (missingVars.length > 0) {
         console.warn(`⚠️  Missing R2 environment variables: ${missingVars.join(', ')}`);
         console.warn('R2 storage service will not be available');
@@ -86,20 +86,30 @@ class StorageService {
 
   /**
    * Generate presigned upload URL
+   * @param {string} fileType - MIME type of the file
+   * @param {string} userId - User ID for organizing files
+   * @param {string} documentType - Type of document: 'id-front', 'id-back', 'selfie'
    */
-  async generatePresignedUploadUrl(fileType = 'image/jpeg', fileName = null) {
+  async generatePresignedUploadUrl(fileType = 'image/jpeg', userId = null, documentType = null) {
     if (!this.isAvailable()) {
       throw new Error('R2 storage service is not available');
     }
 
     try {
-      // Generate unique filename if not provided
-      if (!fileName) {
-        const fileExtension = fileType.split('/')[1];
+      // Generate filename based on user and document type
+      const fileExtension = fileType.split('/')[1] || 'jpg';
+      let fileName;
+      
+      if (userId && documentType) {
+        // User-specific path: users/{userId}/{documentType}.{ext}
+        fileName = `users/${userId}/${documentType}.${fileExtension}`;
+      } else {
+        // Fallback to random UUID
         fileName = `kyc-uploads/${uuidv4()}.${fileExtension}`;
       }
-      const contentType = this.getContentType(fileType);
       
+      const contentType = this.getContentType(fileType);
+
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: fileName,
@@ -111,7 +121,7 @@ class StorageService {
       });
 
       // Generate presigned URL for upload
-      const presignedUrl = await getSignedUrl(this.client, command, { 
+      const presignedUrl = await getSignedUrl(this.client, command, {
         expiresIn: this.presignedUrlExpiry
       });
 
@@ -120,8 +130,8 @@ class StorageService {
         Bucket: this.bucketName,
         Key: fileName
       });
-      
-      const presignedDownloadUrl = await getSignedUrl(this.client, downloadCommand, { 
+
+      const presignedDownloadUrl = await getSignedUrl(this.client, downloadCommand, {
         expiresIn: this.downloadUrlExpiry
       });
 
@@ -153,7 +163,7 @@ class StorageService {
         Key: fileName
       });
 
-      const presignedUrl = await getSignedUrl(this.client, command, { 
+      const presignedUrl = await getSignedUrl(this.client, command, {
         expiresIn: expiresIn
       });
 
@@ -178,7 +188,7 @@ class StorageService {
     try {
       // Generate a short-lived URL for AI processing (5 minutes)
       const result = await this.generatePresignedDownloadUrl(fileName, 300);
-      
+
       return {
         downloadUrl: result.downloadUrl,
         expiresIn: result.expiresIn
@@ -206,7 +216,7 @@ class StorageService {
         Key: fileName
       });
 
-      const presignedUrl = await getSignedUrl(this.client, command, { 
+      const presignedUrl = await getSignedUrl(this.client, command, {
         expiresIn: expiresIn
       });
 
@@ -228,7 +238,7 @@ class StorageService {
     if (!this.publicUrl) {
       throw new Error('R2 public URL not configured. Use presigned URLs for secure access.');
     }
-    
+
     // Remove trailing slash from public URL if present
     const baseUrl = this.publicUrl.replace(/\/$/, '');
     return `${baseUrl}/${fileName}`;
@@ -245,13 +255,13 @@ class StorageService {
     // Check if it's a valid URL
     try {
       const urlObj = new URL(url);
-      
+
       // Check if it's from our R2 domain
       if (this.publicUrl) {
         const publicUrlObj = new URL(this.publicUrl);
         return urlObj.hostname === publicUrlObj.hostname;
       }
-      
+
       // Fallback: check if it's a valid HTTP/HTTPS URL
       return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
     } catch (error) {
@@ -311,10 +321,10 @@ class StorageService {
       });
 
       const response = await this.client.send(command);
-      
+
       // Generate presigned download URL
       const downloadData = await this.generatePresignedUrl(fileName, downloadUrlExpiresIn);
-      
+
       return {
         fileName: fileName,
         contentType: response.ContentType,
@@ -340,7 +350,7 @@ class StorageService {
 
     try {
       const { ListObjectsV2Command } = await import('@aws-sdk/client-s3');
-      
+
       const command = new ListObjectsV2Command({
         Bucket: this.bucketName,
         Prefix: prefix,
@@ -348,7 +358,7 @@ class StorageService {
       });
 
       const response = await this.client.send(command);
-      
+
       // Generate presigned URLs for each file
       const filesWithUrls = await Promise.all(
         (response.Contents || []).map(async (file) => {
@@ -369,7 +379,7 @@ class StorageService {
           }
         })
       );
-      
+
       return {
         files: filesWithUrls,
         isTruncated: response.IsTruncated || false,
@@ -452,7 +462,7 @@ class StorageService {
       });
 
       const listedObjects = await this.client.send(listCommand);
-      
+
       if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
         return { deleted: 0, message: 'No files to clean up' };
       }
@@ -473,7 +483,7 @@ class StorageService {
       });
 
       const deleteResult = await this.client.send(deleteCommand);
-      
+
       return {
         deleted: deleteResult.Deleted.length,
         errors: deleteResult.Errors.length,
@@ -512,7 +522,7 @@ class StorageService {
     try {
       // Try to list objects to test connectivity
       const result = await this.listFiles('health-check', 1);
-      
+
       return {
         status: 'healthy',
         message: 'R2 service is working',

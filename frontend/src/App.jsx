@@ -1,59 +1,110 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { KindeProvider } from '@kinde-oss/kinde-auth-react';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
-import { CallbackPage } from './pages/CallbackPage';
+import { PricingPage } from './pages/PricingPage';
 import { UploadIdPage } from './pages/UploadIdPage';
 import { UploadSelfiePage } from './pages/UploadSelfiePage';
 import { ResultPage } from './pages/ResultPage';
 import { AdminPage } from './pages/AdminPage';
 import { Layout } from './components/Layout';
+import { ApiTokenProvider } from './components/ApiTokenProvider';
 import './index.css';
+import { ThemeProvider } from './components/ThemeContext';
 
-function App() {
-  return (
-      <KindeProvider
-        clientId={process.env.REACT_APP_KINDE_CLIENT_ID || "e747f7340ece46d7be9a54ef6f9f22c3"}
-        domain={process.env.REACT_APP_KINDE_DOMAIN || "https://armith.kinde.com"}
-        redirectUri={process.env.REACT_APP_KINDE_REDIRECT_URI || "http://localhost:3000/callback"}
-        logoutUri={process.env.REACT_APP_KINDE_LOGOUT_URI || "http://localhost:3000"}
-      >
-      <Router>
-        <Layout>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/callback" element={<CallbackPage />} />
-            
-            <Route path="/upload-id" element={
-              <ProtectedRoute>
-                <UploadIdPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/upload-selfie" element={
-              <ProtectedRoute>
-                <UploadSelfiePage />
-              </ProtectedRoute>
-            } />
-            <Route path="/result/:userId?" element={
-              <ProtectedRoute>
-                <ResultPage />
-              </ProtectedRoute>
-            } />
-            
-            {/* Admin Panel */}
-            <Route path="/admin" element={<AdminPage />} />
-            
-            {/* Redirect unknown routes to home */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </KindeProvider>
-  );
+const CLERK_PUBLISHABLE_KEY = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
+
+if (!CLERK_PUBLISHABLE_KEY) {
+  console.error('Missing REACT_APP_CLERK_PUBLISHABLE_KEY');
 }
 
-export default App; 
+// Protected route wrapper
+const ProtectedRoute = ({ children }) => {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  );
+};
+
+// Public route that redirects authenticated users
+const PublicRoute = ({ children }) => {
+  return (
+    <>
+      <SignedIn>
+        <Navigate to="/admin" replace />
+      </SignedIn>
+      <SignedOut>{children}</SignedOut>
+    </>
+  );
+};
+
+// Pricing page - only for unauthenticated users
+const PublicPricingRoute = ({ children }) => {
+  return (
+    <>
+      <SignedIn>
+        <Navigate to="/admin" replace />
+      </SignedIn>
+      <SignedOut>{children}</SignedOut>
+    </>
+  );
+};
+
+export const App = () => {
+  return (
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <ApiTokenProvider>
+        <ThemeProvider>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Layout>
+              <Routes>
+              <Route path="/" element={
+                <PublicRoute>
+                  <HomePage />
+                </PublicRoute>
+              } />
+              <Route path="/auth/*" element={<AuthPage />} />
+              <Route path="/pricing" element={
+                <PublicPricingRoute>
+                  <PricingPage />
+                </PublicPricingRoute>
+              } />
+
+              <Route path="/upload-id" element={
+                <ProtectedRoute>
+                  <UploadIdPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/upload-selfie" element={
+                <ProtectedRoute>
+                  <UploadSelfiePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/result/:userId?" element={
+                <ProtectedRoute>
+                  <ResultPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/admin" element={
+                <ProtectedRoute>
+                  <AdminPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Layout>
+          </Router>
+        </ThemeProvider>
+      </ApiTokenProvider>
+    </ClerkProvider>
+  );
+};
+
+export default App;
