@@ -2,7 +2,7 @@ import React from 'react';
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 
 export const ProtectedRoute = ({ children }) => {
-  return (
+    return (
     <>
       <SignedIn>{children}</SignedIn>
       <SignedOut>

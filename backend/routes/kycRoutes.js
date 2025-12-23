@@ -21,6 +21,6 @@ router.post('/upload-url', requireAuth(), generateUploadUrl);
 router.post('/secure-download-url', requireAuth(), generateSecureDownloadUrlEndpoint);
 router.post('/id-check', requireAuth(), verifyId);
 router.post('/selfie-check', requireAuth(), verifySelfie);
-router.get('/status/:userId', requireAuth(), getUserStatus);
+router.get('/status/:profileId', requireAuth(), getUserStatus);
 
-export default router;
+export default router; 

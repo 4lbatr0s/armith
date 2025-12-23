@@ -32,7 +32,7 @@ const request = async (url, options = {}) => {
   };
 
   const response = await fetch(`${API_BASE_URL}${url}`, config);
-  
+
   // Handle non-JSON responses
   let data;
   const contentType = response.headers.get('content-type');
@@ -86,7 +86,7 @@ export const apiService = {
     body: JSON.stringify(data)
   }),
 
-  getUserStatus: (userId) => request(`/kyc/status/${userId}`),
+  getUserStatus: (profileId) => request(`/kyc/status/${profileId}`),
 
   getVerifications: (page = 1, limit = 10, status) => {
     const params = new URLSearchParams({ page, limit });
@@ -110,9 +110,9 @@ export const apiService = {
 };
 
 export const uploadFileHelper = async (file) => {
-  const uploadData = await apiService.generateUploadUrl(file.type);
-  await apiService.uploadFile(file, uploadData.uploadUrl);
-  return uploadData.downloadUrl;
+    const uploadData = await apiService.generateUploadUrl(file.type);
+    await apiService.uploadFile(file, uploadData.uploadUrl);
+    return uploadData.downloadUrl;
 };
 
-export default apiService;
+export default apiService; 

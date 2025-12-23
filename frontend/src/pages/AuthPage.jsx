@@ -35,30 +35,30 @@ export const AuthPage = () => {
             Access your KYC verification dashboard
           </p>
         </div>
-
+        
         {/* Mode Toggle */}
         <div className="flex justify-center space-x-4 mb-6">
-          <button
+            <button
             onClick={() => setMode('sign-in')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               mode === 'sign-in'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300'
             }`}
-          >
+            >
             Sign In
-          </button>
-          <button
+            </button>
+            <button
             onClick={() => setMode('sign-up')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               mode === 'sign-up'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300'
             }`}
-          >
+            >
             Sign Up
-          </button>
-        </div>
+            </button>
+          </div>
 
         {/* Clerk Components */}
         <div className="flex justify-center">
@@ -79,10 +79,10 @@ export const AuthPage = () => {
           )}
         </div>
 
-        <div className="text-center">
+          <div className="text-center">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            By signing in, you agree to our Terms of Service and Privacy Policy
-          </p>
+              By signing in, you agree to our Terms of Service and Privacy Policy
+            </p>
         </div>
       </div>
     </div>

@@ -1,38 +1,52 @@
-import { v4 as uuidv4 } from 'uuid';
+/**
+ * KYC Controller
+ * Handles ID card and selfie verification endpoints
+ */
+
 import { ERRORS, STATUS } from '../kyc/config.js';
 import { verifyId as kycVerifyId, verifySelfie as kycVerifySelfie } from '../kyc/verify.js';
-import {
-  IdCheckRequestSchema,
-  SelfieCheckRequestSchema,
-  validateRequest
-} from '../schemas.js';
+import { IdCheckRequestSchema, SelfieCheckRequestSchema, validateRequest } from '../schemas.js';
 import storageService from '../services/storageService.js';
-import { readDatabase, writeDatabase, readSettings } from '../utils/database.js';
+import { Profile, IdCardValidation, SelfieValidation, KycConfiguration } from '../models/index.js';
+import { createDefaultConfig } from '../kyc/defaults.js';
+import logger from '../lib/logger.js';
 
-// Helper function to get current thresholds from settings
-const getThresholds = async () => {
-  const settings = await readSettings();
-  return settings.thresholds;
-};
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
-// Helper function to get verification rules from settings
-const getVerificationRules = async () => {
-  const settings = await readSettings();
-  return settings.verificationRules;
-};
+async function getUserConfig(userId) {
+  if (!userId) return null;
 
-// Get supported countries
+  try {
+    let config = await KycConfiguration.findOne({ userId, environment: 'production' });
+    if (!config) {
+      config = await KycConfiguration.create(createDefaultConfig(userId));
+    }
+    return config;
+  } catch (error) {
+    logger.error({ error: error.message, userId }, 'Failed to get user config');
+    return null;
+  }
+}
+
+function getVerificationRulesFromConfig(config) {
+  return config ? config.verificationSteps : { requireIdCard: true, requireSelfie: true };
+}
+
+// ============================================================================
+// ENDPOINTS
+// ============================================================================ //
+
 export const getSupportedCountries = async (req, res) => {
-  // Only Turkish ID is supported
   res.json({
-    supportedCountries: {
-      tr: { name: 'Turkish Republic ID Card' }
-    },
-    message: 'List of supported country codes for ID verification'
+    countries: [{ code: 'TR', name: 'Turkey', supportedDocuments: ['NATIONAL_ID'] }]
   });
 };
 
-// Get LLM service status
+/**
+ * Get LLM service status
+ */
 export const getLLMStatus = async (req, res) => {
   try {
     res.json({
@@ -45,7 +59,7 @@ export const getLLMStatus = async (req, res) => {
       message: 'KYC Service status retrieved successfully'
     });
   } catch (error) {
-    console.error('Status check error:', error);
+    logger.error({ error }, 'LLM status check error');
     res.status(500).json({
       status: STATUS.FAILED,
       errors: [ERRORS.INTERNAL_ERROR]
@@ -53,7 +67,9 @@ export const getLLMStatus = async (req, res) => {
   }
 };
 
-// Generate secure download URL for AI processing
+/**
+ * Generate secure download URL for AI processing
+ */
 export const generateSecureDownloadUrlEndpoint = async (req, res) => {
   try {
     const { fileName } = req.body;
@@ -76,7 +92,7 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
       expiresIn: downloadData.expiresIn
     });
   } catch (error) {
-    console.error('Secure download URL generation error:', error);
+    logger.error({ error, fileName: req.body.fileName }, 'Secure download URL generation error');
     res.status(500).json({
       status: STATUS.FAILED,
       errors: [ERRORS.INTERNAL_ERROR]
@@ -84,7 +100,9 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
   }
 };
 
-// Generate presigned upload URL
+/**
+ * Generate presigned upload URL
+ */
 export const generateUploadUrl = async (req, res) => {
   try {
     const { fileType, userId, documentType } = req.body;
@@ -108,7 +126,7 @@ export const generateUploadUrl = async (req, res) => {
       ...uploadData
     });
   } catch (error) {
-    console.error('Upload URL generation error:', error);
+    logger.error({ error }, 'Upload URL generation error');
     res.status(500).json({
       status: STATUS.FAILED,
       errors: [ERRORS.INTERNAL_ERROR]
@@ -116,365 +134,407 @@ export const generateUploadUrl = async (req, res) => {
   }
 };
 
-// ID verification endpoint
+/**
+ * ID verification endpoint
+ */
 export const verifyId = async (req, res) => {
   try {
-    // Validate request
     const validation = validateRequest(IdCheckRequestSchema, req.body);
-
     if (!validation.success) {
+      logger.warn({ details: validation.details }, 'Invalid ID verification request');
       return res.status(400).json({
         status: STATUS.FAILED,
-        errors: validation.details.map(detail => ({
-          code: 'INVALID_REQUEST',
-          message: `${detail.field}: ${detail.message}`
-        }))
+        errors: validation.details.map(d => ({ code: 'INVALID_REQUEST', message: `${d.field}: ${d.message}` }))
       });
     }
 
     const { countryCode, frontImageUrl, backImageUrl } = validation.data;
 
-    // Only TR is supported
     if (countryCode.toLowerCase() !== 'tr') {
-      return res.status(400).json({
-        status: STATUS.FAILED,
-        errors: [{
-          code: 'UNSUPPORTED_COUNTRY',
-          message: 'Only Turkish ID (TR) is currently supported'
-        }]
-      });
+      return res.status(400).json({ status: STATUS.FAILED, errors: [{ code: 'UNSUPPORTED_COUNTRY', message: 'Only Turkish ID (TR) is supported' }] });
     }
 
-    // Validate image URLs
     if (!storageService.isValidImageUrl(frontImageUrl) || (backImageUrl && !storageService.isValidImageUrl(backImageUrl))) {
-      return res.status(400).json({
-        status: STATUS.FAILED,
-        errors: [ERRORS.INVALID_IMAGE_URL]
-      });
+      return res.status(400).json({ status: STATUS.FAILED, errors: [ERRORS.INVALID_IMAGE_URL] });
     }
+
+    const authUserId = req.auth?.userId;
+    const userConfig = await getUserConfig(authUserId);
+    const verificationRules = getVerificationRulesFromConfig(userConfig);
+
+    logger.info({ authUserId, countryCode }, 'Starting ID verification');
 
     // Call KYC verification
-    const result = await kycVerifyId(frontImageUrl, backImageUrl);
+    const result = await kycVerifyId(frontImageUrl, backImageUrl, userConfig);
 
     if (!result.success) {
-      return res.status(500).json({
-        status: result.status,
-        errors: [result.error]
+      logger.error({ result }, 'ID verification failed internally');
+      return res.status(500).json({ status: result.status, errors: [result.error] });
+    }
+
+    const rejectionReasons = result.errors.map(e => e.message);
+
+    // Determine overall status
+    let overallStatus = result.status;
+    if (result.status === STATUS.APPROVED && verificationRules.requireSelfie) {
+      overallStatus = STATUS.PENDING;
+    }
+
+    // Find or create Profile
+    // Try to find existing profile by userId first, or by country+identityNumber if identityNumber exists
+    let profile = await Profile.findOne({ userId: authUserId });
+    
+    if (!profile && result.data?.identityNumber) {
+      // Try to find by country + identityNumber
+      profile = await Profile.findOne({
+        country: countryCode.toUpperCase(),
+        identityNumber: result.data.identityNumber
       });
     }
 
-    // Generate rejection reasons from errors
-    const rejectionReasons = result.errors.map(error => error.message);
-
-    // Get verification rules from settings
-    const verificationRules = await getVerificationRules();
-    
-    // Save to database
-    const userId = uuidv4();
-    const database = await readDatabase();
-    
-    // Determine overall status based on settings:
-    let overallStatus;
-    let message;
-    
-    if (result.status === STATUS.FAILED) {
-      overallStatus = STATUS.FAILED;
-    } else if (result.status === STATUS.REJECTED) {
-      overallStatus = STATUS.REJECTED;
-    } else {
-      // ID approved - check if selfie is required
-      if (verificationRules.requireSelfie) {
-        // Selfie required -> status is pending
-        overallStatus = STATUS.PENDING;
-        message = 'ID verification successful. Please complete selfie verification.';
-      } else {
-        // Selfie not required -> user is fully verified
-        overallStatus = STATUS.APPROVED;
-        message = 'Verification complete! ID verification successful.';
+    if (profile) {
+      // Update existing profile
+      profile.country = countryCode.toUpperCase();
+      profile.status = overallStatus.toUpperCase();
+      profile.idVerificationStatus = result.status.toUpperCase();
+      
+      // Only update ID card information if ID verification is APPROVED
+      if (result.status === STATUS.APPROVED) {
+        profile.fullName = result.data?.fullName || profile.fullName;
+        profile.identityNumber = result.data?.identityNumber || profile.identityNumber;
+        profile.dateOfBirth = result.data?.dateOfBirth ? new Date(result.data.dateOfBirth) : profile.dateOfBirth;
+        profile.gender = result.data?.gender || profile.gender;
+        profile.nationality = result.data?.nationality || profile.nationality;
+        
+        // Additional ID card information
+        profile.serialNumber = result.data?.serialNumber || profile.serialNumber;
+        profile.expiryDate = result.data?.expiryDate ? new Date(result.data.expiryDate) : profile.expiryDate;
+        profile.address = result.data?.address || profile.address;
+        profile.documentCondition = result.data?.documentCondition?.toUpperCase() || profile.documentCondition;
+        profile.overallConfidence = result.confidence?.overallConfidence || result.confidence?.imageQuality || profile.overallConfidence;
+        
+        // Image URLs
+        profile.idFrontImageUrl = frontImageUrl;
+        if (backImageUrl) profile.idBackImageUrl = backImageUrl;
       }
+      
+      // Verification metadata (always update)
+      profile.verificationAttempts = (profile.verificationAttempts || 0) + 1;
+      profile.lastVerificationAttempt = new Date();
+      if (rejectionReasons.length > 0) {
+        profile.rejectionReasons = [...(profile.rejectionReasons || []), ...rejectionReasons];
+      }
+      
+      await profile.save();
+    } else {
+      // Create new profile
+      profile = await Profile.create({
+        userId: authUserId,
+        fullName: result.data?.fullName,
+        identityNumber: result.data?.identityNumber,
+        dateOfBirth: result.data?.dateOfBirth ? new Date(result.data.dateOfBirth) : null,
+        gender: result.data?.gender,
+        nationality: result.data?.nationality,
+        country: countryCode.toUpperCase(),
+        status: overallStatus.toUpperCase(),
+        idVerificationStatus: result.status.toUpperCase(),
+        
+        // Additional ID card information
+        serialNumber: result.data?.serialNumber,
+        expiryDate: result.data?.expiryDate ? new Date(result.data.expiryDate) : null,
+        address: result.data?.address,
+        documentCondition: result.data?.documentCondition?.toUpperCase(),
+        overallConfidence: result.confidence?.overallConfidence || result.confidence?.imageQuality,
+        
+        // Image URLs
+        idFrontImageUrl: frontImageUrl,
+        idBackImageUrl: backImageUrl || null,
+        
+        // Verification metadata
+        verificationAttempts: 1,
+        lastVerificationAttempt: new Date(),
+        rejectionReasons: rejectionReasons,
+      });
     }
-    
-    const userRecord = {
-      id: userId,
-      country: countryCode,
-      idResult: {
-        ...result.data,
-        confidence: result.confidence,
-        status: result.status,
-        errors: result.errors,
-        rejectionReasons
-      },
-      selfieResult: null,
-      status: overallStatus,
-      createdAt: new Date().toISOString(),
+
+    // Create IdCardValidation
+    await IdCardValidation.create({
+      profileId: profile._id,
+      countryCode: countryCode.toUpperCase(),
       frontImageUrl,
-      backImageUrl
-    };
+      backImageUrl,
+      fullName: result.data?.fullName,
+      identityNumber: result.data?.identityNumber,
+      dateOfBirth: result.data?.dateOfBirth ? new Date(result.data.dateOfBirth) : null,
+      expiryDate: result.data?.expiryDate ? new Date(result.data.expiryDate) : null,
+      gender: result.data?.gender,
+      nationality: result.data?.nationality,
+      serialNumber: result.data?.serialNumber,
+      mrz: result.data?.mrz,
+      mrzInfo: result.data?.mrzInfo,
+      address: result.data?.address,
+      documentCondition: result.data?.documentCondition?.toUpperCase(),
+      fullNameConfidence: result.confidence?.fullName,
+      identityNumberConfidence: result.confidence?.identityNumber,
+      dateOfBirthConfidence: result.confidence?.dateOfBirth,
+      expiryDateConfidence: result.confidence?.expiryDate,
+      imageQuality: result.confidence?.imageQuality,
+      status: result.status.toUpperCase(),
+      errors: result.errors,
+      rejectionReasons,
+    });
 
-    database.users.push(userRecord);
-    await writeDatabase(database);
+    logger.info({ profileId: profile._id, status: overallStatus }, 'ID verification completed');
 
-    // Response
     res.json({
-      status: overallStatus,           // Overall status
-      idStatus: result.status,         // ID-specific status
+      status: overallStatus,
+      idStatus: result.status,
       data: result.data,
       confidence: result.confidence,
       errors: result.errors,
       rejectionReasons,
-      userId,
-      images: {
-        front: frontImageUrl,
-        back: backImageUrl || null
-      },
-      message,
-      verificationRules                // Send rules so frontend knows what's required
+      profileId: profile._id,
+      images: { front: frontImageUrl, back: backImageUrl || null },
+      message: overallStatus === STATUS.PENDING ? 'ID verification successful. Please complete selfie verification.' : 'Verification complete!',
+      verificationRules,
     });
 
   } catch (error) {
-    console.error('ID check error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    logger.error({ error }, 'Unexpected error in verifyId');
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
 
-// Selfie verification endpoint
+/**
+ * Selfie verification endpoint
+ */
 export const verifySelfie = async (req, res) => {
   try {
-    // Validate request
     const validation = validateRequest(SelfieCheckRequestSchema, req.body);
     if (!validation.success) {
+      logger.warn({ details: validation.details }, 'Invalid selfie verification request');
       return res.status(400).json({
         status: STATUS.FAILED,
-        errors: validation.details.map(detail => ({
-          code: 'INVALID_REQUEST',
-          message: `${detail.field}: ${detail.message}`
-        }))
+        errors: validation.details.map(d => ({ code: 'INVALID_REQUEST', message: `${d.field}: ${d.message}` }))
       });
     }
 
-    const { idPhotoUrl, selfieUrls, verificationId } = validation.data;
+    const { idPhotoUrl, selfieUrls, profileId: profileIdFromBody, verificationId } = validation.data;
+    // Support both profileId and verificationId (legacy)
+    const profileId = profileIdFromBody || verificationId;
 
-    // Validate image URLs
     const allUrls = [idPhotoUrl, ...selfieUrls];
     if (!allUrls.every(url => storageService.isValidImageUrl(url))) {
-      return res.status(400).json({
-        status: STATUS.FAILED,
-        errors: [ERRORS.INVALID_IMAGE_URL]
-      });
+      return res.status(400).json({ status: STATUS.FAILED, errors: [ERRORS.INVALID_IMAGE_URL] });
     }
 
-    // Call KYC verification
-    const result = await kycVerifySelfie(idPhotoUrl, selfieUrls);
+    const authUserId = req.auth?.userId;
+    const userConfig = await getUserConfig(authUserId);
+    const verificationRules = getVerificationRulesFromConfig(userConfig);
+
+    logger.info({ authUserId, profileId }, 'Starting selfie verification');
+
+    const result = await kycVerifySelfie(idPhotoUrl, selfieUrls, userConfig);
 
     if (!result.success) {
-      return res.status(500).json({
-        status: result.status,
-        errors: [result.error]
-      });
+      logger.error({ result }, 'Selfie verification failed internally');
+      return res.status(500).json({ status: result.status, errors: [result.error] });
     }
 
-    // Generate rejection reasons from errors
-    const rejectionReasons = result.errors.map(error => error.message);
-
-    // Get verification rules from settings
-    const verificationRules = await getVerificationRules();
-
-    // Update database if verificationId provided
+    const rejectionReasons = result.errors.map(e => e.message);
     let overallStatus = result.status;
-    
-    if (verificationId) {
-      const database = await readDatabase();
-      const userIndex = database.users.findIndex(u => u.id === verificationId);
-      
-      if (userIndex !== -1) {
-        // Update user record with selfie result
-        database.users[userIndex].selfieResult = {
-          ...result.data,
-          status: result.status,
-          errors: result.errors,
-          rejectionReasons
-        };
-        database.users[userIndex].selfieImageUrl = selfieUrls[0];
-        
-        // Calculate overall status based on settings
-        const idStatus = database.users[userIndex].idResult?.status;
-        const selfieStatus = result.status;
-        
-        // Check what's required according to settings
-        const idRequired = verificationRules.requireIdCard;
-        const selfieRequired = verificationRules.requireSelfie;
-        
-        // Determine approval based on requirements
-        const idOk = !idRequired || idStatus === STATUS.APPROVED;
-        const selfieOk = !selfieRequired || selfieStatus === STATUS.APPROVED;
-        
-        // Check for failures
-        const hasFailed = (idRequired && idStatus === STATUS.FAILED) || 
-                          (selfieRequired && selfieStatus === STATUS.FAILED);
-        const hasRejection = (idRequired && idStatus === STATUS.REJECTED) || 
-                             (selfieRequired && selfieStatus === STATUS.REJECTED);
-        
-        if (hasFailed) {
-          overallStatus = STATUS.FAILED;
-        } else if (hasRejection) {
-          overallStatus = STATUS.REJECTED;
-        } else if (idOk && selfieOk) {
+
+    // Update profile if profileId provided
+    if (profileId) {
+      const profile = await Profile.findById(profileId);
+      if (profile) {
+        const idValidation = await IdCardValidation.findOne({ profileId });
+        const idStatus = idValidation?.status || 'PENDING';
+
+        // Determine overall status
+        const idOk = !verificationRules.requireIdCard || idStatus === 'APPROVED';
+        const selfieOk = !verificationRules.requireSelfie || result.status === STATUS.APPROVED;
+
+        if (idOk && selfieOk) {
           overallStatus = STATUS.APPROVED;
-        } else {
-          overallStatus = STATUS.PENDING;
+        } else if (result.status === STATUS.FAILED || idStatus === 'FAILED') {
+          overallStatus = STATUS.FAILED;
+        } else if (result.status === STATUS.REJECTED || idStatus === 'REJECTED') {
+          overallStatus = STATUS.REJECTED;
+        }
+
+        profile.status = overallStatus.toUpperCase();
+        profile.selfieVerificationStatus = result.status.toUpperCase();
+        profile.idVerificationStatus = idStatus;
+        
+        // Selfie verification summary
+        profile.selfieMatchConfidence = result.data?.matchConfidence || profile.selfieMatchConfidence;
+        profile.selfieSpoofingRisk = result.data?.spoofingRisk || profile.selfieSpoofingRisk;
+        profile.selfieImageUrl = selfieUrls[0] || profile.selfieImageUrl;
+        
+        // Verification metadata
+        profile.verificationAttempts = (profile.verificationAttempts || 0) + 1;
+        profile.lastVerificationAttempt = new Date();
+        if (rejectionReasons.length > 0) {
+          profile.rejectionReasons = [...(profile.rejectionReasons || []), ...rejectionReasons];
         }
         
-        database.users[userIndex].status = overallStatus;
-        await writeDatabase(database);
+        await profile.save();
+
+        // Create SelfieValidation
+        await SelfieValidation.create({
+          profileId: profile._id,
+          idPhotoUrl,
+          selfieUrls,
+          isMatch: result.data?.isMatch,
+          matchConfidence: result.data?.matchConfidence,
+          spoofingRisk: result.data?.spoofingRisk,
+          faceCount: result.data?.faceCount,
+          imageQualityIssues: result.data?.imageQualityIssues,
+          lightingCondition: result.data?.lightingCondition?.toUpperCase(),
+          faceSize: result.data?.faceSize?.toUpperCase(),
+          faceCoverage: result.data?.faceCoverage?.toUpperCase(),
+          imageQuality: result.data?.imageQuality,
+          faceDetectionConfidence: result.data?.faceDetectionConfidence,
+          status: result.status.toUpperCase(),
+          errors: result.errors,
+          rejectionReasons,
+        });
+
+        logger.info({ profileId, status: overallStatus }, 'Selfie verification completed and profile updated');
+      } else {
+        logger.warn({ profileId }, 'Profile not found during selfie verification');
       }
     }
 
-    // Response
     res.json({
-      status: overallStatus,           // Overall verification status
-      selfieStatus: result.status,     // Selfie-specific status
+      status: overallStatus,
+      selfieStatus: result.status,
       data: result.data,
       errors: result.errors,
       rejectionReasons,
-      images: {
-        idPhoto: idPhotoUrl,
-        selfies: selfieUrls
-      },
-      verificationId,
-      verificationRules
+      images: { idPhoto: idPhotoUrl, selfies: selfieUrls },
+      profileId,
+      verificationRules,
     });
 
   } catch (error) {
-    console.error('Selfie check error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    logger.error({ error }, 'Unexpected error in verifySelfie');
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
 
-// Get user verification status - full details
+/**
+ * Get user verification status
+ */
 export const getUserStatus = async (req, res) => {
   try {
-    const { userId } = req.params;
-    const database = await readDatabase();
-    const user = database.users.find(u => u.id === userId);
+    const { profileId } = req.params;
 
-    if (!user) {
-      return res.status(404).json({
-        status: STATUS.FAILED,
-        errors: [{
-          code: 'USER_NOT_FOUND',
-          message: 'User verification record not found'
-        }]
-      });
+    const profile = await Profile.findById(profileId);
+    if (!profile) {
+      return res.status(404).json({ status: STATUS.FAILED, errors: [{ code: 'NOT_FOUND', message: 'Profile not found' }] });
     }
 
-    // Get current settings
-    const verificationRules = await getVerificationRules();
-    const thresholds = await getThresholds();
+    const [idValidation, selfieValidation] = await Promise.all([
+      IdCardValidation.findOne({ profileId }),
+      SelfieValidation.findOne({ profileId }),
+    ]);
 
-    // Determine what's missing for verification
-    const idCompleted = !!user.idResult;
-    const selfieCompleted = !!user.selfieResult;
-    const idApproved = user.idResult?.status === STATUS.APPROVED;
-    const selfieApproved = user.selfieResult?.status === STATUS.APPROVED;
-    
-    // Calculate verification progress based on rules
-    const idRequired = verificationRules.requireIdCard;
-    const selfieRequired = verificationRules.requireSelfie;
-    
-    let verificationProgress = {
-      idVerification: {
-        required: idRequired,
-        completed: idCompleted,
-        approved: idApproved
-      },
-      selfieVerification: {
-        required: selfieRequired,
-        completed: selfieCompleted,
-        approved: selfieApproved
-      },
-      isFullyVerified: (!idRequired || idApproved) && (!selfieRequired || selfieApproved)
-    };
-    
-    // Return full verification details
+    const authUserId = req.auth?.userId;
+    const userConfig = await getUserConfig(authUserId);
+    const verificationRules = getVerificationRulesFromConfig(userConfig);
+
+    // Get thresholds from config
+    const thresholds = userConfig ? {
+      fullNameConfidence: userConfig.idCardThresholds?.minFullNameConfidence,
+      identityNumberConfidence: userConfig.idCardThresholds?.minIdentityNumberConfidence,
+      dateOfBirthConfidence: userConfig.idCardThresholds?.minDateOfBirthConfidence,
+      expiryDateConfidence: userConfig.idCardThresholds?.minExpiryDateConfidence,
+      imageQuality: userConfig.idCardThresholds?.minImageQuality,
+      matchConfidence: userConfig.selfieThresholds?.minMatchConfidence,
+      faceDetectionConfidence: userConfig.selfieThresholds?.minFacialFeatureConfidence,
+      spoofingRiskMax: userConfig.selfieThresholds?.maxSpoofingRisk,
+      minAge: userConfig.validationRules?.minAge,
+      maxAge: userConfig.validationRules?.maxAge || 120,
+    } : {};
+
+    const idCompleted = !!idValidation;
+    const selfieCompleted = !!selfieValidation;
+    const idApproved = idValidation?.status === 'APPROVED';
+    const selfieApproved = selfieValidation?.status === 'APPROVED';
+
+    // Simplified status check
+    const isFullyVerified = (!verificationRules.requireIdCard || idApproved) &&
+      (!verificationRules.requireSelfie || selfieApproved);
+
+    // Get profile data (if ID is approved, use profile data; otherwise use validation data)
+    const idData = idApproved && profile.idVerificationStatus === 'APPROVED' ? {
+      fullName: profile.fullName,
+      identityNumber: profile.identityNumber,
+      dateOfBirth: profile.dateOfBirth,
+      expiryDate: profile.expiryDate,
+      gender: profile.gender,
+      nationality: profile.nationality,
+      serialNumber: profile.serialNumber,
+      address: profile.address,
+      documentCondition: profile.documentCondition,
+    } : (idValidation ? {
+      fullName: idValidation.fullName,
+      identityNumber: idValidation.identityNumber,
+      dateOfBirth: idValidation.dateOfBirth,
+      expiryDate: idValidation.expiryDate,
+      gender: idValidation.gender,
+      nationality: idValidation.nationality,
+      serialNumber: idValidation.serialNumber,
+      address: idValidation.address,
+      documentCondition: idValidation.documentCondition,
+    } : null);
+
+    // Get MRZ data from validation (not stored in profile)
+    const mrzData = idValidation ? {
+      mrz: idValidation.mrz,
+      mrzInfo: idValidation.mrzInfo,
+    } : null;
+
     res.json({
-      id: user.id,
-      status: user.status,
-      country: user.country,
-      createdAt: user.createdAt,
-      
-      // Verification Rules
+      id: profile._id,
+      status: profile.status,
+      country: profile.country,
+      createdAt: profile.createdAt,
       verificationRules,
-      
-      // Verification Progress
-      progress: verificationProgress,
-      
-      // ID Verification
-      idVerification: user.idResult ? {
-        status: user.idResult.status,
-        data: {
-          fullName: user.idResult.fullName,
-          identityNumber: user.idResult.identityNumber,
-          dateOfBirth: user.idResult.dateOfBirth,
-          expiryDate: user.idResult.expiryDate,
-          gender: user.idResult.gender,
-          nationality: user.idResult.nationality,
-          serialNumber: user.idResult.serialNumber,
-          mrz: user.idResult.mrz,
-          address: user.idResult.address,
-          documentCondition: user.idResult.documentCondition,
-          countryCode: user.idResult.countryCode
-        },
-        confidence: user.idResult.confidence || {
-          fullName: user.idResult.fullNameConfidence,
-          identityNumber: user.idResult.identityNumberConfidence,
-          dateOfBirth: user.idResult.dateOfBirthConfidence,
-          expiryDate: user.idResult.expiryDateConfidence,
-          imageQuality: user.idResult.imageQuality
-        },
-        errors: user.idResult.errors || [],
-        rejectionReasons: user.idResult.rejectionReasons || []
-      } : null,
-      
-      // Selfie Verification
-      selfieVerification: user.selfieResult ? {
-        status: user.selfieResult.status,
-        data: {
-          isMatch: user.selfieResult.isMatch,
-          matchConfidence: user.selfieResult.matchConfidence,
-          spoofingRisk: user.selfieResult.spoofingRisk,
-          faceCount: user.selfieResult.faceCount,
-          lightingCondition: user.selfieResult.lightingCondition,
-          faceSize: user.selfieResult.faceSize,
-          faceCoverage: user.selfieResult.faceCoverage,
-          faceDetectionConfidence: user.selfieResult.faceDetectionConfidence,
-          imageQuality: user.selfieResult.imageQuality,
-          imageQualityIssues: user.selfieResult.imageQualityIssues
-        },
-        errors: user.selfieResult.errors || [],
-        rejectionReasons: user.selfieResult.rejectionReasons || []
-      } : null,
-      
-      // Images
-      images: {
-        idFront: user.frontImageUrl,
-        idBack: user.backImageUrl,
-        selfie: user.selfieImageUrl || null
+      progress: {
+        idVerification: { required: verificationRules.requireIdCard, completed: idCompleted, approved: idApproved },
+        selfieVerification: { required: verificationRules.requireSelfie, completed: selfieCompleted, approved: selfieApproved },
+        isFullyVerified,
       },
-      
-      // Thresholds (for reference) - from settings
-      thresholds
+      idVerification: idValidation ? {
+        status: idValidation.status,
+        data: idData ? { ...idData, ...mrzData } : null,
+        confidence: {
+          fullName: idValidation.fullNameConfidence,
+          identityNumber: idValidation.identityNumberConfidence,
+          dateOfBirth: idValidation.dateOfBirthConfidence,
+          expiryDate: idValidation.expiryDateConfidence,
+          imageQuality: idValidation.imageQuality,
+        },
+        errors: idValidation.errors || [],
+      } : null,
+      selfieVerification: selfieValidation ? {
+        status: selfieValidation.status,
+        data: { isMatch: selfieValidation.isMatch, matchConfidence: selfieValidation.matchConfidence, spoofingRisk: selfieValidation.spoofingRisk },
+        errors: selfieValidation.errors || [],
+      } : null,
+      images: { 
+        idFront: profile.idFrontImageUrl || idValidation?.frontImageUrl, 
+        idBack: profile.idBackImageUrl || idValidation?.backImageUrl, 
+        selfie: profile.selfieImageUrl || selfieValidation?.selfieUrls?.[0] 
+      },
+      thresholds,
     });
+
   } catch (error) {
-    console.error('Status check error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    logger.error({ error, profileId: req.params.profileId }, 'Status check error');
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };

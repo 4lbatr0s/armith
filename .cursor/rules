@@ -1,0 +1,257 @@
+
+# **Cursor AI Development Rules**
+
+## **Core Principles (Non-Negotiable)**
+
+### **1. Simplicity Over Cleverness**
+- **KISS (Keep It Simple, Stupid):** If a solution requires explanation, it's too complex.
+- **YAGNI (You Aren't Gonna Need It):** Build what's requested. Nothing more.
+- **No premature optimization.** Readable code > "performant" code until profiling proves otherwise.
+
+### **2. Code Reuse Without Abstraction Hell**
+- **DRY (Don't Repeat Yourself):** Extract logic repeated **3+ times**. Not before.
+- **Maximum abstraction depth: 2 levels.** 
+  - ✅ `function → helper function`
+  - ❌ `function → service → utility → base class → abstract interface`
+- **If abstraction saves <5 lines, don't do it.**
+
+### **3. File & Code Organization**
+- **Before creating anything, search first:**
+  ```
+  1. Search codebase for similar functions/classes
+  2. Check if utility already exists in /utils, /lib, /helpers
+  3. Verify no duplicate logic in current module
+  ```
+- **Maximum function length: 50 lines** (including whitespace/comments)
+  - If exceeding, split into named helper functions within same file
+  - Don't create new files for 1-2 helper functions
+  
+- **Maximum file length: 300 lines**
+  - Exception: Type definition files can be longer
+
+---
+
+## **TypeScript-Specific Rules**
+
+### **Type Strictness**
+```typescript
+// ✅ ALWAYS: Simple, explicit types
+type User = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+// ❌ NEVER: Over-engineered types
+type User<T extends Record<string, unknown>> = {
+  id: Extract<keyof T, string>;
+  meta: Partial<Omit<T, 'id'>>;
+};
+```
+
+### **Type Rules:**
+1. **Use `type` over `interface`** (unless extending classes)
+2. **Prefer `unknown` over `any`** (forces type checking)
+3. **No complex generics unless absolutely necessary:**
+   - ✅ `Array<User>`, `Promise<Response>`
+   - ❌ `ConditionalExtract<DeepPartial<T>, keyof U>`
+4. **Avoid utility types for simple cases:**
+   - ❌ `Partial<Pick<User, 'name' | 'email'>>`
+   - ✅ `{ name?: string; email?: string }`
+
+### **Modern Syntax (Required)**
+```typescript
+// ✅ Use modern features
+const items = array.filter(x => x.active);
+const { name, ...rest } = user;
+const result = data?.user?.profile ?? 'default';
+await Promise.all(tasks);
+
+// ❌ Avoid outdated patterns
+var items = array.filter(function(x) { return x.active; });
+const name = user && user.name ? user.name : 'default';
+```
+
+---
+
+## **Architecture Constraints**
+
+### **Function Composition**
+- **Single Responsibility:** Each function does ONE thing
+- **Maximum parameters: 3** (use object destructuring if more needed)
+  ```typescript
+  // ✅ Good
+  function createUser({ name, email, role }: CreateUserParams) {}
+  
+  // ❌ Bad
+  function createUser(name: string, email: string, role: string, active: boolean, team: string) {}
+  ```
+
+### **Error Handling**
+- **Never swallow errors silently:**
+  ```typescript
+  // ❌ NEVER
+  try { await action(); } catch {}
+  
+  // ✅ ALWAYS
+  try { 
+    await action(); 
+  } catch (error) {
+    logger.error('Action failed', error);
+    throw error; // or handle explicitly
+  }
+  ```
+
+### **Async/Await**
+- **Use `async/await` over `.then()` chains**
+- **Always handle promises** (no floating promises)
+- **Use `Promise.all()` for parallel operations** (don't await sequentially unless required)
+
+---
+
+## **Forbidden Patterns**
+
+### **❌ Never Do This:**
+1. **Classes with >5 methods** (split into smaller units)
+2. **Inheritance deeper than 1 level** (favor composition)
+3. **Default exports** (use named exports for better refactoring)
+4. **Magic numbers** (use named constants)
+   ```typescript
+   // ❌ Bad
+   if (status === 200) {}
+   
+   // ✅ Good
+   const HTTP_OK = 200;
+   if (status === HTTP_OK) {}
+   ```
+5. **Comments explaining what code does** (code should be self-explanatory)
+   ```typescript
+   // ❌ Bad: Comment explains WHAT
+   // Loop through users and filter active ones
+   const active = users.filter(u => u.isActive);
+   
+   // ✅ Good: Function name explains intent
+   const getActiveUsers = (users: User[]) => users.filter(u => u.isActive);
+   ```
+
+---
+
+## **Decision Chain of Thought (MANDATORY BEFORE ANY CODE)**
+
+**Before writing ANY code, execute this checklist:**
+
+```
+[ ] 1. SEARCH: Does this function/class/file already exist?
+       - Check current directory
+       - Check /utils, /lib, /helpers, /services
+       - Search for similar function names
+
+[ ] 2. NECESSITY: Is this actually needed, or am I over-engineering?
+       - YAGNI: Does the spec explicitly require this?
+       - Can I solve this with existing code?
+
+[ ] 3. SIMPLICITY: What's the dumbest solution that works?
+       - Can I do this in 10 lines instead of 50?
+       - Am I adding abstraction for theoretical future needs?
+
+[ ] 4. TYPING: What's the simplest type that works?
+       - Am I using generics when a concrete type works?
+       - Am I over-engineering with utility types?
+
+[ ] 5. LENGTH CHECK: Will this exceed 50 lines?
+       - If yes: Can I extract 1-2 helper functions?
+       - If no: Proceed
+
+[ ] 6. ABSTRACTION DEPTH: Am I more than 2 levels deep?
+       - Count: Original function → helper → ???
+       - If deeper than 2: flatten or reconsider design
+
+[ ] 7. MODERN SYNTAX: Am I using latest JS/TS features?
+       - Optional chaining, nullish coalescing, etc.
+```
+
+**If ANY checkbox fails, STOP and reconsider.**
+
+---
+
+## **Response Format (For AI Agent)**
+
+When implementing a feature, respond in this structure:
+
+```
+## Analysis
+- What exists: [list similar functions/files found]
+- Why new code is needed: [justification or "using existing X"]
+- Complexity assessment: [simple/medium/requires abstraction]
+
+## Implementation Plan
+- Files to modify: [list]
+- New functions: [list with line count estimates]
+- Abstraction depth: [0, 1, or 2 levels]
+
+## Code
+[actual implementation]
+
+## Verification
+- Line counts: [function name: X lines]
+- Abstraction depth: [X levels]
+- Search results: [confirmed no duplicates]
+```
+
+---
+
+## **Auto Agent Settings**
+
+### **When to Auto-Act**
+The AI agent should automatically:
+1. **Fix linter errors** when detected (ESLint, TypeScript errors)
+2. **Run tests** after code changes (if test suite exists)
+3. **Update imports** when refactoring (add/remove unused imports)
+4. **Format code** according to project standards (Prettier, ESLint auto-fix)
+5. **Update related files** when renaming functions/components (if clearly safe)
+
+### **When NOT to Auto-Act**
+The AI agent should **STOP and ask** before:
+1. **Deleting files** (even if seemingly unused)
+2. **Modifying database schemas** (migrations require explicit approval)
+3. **Changing environment variables** or configuration files
+4. **Breaking changes** to public APIs or interfaces
+5. **Large refactorings** (>100 lines changed across multiple files)
+6. **Dependency updates** (package.json changes)
+7. **Authentication/security changes**
+
+### **Auto-Agent Behavior Rules**
+- **Always create a todo list** for multi-step tasks (3+ steps)
+- **Mark todos as completed** immediately after finishing each step
+- **Run linter** after every code change
+- **Check for breaking changes** before committing related modifications
+- **Verify imports** are correct after file moves/renames
+- **Test critical paths** after authentication or data flow changes
+
+### **Auto-Agent Safety Checks**
+Before any auto-action, verify:
+```
+[ ] Is this change reversible?
+[ ] Will this break existing functionality?
+[ ] Are there tests that need updating?
+[ ] Is this a security-sensitive change?
+[ ] Does this require user approval?
+```
+
+If ANY check fails, **ask the user first**.
+
+### **Auto-Agent Communication**
+- **Silent fixes**: Linter errors, formatting, unused imports
+- **Notify fixes**: Function renames, file moves, test updates
+- **Ask before**: Deletions, schema changes, breaking changes
+
+---
+
+## **Override Command**
+
+If you need to break these rules (rare), use:
+```
+@override [rule name] because [specific reason]
+```
+
+Example: `@override max-function-length because parsing logic requires 80 lines for readability`

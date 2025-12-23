@@ -53,8 +53,8 @@ export const Layout = ({ children }) => {
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                         : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                     }`}
-                  >
-                    {t('layout.home')}
+                >
+                  {t('layout.home')}
                   </Link>
                 )}
                 {!isSignedIn && (
@@ -166,4 +166,4 @@ export const Layout = ({ children }) => {
       </footer>
     </div>
   );
-};
+}; 

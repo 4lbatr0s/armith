@@ -13,7 +13,6 @@
     "@aws-sdk/client-s3": "^3.893.0",
     "@aws-sdk/s3-request-presigner": "^3.893.0",
     "@clerk/express": "^1.7.60",
-    "@prisma/client": "^6.16.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -21,13 +20,16 @@
     "express-rate-limit": "^7.1.5",
     "groq-sdk": "^0.37.0",
     "helmet": "^7.1.0",
+    "mongoose": "^9.0.2",
+    "mrz": "^5.0.0",
+    "pino": "10.1.0",
     "uuid": "^9.0.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "jest": "^29.7.0",
     "nodemon": "^3.0.2",
-    "prisma": "^6.16.2"
+    "pino-pretty": "^11.2.1"
   },
   "keywords": [
     "kyc",

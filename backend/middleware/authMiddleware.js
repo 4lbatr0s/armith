@@ -12,7 +12,7 @@ export const authenticateUser = requireAuth();
 export const optionalAuth = (req, res, next) => {
   const auth = getAuth(req);
   req.auth = auth;
-  next();
+    next();
 };
 
 /**

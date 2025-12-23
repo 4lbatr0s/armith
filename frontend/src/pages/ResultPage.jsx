@@ -3,11 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
+import { StatusBadge } from '../components/Result/StatusBadge';
+import { ImageCard } from '../components/Result/ImageCard';
+import { DataField } from '../components/Result/DataField';
+import { ConfidenceCircle } from '../components/Result/ConfidenceCircle';
+import { ConfidenceBar } from '../components/Result/ConfidenceBar';
+import { AnalysisCard } from '../components/Result/AnalysisCard';
+import { ThresholdItem } from '../components/Result/ThresholdItem';
+import { ErrorSection } from '../components/Result/ErrorSection';
+import { maskIdentityNumber, formatDateOnly as formatDate, isExpired, formatMRZ } from '../lib/utils';
 
 export const ResultPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { userId } = useParams();
+  const { profileId } = useParams();
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,9 +25,9 @@ export const ResultPage = () => {
     const fetchResult = async () => {
       try {
         setLoading(true);
-        
-        if (userId) {
-          const data = await apiService.getUserStatus(userId);
+
+        if (profileId) {
+          const data = await apiService.getUserStatus(profileId);
           setResult(data);
         } else {
           const storedResult = localStorage.getItem('verificationResult');
@@ -38,7 +47,7 @@ export const ResultPage = () => {
     };
 
     fetchResult();
-  }, [userId, navigate]);
+  }, [profileId, navigate]);
 
   if (loading) {
     return (
@@ -127,7 +136,7 @@ export const ResultPage = () => {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* Header Card */}
         <div className="bg-white dark:bg-gray-800 shadow-lg rounded-2xl mb-6 overflow-hidden">
           <div className={`h-2 ${getHeaderColor()}`} />
@@ -204,14 +213,13 @@ export const ResultPage = () => {
               <div className="flex-1">
                 <h4 className="font-semibold text-blue-800 dark:text-blue-300">{t('result.pending_msg')}</h4>
                 <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">{t('result.pending_desc')}</p>
-                
+
                 {/* Progress Steps */}
                 <div className="mt-4 flex items-center gap-4">
                   <div className="flex items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      progress.idVerification?.approved ? 'bg-green-500' : 
-                      progress.idVerification?.completed ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.idVerification?.approved ? 'bg-green-500' :
+                        progress.idVerification?.completed ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}>
                       {progress.idVerification?.approved ? (
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
@@ -226,16 +234,14 @@ export const ResultPage = () => {
                     </div>
                     <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t('result.step_id')}</span>
                   </div>
-                  
-                  <div className={`flex-1 h-1 rounded ${
-                    progress.idVerification?.approved ? 'bg-green-300' : 'bg-gray-300 dark:bg-gray-600'
-                  }`} />
-                  
+
+                  <div className={`flex-1 h-1 rounded ${progress.idVerification?.approved ? 'bg-green-300' : 'bg-gray-300 dark:bg-gray-600'
+                    }`} />
+
                   <div className="flex items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      progress.selfieVerification?.approved ? 'bg-green-500' : 
-                      progress.selfieVerification?.completed ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.selfieVerification?.approved ? 'bg-green-500' :
+                        progress.selfieVerification?.completed ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}>
                       {progress.selfieVerification?.approved ? (
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
@@ -258,10 +264,10 @@ export const ResultPage = () => {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          
+
           {/* Left Sidebar - Images & Thresholds */}
           <div className="xl:col-span-1 space-y-6">
-            
+
             {/* ID Card Images */}
             <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
@@ -274,9 +280,9 @@ export const ResultPage = () => {
               </div>
               <div className="p-4 space-y-4">
                 {result.images?.idFront ? (
-                  <ImageCard 
-                    label={t('result.id_front')} 
-                    url={result.images.idFront} 
+                  <ImageCard
+                    label={t('result.id_front')}
+                    url={result.images.idFront}
                     status={idResult.status}
                   />
                 ) : (
@@ -285,8 +291,8 @@ export const ResultPage = () => {
                   </div>
                 )}
                 {result.images?.idBack && (
-                  <ImageCard 
-                    label={t('result.id_back')} 
+                  <ImageCard
+                    label={t('result.id_back')}
                     url={result.images.idBack}
                     status={idResult.status}
                   />
@@ -307,8 +313,8 @@ export const ResultPage = () => {
               </div>
               <div className="p-4">
                 {result.images?.selfie ? (
-                  <ImageCard 
-                    label={t('result.selfie')} 
+                  <ImageCard
+                    label={t('result.selfie')}
                     url={result.images.selfie}
                     status={selfieResult.status}
                     large
@@ -351,21 +357,31 @@ export const ResultPage = () => {
 
           {/* Main Content Area */}
           <div className="xl:col-span-3 space-y-6">
-            
+
             {/* ID Verification Card */}
             <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                  <span className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-3">
-                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                    </svg>
-                  </span>
-                  {t('result.id_verification')}
-                </h3>
+                <div className="flex items-center">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <span className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-3">
+                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                      </svg>
+                    </span>
+                    {t('result.id_verification')}
+                  </h3>
+                  {idResult.status === 'APPROVED' && (
+                    <span className="ml-3 px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      {t('result.profile_synced')}
+                    </span>
+                  )}
+                </div>
                 <StatusBadge status={idResult.status} t={t} />
               </div>
-              
+
               {idResult.data ? (
                 <div className="p-6">
                   {/* Personal Information */}
@@ -403,11 +419,81 @@ export const ResultPage = () => {
                       <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
                         {t('result.mrz')}
                       </h4>
-                      <div className="bg-gray-900 dark:bg-black rounded-lg p-4 overflow-x-auto">
+                      <div className="bg-gray-900 dark:bg-black rounded-lg p-4 overflow-x-auto mb-4">
                         <code className="text-green-400 font-mono text-xs whitespace-pre">
                           {formatMRZ(idResult.data.mrz)}
                         </code>
                       </div>
+
+                      {/* Parsed MRZ Info */}
+                      {idResult.data.mrzInfo && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                          <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {t('result.mrz_parsed')}
+                          </h5>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                            {idResult.data.mrzInfo.format && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_format')}:</span>
+                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.format}</span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.valid !== undefined && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_valid')}:</span>
+                                <span className={`ml-2 font-semibold ${idResult.data.mrzInfo.valid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {idResult.data.mrzInfo.valid ? t('result.yes') : t('result.no')}
+                                </span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.documentNumber && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_doc_number')}:</span>
+                                <span className="ml-2 font-mono font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.documentNumber}</span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.dateOfBirth && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_dob')}:</span>
+                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.dateOfBirth}</span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.expiryDate && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_expiry')}:</span>
+                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.expiryDate}</span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.nationality && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_nationality')}:</span>
+                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.nationality}</span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.sex && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_sex')}:</span>
+                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.sex}</span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.surname && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_surname')}:</span>
+                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.surname}</span>
+                              </div>
+                            )}
+                            {idResult.data.mrzInfo.givenNames && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_given_names')}:</span>
+                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.givenNames}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -418,29 +504,29 @@ export const ResultPage = () => {
                         {t('result.confidence_scores')}
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                        <ConfidenceCircle 
-                          label={t('result.image_quality')} 
-                          value={idResult.confidence.imageQuality} 
+                        <ConfidenceCircle
+                          label={t('result.image_quality')}
+                          value={idResult.confidence.imageQuality}
                           threshold={thresholds.imageQuality || 0.7}
                         />
-                        <ConfidenceCircle 
-                          label={t('result.name_confidence')} 
-                          value={idResult.confidence.fullName} 
+                        <ConfidenceCircle
+                          label={t('result.name_confidence')}
+                          value={idResult.confidence.fullName}
                           threshold={thresholds.fullNameConfidence || 0.8}
                         />
-                        <ConfidenceCircle 
-                          label={t('result.id_confidence')} 
-                          value={idResult.confidence.identityNumber} 
+                        <ConfidenceCircle
+                          label={t('result.id_confidence')}
+                          value={idResult.confidence.identityNumber}
                           threshold={thresholds.identityNumberConfidence || 0.95}
                         />
-                        <ConfidenceCircle 
-                          label={t('result.dob_confidence')} 
-                          value={idResult.confidence.dateOfBirth} 
+                        <ConfidenceCircle
+                          label={t('result.dob_confidence')}
+                          value={idResult.confidence.dateOfBirth}
                           threshold={thresholds.dateOfBirthConfidence || 0.9}
                         />
-                        <ConfidenceCircle 
-                          label={t('result.expiry_confidence')} 
-                          value={idResult.confidence.expiryDate} 
+                        <ConfidenceCircle
+                          label={t('result.expiry_confidence')}
+                          value={idResult.confidence.expiryDate}
                           threshold={thresholds.expiryDateConfidence || 0.9}
                         />
                       </div>
@@ -475,16 +561,15 @@ export const ResultPage = () => {
                 </h3>
                 <StatusBadge status={selfieResult.status} t={t} />
               </div>
-              
+
               {selfieResult.data ? (
                 <div className="p-6">
                   {/* Face Match Result - Hero Section */}
                   <div className="mb-6 p-6 rounded-xl bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                          selfieResult.data.isMatch ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
-                        }`}>
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${selfieResult.data.isMatch ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
+                          }`}>
                           {selfieResult.data.isMatch ? (
                             <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -517,40 +602,40 @@ export const ResultPage = () => {
                       {t('result.selfie_analysis')}
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                      <AnalysisCard 
-                        label={t('result.face_count')} 
+                      <AnalysisCard
+                        label={t('result.face_count')}
                         value={selfieResult.data.faceCount}
                         expected={1}
                         icon="👤"
                         good={selfieResult.data.faceCount === 1}
                       />
-                      <AnalysisCard 
-                        label={t('result.spoofing_risk')} 
+                      <AnalysisCard
+                        label={t('result.spoofing_risk')}
                         value={`${((selfieResult.data.spoofingRisk || 0) * 100).toFixed(0)}%`}
                         icon="🎭"
                         good={(selfieResult.data.spoofingRisk || 0) <= (thresholds.spoofingRiskMax || 0.3)}
                         inverse
                       />
-                      <AnalysisCard 
-                        label={t('result.lighting')} 
+                      <AnalysisCard
+                        label={t('result.lighting')}
                         value={selfieResult.data.lightingCondition || 'N/A'}
                         icon="💡"
                         good={selfieResult.data.lightingCondition === 'good'}
                       />
-                      <AnalysisCard 
-                        label={t('result.face_size')} 
+                      <AnalysisCard
+                        label={t('result.face_size')}
                         value={selfieResult.data.faceSize || 'N/A'}
                         icon="📐"
                         good={selfieResult.data.faceSize === 'adequate'}
                       />
-                      <AnalysisCard 
-                        label={t('result.face_coverage')} 
+                      <AnalysisCard
+                        label={t('result.face_coverage')}
                         value={selfieResult.data.faceCoverage || 'N/A'}
                         icon="👁"
                         good={selfieResult.data.faceCoverage === 'clear'}
                       />
-                      <AnalysisCard 
-                        label={t('result.image_quality')} 
+                      <AnalysisCard
+                        label={t('result.image_quality')}
                         value={`${((selfieResult.data.imageQuality || 0) * 100).toFixed(0)}%`}
                         icon="🖼"
                         good={(selfieResult.data.imageQuality || 0) >= (thresholds.imageQuality || 0.7)}
@@ -564,19 +649,19 @@ export const ResultPage = () => {
                       {t('result.confidence_scores')}
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      <ConfidenceBar 
-                        label={t('result.face_detection')} 
-                        value={selfieResult.data.faceDetectionConfidence} 
+                      <ConfidenceBar
+                        label={t('result.face_detection')}
+                        value={selfieResult.data.faceDetectionConfidence}
                         threshold={thresholds.faceDetectionConfidence || 0.8}
                       />
-                      <ConfidenceBar 
-                        label={t('result.image_quality')} 
-                        value={selfieResult.data.imageQuality} 
+                      <ConfidenceBar
+                        label={t('result.image_quality')}
+                        value={selfieResult.data.imageQuality}
                         threshold={thresholds.imageQuality || 0.7}
                       />
-                      <ConfidenceBar 
-                        label={t('result.match_score')} 
-                        value={(selfieResult.data.matchConfidence || 0) / 100} 
+                      <ConfidenceBar
+                        label={t('result.match_score')}
+                        value={(selfieResult.data.matchConfidence || 0) / 100}
                         threshold={(thresholds.matchConfidence || 80) / 100}
                       />
                     </div>
@@ -590,7 +675,7 @@ export const ResultPage = () => {
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {selfieResult.data.imageQualityIssues.map((issue, index) => (
-                          <span 
+                          <span
                             key={index}
                             className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
                           >
@@ -623,203 +708,4 @@ export const ResultPage = () => {
       </div>
     </div>
   );
-};
-
-// ============================================================================
-// Helper Components
-// ============================================================================
-
-const StatusBadge = ({ status, t, large }) => {
-  const config = {
-    approved: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', dot: 'bg-green-500' },
-    rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', dot: 'bg-red-500' },
-    failed: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', dot: 'bg-yellow-500' },
-    pending: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', dot: 'bg-blue-500 animate-pulse' }
-  }[status] || { bg: 'bg-gray-100', text: 'text-gray-800', dot: 'bg-gray-500' };
-  
-  const labels = { approved: t('result.status_approved'), rejected: t('result.status_rejected'), failed: t('result.status_failed'), pending: t('result.status_pending') };
-  
-  return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full font-medium ${config.bg} ${config.text} ${large ? 'text-sm' : 'text-xs'}`}>
-      <span className={`w-2 h-2 rounded-full mr-2 ${config.dot}`} />
-      {labels[status] || status}
-    </span>
-  );
-};
-
-const ImageCard = ({ label, url, status, large }) => (
-  <div className="relative group">
-    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-    <div className="relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-      <img 
-        src={url} 
-        alt={label} 
-        className={`w-full object-cover ${large ? 'h-48' : 'h-28'} group-hover:scale-105 transition-transform duration-200`}
-      />
-      {status && (
-        <div className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center ${
-          status === 'approved' ? 'bg-green-500' : status === 'rejected' ? 'bg-red-500' : 'bg-yellow-500'
-        }`}>
-          {status === 'approved' ? (
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          )}
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-const DataField = ({ label, value, icon, mono, capitalize, highlight }) => (
-  <div className={`p-3 rounded-lg ${highlight ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
-    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{icon} {label}</p>
-    <p className={`text-sm font-semibold text-gray-900 dark:text-white truncate ${mono ? 'font-mono' : ''} ${capitalize ? 'capitalize' : ''} ${highlight ? 'text-red-600 dark:text-red-400' : ''}`}>
-      {value || '—'}
-    </p>
-  </div>
-);
-
-const ConfidenceCircle = ({ label, value, threshold }) => {
-  const percentage = Math.round((value || 0) * 100);
-  const isGood = (value || 0) >= threshold;
-  const circumference = 2 * Math.PI * 40;
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
-  
-  return (
-    <div className="flex flex-col items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-      <div className="relative w-20 h-20">
-        <svg className="w-20 h-20 transform -rotate-90">
-          <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="none" className="text-gray-200 dark:text-gray-600" />
-          <circle 
-            cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="none" 
-            strokeDasharray={circumference} 
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            className={isGood ? 'text-green-500' : 'text-red-500'}
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`text-lg font-bold ${isGood ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {percentage}%
-          </span>
-        </div>
-      </div>
-      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">{label}</p>
-    </div>
-  );
-};
-
-const ConfidenceBar = ({ label, value, threshold }) => {
-  const percentage = Math.round((value || 0) * 100);
-  const isGood = (value || 0) >= threshold;
-  
-  return (
-    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-      <div className="flex justify-between text-xs mb-2">
-        <span className="text-gray-500 dark:text-gray-400">{label}</span>
-        <span className={`font-semibold ${isGood ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {percentage}%
-        </span>
-      </div>
-      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-        <div 
-          className={`h-2.5 rounded-full transition-all duration-300 ${isGood ? 'bg-green-500' : 'bg-red-500'}`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    </div>
-  );
-};
-
-const AnalysisCard = ({ label, value, icon, good, expected, inverse }) => (
-  <div className={`p-4 rounded-lg border-2 ${good ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20' : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'}`}>
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-2xl">{icon}</span>
-      {good ? (
-        <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-        </svg>
-      ) : (
-        <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      )}
-    </div>
-    <p className={`text-lg font-bold capitalize ${good ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-      {value}
-    </p>
-    <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-    {expected !== undefined && (
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Expected: {expected}</p>
-    )}
-  </div>
-);
-
-const ThresholdItem = ({ label, value }) => (
-  <div className="flex justify-between py-1">
-    <span className="text-gray-500 dark:text-gray-400">{label}</span>
-    <span className="text-gray-900 dark:text-white font-mono text-xs">{value}</span>
-  </div>
-);
-
-const ErrorSection = ({ errors, t }) => (
-  <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
-    <h4 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center">
-      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      {t('result.issues_found')}
-    </h4>
-    <ul className="space-y-2">
-      {errors.map((error, index) => (
-        <li key={index} className="flex items-start text-sm text-red-700 dark:text-red-300">
-          <span className="text-red-500 mr-2">•</span>
-          {error}
-        </li>
-      ))}
-    </ul>
-  </div>
-);
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-const maskIdentityNumber = (idNumber) => {
-  if (!idNumber || idNumber.length < 4) return idNumber;
-  return idNumber.slice(0, 3) + '*'.repeat(Math.max(0, idNumber.length - 6)) + idNumber.slice(-3);
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return null;
-  try {
-    return new Date(dateString).toLocaleDateString();
-  } catch {
-    return dateString;
-  }
-};
-
-const isExpired = (dateString) => {
-  if (!dateString) return false;
-  try {
-    return new Date(dateString) < new Date();
-  } catch {
-    return false;
-  }
-};
-
-const formatMRZ = (mrz) => {
-  if (!mrz) return '';
-  // Split MRZ into lines (typically 2 or 3 lines of 30-44 characters)
-  const lineLength = mrz.length > 60 ? Math.ceil(mrz.length / 2) : 44;
-  const lines = [];
-  for (let i = 0; i < mrz.length; i += lineLength) {
-    lines.push(mrz.slice(i, i + lineLength));
-  }
-  return lines.join('\n');
 };

@@ -16,7 +16,8 @@ const IdCheckRequestSchema = z.object({
 const SelfieCheckRequestSchema = z.object({
   idPhotoUrl: z.string().url('Must be a valid URL'),
   selfieUrls: z.array(z.string().url()).min(1, 'At least one selfie URL is required').max(5, 'Maximum 5 selfie URLs allowed'),
-  verificationId: z.string().uuid().optional() // Link to ID verification
+  profileId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Must be a valid MongoDB ObjectId').optional(), // Link to Profile (MongoDB ObjectId)
+  verificationId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Must be a valid MongoDB ObjectId').optional() // Legacy support - same as profileId
 });
 
 /**

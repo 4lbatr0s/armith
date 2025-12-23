@@ -70,4 +70,41 @@ export function formatFileSize(bytes) {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-} 
+}
+
+export function formatDateOnly(dateString) {
+  if (!dateString) return null;
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+export function maskIdentityNumber(idNumber) {
+  if (!idNumber || idNumber.length < 4) return idNumber;
+  return idNumber.slice(0, 3) + '*'.repeat(Math.max(0, idNumber.length - 6)) + idNumber.slice(-3);
+}
+
+export function isExpired(dateString) {
+  if (!dateString) return false;
+  try {
+    return new Date(dateString) < new Date();
+  } catch {
+    return false;
+  }
+}
+
+export function formatMRZ(mrz) {
+  if (!mrz) return '';
+  const lineLength = mrz.length > 60 ? Math.ceil(mrz.length / 2) : 44;
+  const lines = [];
+  for (let i = 0; i < mrz.length; i += lineLength) {
+    lines.push(mrz.slice(i, i + lineLength));
+  }
+  return lines.join('\n');
+}

@@ -60,9 +60,9 @@ export const App = () => {
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
       <ApiTokenProvider>
         <ThemeProvider>
-          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <Layout>
-              <Routes>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Layout>
+            <Routes>
               <Route path="/" element={
                 <PublicRoute>
                   <HomePage />
@@ -85,7 +85,7 @@ export const App = () => {
                   <UploadSelfiePage />
                 </ProtectedRoute>
               } />
-              <Route path="/result/:userId?" element={
+              <Route path="/result/:profileId?" element={
                 <ProtectedRoute>
                   <ResultPage />
                 </ProtectedRoute>
@@ -98,9 +98,9 @@ export const App = () => {
               } />
 
               <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Layout>
-          </Router>
+            </Routes>
+          </Layout>
+        </Router>
         </ThemeProvider>
       </ApiTokenProvider>
     </ClerkProvider>

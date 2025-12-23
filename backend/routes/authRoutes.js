@@ -1,7 +1,7 @@
 import express from 'express';
 import { getAuth } from '@clerk/express';
 import { authenticateUser } from '../middleware/authMiddleware.js';
-import { prisma } from '../lib/prisma.js';
+import { User } from '../models/index.js';
 
 const router = express.Router();
 
@@ -12,33 +12,18 @@ const router = express.Router();
 router.get('/profile', authenticateUser, async (req, res) => {
   try {
     const auth = getAuth(req);
-    const userId = auth.userId;
+    const clerkId = auth.userId;
 
-    // Find or create user in database
-    let user = await prisma.user.findUnique({
-      where: { clerkId: userId }
-    });
+    let user = await User.findOne({ clerkId });
 
     if (!user) {
-      // Create user on first access
-      user = await prisma.user.create({
-        data: {
-          clerkId: userId,
-          lastLoginAt: new Date()
-        }
-      });
+      user = await User.create({ clerkId, lastLoginAt: new Date() });
     } else {
-      // Update last login
-      user = await prisma.user.update({
-        where: { clerkId: userId },
-        data: { lastLoginAt: new Date() }
-      });
+      user.lastLoginAt = new Date();
+      await user.save();
     }
 
-    res.json({
-      success: true,
-      data: { user }
-    });
+    res.json({ success: true, data: { user } });
   } catch (error) {
     console.error('Profile error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch profile' });
@@ -52,13 +37,9 @@ router.get('/profile', authenticateUser, async (req, res) => {
 router.get('/status', (req, res) => {
   try {
     const auth = getAuth(req);
-    
     res.json({
       success: true,
-      data: {
-        authenticated: !!auth.userId,
-        userId: auth.userId
-      }
+      data: { authenticated: !!auth.userId, userId: auth.userId }
     });
   } catch (error) {
     console.error('Status error:', error);
@@ -68,7 +49,7 @@ router.get('/status', (req, res) => {
 
 /**
  * POST /auth/webhook
- * Clerk webhook endpoint for user events
+ * Clerk webhook endpoint
  */
 router.post('/webhook', async (req, res) => {
   try {
@@ -76,10 +57,9 @@ router.post('/webhook', async (req, res) => {
 
     if (type === 'user.created' || type === 'user.updated') {
       const clerkUser = data;
-      
-      await prisma.user.upsert({
-        where: { clerkId: clerkUser.id },
-        update: {
+      await User.findOneAndUpdate(
+        { clerkId: clerkUser.id },
+        {
           email: clerkUser.email_addresses?.[0]?.email_address,
           emailVerified: clerkUser.email_addresses?.[0]?.verification?.status === 'verified',
           lastLoginAt: new Date(),
@@ -89,27 +69,13 @@ router.post('/webhook', async (req, res) => {
             imageUrl: clerkUser.image_url
           }
         },
-        create: {
-          clerkId: clerkUser.id,
-          email: clerkUser.email_addresses?.[0]?.email_address,
-          emailVerified: clerkUser.email_addresses?.[0]?.verification?.status === 'verified',
-          lastLoginAt: new Date(),
-          providerData: {
-            firstName: clerkUser.first_name,
-            lastName: clerkUser.last_name,
-            imageUrl: clerkUser.image_url
-          }
-        }
-      });
-
+        { upsert: true, new: true }
+      );
       console.log(`User ${type}:`, clerkUser.id);
     }
 
     if (type === 'user.deleted') {
-      await prisma.user.delete({
-        where: { clerkId: data.id }
-      }).catch(() => {}); // Ignore if not found
-      
+      await User.deleteOne({ clerkId: data.id });
       console.log('User deleted:', data.id);
     }
 

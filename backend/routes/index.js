@@ -3,6 +3,7 @@ import healthRoutes from './healthRoutes.js';
 import kycRoutes from './kycRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import authRoutes from './authRoutes.js';
+import configRoutes from './configRoutes.js';
 
 const router = express.Router();
 
@@ -17,5 +18,8 @@ router.use('/kyc', kycRoutes);
 
 // Mount admin routes
 router.use('/admin', adminRoutes);
+
+// Mount config routes
+router.use('/config', configRoutes);
 
 export default router; 

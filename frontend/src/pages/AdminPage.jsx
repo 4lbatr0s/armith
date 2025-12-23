@@ -67,14 +67,16 @@ export const AdminPage = () => {
   }, [activeTab]);
 
   const handleSaveSettings = async () => {
+    if (!settings) return;
+    
     try {
       setSettingsSaving(true);
       setSettingsError(null);
       setSettingsSuccess(null);
       
       await apiService.updateSettings({
-        verificationRules: settings.verificationRules,
-        thresholds: settings.thresholds
+        verificationRules: settings.verificationRules || {},
+        thresholds: settings.thresholds || {}
       });
       
       setSettingsSuccess(t('settings.save_success'));
@@ -108,23 +110,29 @@ export const AdminPage = () => {
   };
 
   const updateVerificationRule = (key, value) => {
-    setSettings(prev => ({
-      ...prev,
-      verificationRules: {
-        ...prev.verificationRules,
-        [key]: value
-      }
-    }));
+    setSettings(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        verificationRules: {
+          ...(prev.verificationRules || {}),
+          [key]: value
+        }
+      };
+    });
   };
 
   const updateThreshold = (key, value) => {
-    setSettings(prev => ({
-      ...prev,
-      thresholds: {
-        ...prev.thresholds,
-        [key]: value
-      }
-    }));
+    setSettings(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        thresholds: {
+          ...(prev.thresholds || {}),
+          [key]: value
+        }
+      };
+    });
   };
 
   if (isLoading && !stats) {
@@ -168,7 +176,7 @@ export const AdminPage = () => {
               {t('settings.title')}
             </button>
           </div>
-        </div>
+                </div>
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
@@ -197,7 +205,7 @@ export const AdminPage = () => {
                   >
                     <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                  </svg>
                     {t('dashboard.refresh')}
                   </Button>
                 </div>
@@ -230,96 +238,112 @@ export const AdminPage = () => {
                 value={stats?.rejectedCount || 0}
                 color="red"
               />
-            </div>
+        </div>
 
-            {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-                {error}
-              </div>
-            )}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+            {error}
+          </div>
+        )}
 
-            {/* Recent Verifications Table */}
-            <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg transition-colors duration-200">
-              <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">{t('dashboard.recent_verifications')}</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{t('dashboard.recent_verifications_desc')}</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ID</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.country')}</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+        {/* Recent Verifications Table */}
+        <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg transition-colors duration-200">
+          <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">{t('dashboard.recent_verifications')}</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{t('dashboard.recent_verifications_desc')}</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.name')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.tckn')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.id_status')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.selfie_status')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.overall_status')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.date')}</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('common.view')}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {verifications.length > 0 ? (
-                      verifications.map((verification) => (
-                        <tr key={verification.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white font-mono">
-                            {verification.id.substring(0, 8)}...
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 uppercase">
-                            {verification.country}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <StatusBadge status={verification.status} />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(verification.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            <Button
-                              variant="link"
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 p-0 h-auto font-medium"
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {verifications.length > 0 ? (
+                  verifications.map((verification) => (
+                    <tr key={verification.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {verification.fullName || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
+                        {verification.identityNumber ? `${verification.identityNumber.substring(0, 3)}***${verification.identityNumber.substring(verification.identityNumber.length - 2)}` : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {verification.idVerification?.completed ? (
+                          <StatusBadge status={verification.idVerification.status} />
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{t('dashboard.not_started')}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {verification.selfieVerification?.completed ? (
+                          <StatusBadge status={verification.selfieVerification.status} />
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{t('dashboard.not_started')}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={verification.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {new Date(verification.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <Button
+                          variant="link"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 p-0 h-auto font-medium"
                               onClick={() => navigate(`/result/${verification.id}`)}
-                            >
-                              {t('common.view')}
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                        >
+                          {t('common.view')}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                           {t('dashboard.no_verifications')}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            {/* Pagination */}
-            <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4 rounded-lg shadow transition-colors duration-200">
-              <div className="flex-1 flex justify-between sm:hidden">
+        {/* Pagination */}
+        <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4 rounded-lg shadow transition-colors duration-200">
+          <div className="flex-1 flex justify-between sm:hidden">
                 <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} variant="outline" className="dark:bg-gray-700 dark:text-white dark:border-gray-600">
+              {t('dashboard.previous')}
+            </Button>
+                <Button onClick={() => setPage(p => p + 1)} disabled={verifications.length < 10} variant="outline" className="dark:bg-gray-700 dark:text-white dark:border-gray-600">
+              {t('dashboard.next')}
+            </Button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {t('dashboard.showing_page')} <span className="font-medium">{page}</span>
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} variant="outline" className="rounded-l-md dark:bg-gray-700 dark:text-white dark:border-gray-600">
                   {t('dashboard.previous')}
                 </Button>
-                <Button onClick={() => setPage(p => p + 1)} disabled={verifications.length < 10} variant="outline" className="dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                    <Button onClick={() => setPage(p => p + 1)} disabled={verifications.length < 10} variant="outline" className="rounded-r-md dark:bg-gray-700 dark:text-white dark:border-gray-600">
                   {t('dashboard.next')}
                 </Button>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    {t('dashboard.showing_page')} <span className="font-medium">{page}</span>
-                  </p>
-                </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                    <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} variant="outline" className="rounded-l-md dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                      {t('dashboard.previous')}
-                    </Button>
-                    <Button onClick={() => setPage(p => p + 1)} disabled={verifications.length < 10} variant="outline" className="rounded-r-md dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                      {t('dashboard.next')}
-                    </Button>
-                  </nav>
-                </div>
+              </nav>
+            </div>
               </div>
             </div>
           </>
@@ -361,20 +385,20 @@ export const AdminPage = () => {
                     <ToggleSwitch
                       label={t('settings.require_id_card')}
                       description={t('settings.require_id_card_desc')}
-                      checked={settings.verificationRules.requireIdCard}
+                      checked={settings.verificationRules?.requireIdCard ?? true}
                       onChange={(checked) => updateVerificationRule('requireIdCard', checked)}
-                      disabled={!settings.verificationRules.requireSelfie}
+                      disabled={!settings.verificationRules?.requireSelfie}
                     />
                     <ToggleSwitch
                       label={t('settings.require_selfie')}
                       description={t('settings.require_selfie_desc')}
-                      checked={settings.verificationRules.requireSelfie}
+                      checked={settings.verificationRules?.requireSelfie ?? true}
                       onChange={(checked) => updateVerificationRule('requireSelfie', checked)}
-                      disabled={!settings.verificationRules.requireIdCard}
+                      disabled={!settings.verificationRules?.requireIdCard}
                     />
                     
                     {/* Warning if only one is selected */}
-                    {(!settings.verificationRules.requireIdCard || !settings.verificationRules.requireSelfie) && (
+                    {(!settings.verificationRules?.requireIdCard || !settings.verificationRules?.requireSelfie) && (
                       <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                         <p className="text-sm text-yellow-700 dark:text-yellow-400 flex items-center">
                           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,52 +425,52 @@ export const AdminPage = () => {
                   <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <ThresholdSlider
                       label={t('settings.th_name_confidence')}
-                      value={settings.thresholds.fullNameConfidence}
+                      value={settings.thresholds?.fullNameConfidence ?? 0.8}
                       onChange={(val) => updateThreshold('fullNameConfidence', val)}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds.fullNameConfidence}
+                      defaultValue={defaults?.thresholds?.fullNameConfidence ?? 0.8}
                       format="percent"
                     />
                     <ThresholdSlider
                       label={t('settings.th_id_confidence')}
-                      value={settings.thresholds.identityNumberConfidence}
+                      value={settings.thresholds?.identityNumberConfidence ?? 0.95}
                       onChange={(val) => updateThreshold('identityNumberConfidence', val)}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds.identityNumberConfidence}
+                      defaultValue={defaults?.thresholds?.identityNumberConfidence ?? 0.95}
                       format="percent"
                     />
                     <ThresholdSlider
                       label={t('settings.th_dob_confidence')}
-                      value={settings.thresholds.dateOfBirthConfidence}
+                      value={settings.thresholds?.dateOfBirthConfidence ?? 0.9}
                       onChange={(val) => updateThreshold('dateOfBirthConfidence', val)}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds.dateOfBirthConfidence}
+                      defaultValue={defaults?.thresholds?.dateOfBirthConfidence ?? 0.9}
                       format="percent"
                     />
                     <ThresholdSlider
                       label={t('settings.th_expiry_confidence')}
-                      value={settings.thresholds.expiryDateConfidence}
+                      value={settings.thresholds?.expiryDateConfidence ?? 0.9}
                       onChange={(val) => updateThreshold('expiryDateConfidence', val)}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds.expiryDateConfidence}
+                      defaultValue={defaults?.thresholds?.expiryDateConfidence ?? 0.9}
                       format="percent"
                     />
                     <ThresholdSlider
                       label={t('settings.th_image_quality')}
-                      value={settings.thresholds.imageQuality}
+                      value={settings.thresholds?.imageQuality ?? 0.7}
                       onChange={(val) => updateThreshold('imageQuality', val)}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds.imageQuality}
+                      defaultValue={defaults?.thresholds?.imageQuality ?? 0.7}
                       format="percent"
                     />
                   </div>
@@ -466,33 +490,33 @@ export const AdminPage = () => {
                   <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <ThresholdSlider
                       label={t('settings.th_match_confidence')}
-                      value={settings.thresholds.matchConfidence}
+                      value={settings.thresholds?.matchConfidence ?? 80}
                       onChange={(val) => updateThreshold('matchConfidence', val)}
                       min={0}
                       max={100}
                       step={5}
-                      defaultValue={defaults?.thresholds.matchConfidence}
+                      defaultValue={defaults?.thresholds?.matchConfidence ?? 80}
                       format="number"
                       suffix="%"
                     />
                     <ThresholdSlider
                       label={t('settings.th_face_detection')}
-                      value={settings.thresholds.faceDetectionConfidence}
+                      value={settings.thresholds?.faceDetectionConfidence ?? 0.8}
                       onChange={(val) => updateThreshold('faceDetectionConfidence', val)}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds.faceDetectionConfidence}
+                      defaultValue={defaults?.thresholds?.faceDetectionConfidence ?? 0.8}
                       format="percent"
                     />
                     <ThresholdSlider
                       label={t('settings.th_spoofing_max')}
-                      value={settings.thresholds.spoofingRiskMax}
+                      value={settings.thresholds?.spoofingRiskMax ?? 0.3}
                       onChange={(val) => updateThreshold('spoofingRiskMax', val)}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds.spoofingRiskMax}
+                      defaultValue={defaults?.thresholds?.spoofingRiskMax ?? 0.3}
                       format="percent"
                       inverse
                     />
@@ -513,23 +537,23 @@ export const AdminPage = () => {
                   <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <ThresholdSlider
                       label={t('settings.th_min_age')}
-                      value={settings.thresholds.minAge}
+                      value={settings.thresholds?.minAge ?? 18}
                       onChange={(val) => updateThreshold('minAge', val)}
                       min={0}
                       max={100}
                       step={1}
-                      defaultValue={defaults?.thresholds.minAge}
+                      defaultValue={defaults?.thresholds?.minAge ?? 18}
                       format="number"
                       suffix={` ${t('settings.years')}`}
                     />
                     <ThresholdSlider
                       label={t('settings.th_max_age')}
-                      value={settings.thresholds.maxAge}
+                      value={settings.thresholds?.maxAge ?? 120}
                       onChange={(val) => updateThreshold('maxAge', val)}
                       min={50}
                       max={150}
                       step={1}
-                      defaultValue={defaults?.thresholds.maxAge}
+                      defaultValue={defaults?.thresholds?.maxAge ?? 120}
                       format="number"
                       suffix={` ${t('settings.years')}`}
                     />

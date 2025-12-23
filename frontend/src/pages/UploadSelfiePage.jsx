@@ -106,11 +106,11 @@ export const UploadSelfiePage = () => {
         return;
       }
 
-      // 3. Verify Selfie (with verificationId to save to database)
+      // 3. Verify Selfie (with profileId to save to database)
       const selfieResult = await apiService.verifySelfie({
         idPhotoUrl: idPhotoUrl,
         selfieUrls: [uploadData.downloadUrl],
-        verificationId: verificationId
+        profileId: verificationId // This is actually profileId from localStorage
       });
 
       // 4. Navigate to result page with verification ID

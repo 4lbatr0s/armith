@@ -53,7 +53,7 @@ export const UploadIdPage = () => {
       setError(null);
 
       const userId = user?.id;
-      
+
       // 1. Upload Front Image
       const frontUploadData = await apiService.generateUploadUrl(frontFile.type, userId, 'id-front');
       await apiService.uploadFile(frontFile, frontUploadData.uploadUrl);
@@ -76,9 +76,9 @@ export const UploadIdPage = () => {
         userEmail: user?.emailAddresses?.[0]?.emailAddress
       });
 
-      // Store the verification ID, ID photo URL, and ID result
-      if (verificationResult.userId) {
-        localStorage.setItem('currentVerificationId', verificationResult.userId);
+      // Store the verification ID (profileId), ID photo URL, and ID result
+      if (verificationResult.profileId) {
+        localStorage.setItem('currentVerificationId', verificationResult.profileId);
       }
       localStorage.setItem('idPhotoUrl', frontUploadData.downloadUrl);
       localStorage.setItem('idVerificationResult', JSON.stringify(verificationResult));

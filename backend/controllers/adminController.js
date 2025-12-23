@@ -1,282 +1,216 @@
-import { ERRORS, STATUS } from '../kyc/config.js';
-import { readDatabase, readSettings, writeSettings, getDefaultSettings } from '../utils/database.js';
+/**
+ * Admin Controller
+ * Admin endpoints for viewing verifications and managing settings
+ */
 
-// Admin endpoint to list all verifications
+import { ERRORS, STATUS } from '../kyc/config.js';
+import { Profile, IdCardValidation, SelfieValidation, KycConfiguration } from '../models/index.js';
+import { createDefaultConfig, PRESETS } from '../kyc/defaults.js';
+
+/**
+ * Get all verifications (admin endpoint)
+ */
 export const getVerifications = async (req, res) => {
   try {
-    const database = await readDatabase();
     const { page = 1, limit = 10, status } = req.query;
+    const skip = (page - 1) * limit;
 
-    let users = database.users;
+    const filter = status ? { status } : {};
 
-    // Filter by status if provided
-    if (status) {
-      users = users.filter(user => user.status === status);
-    }
-
-    // Pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + parseInt(limit);
-    const paginatedUsers = users.slice(startIndex, endIndex);
+    const [profiles, total] = await Promise.all([
+      Profile.find(filter).skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 }),
+      Profile.countDocuments(filter)
+    ]);
 
     res.json({
-      users: paginatedUsers.map(user => ({
-        id: user.id,
-        country: user.country,
-        status: user.status,
-        createdAt: user.createdAt,
-        hasIdResult: !!user.idResult,
-        hasSelfieResult: !!user.selfieResult
+      users: profiles.map(p => ({
+        id: p._id,
+        fullName: p.fullName,
+        identityNumber: p.identityNumber,
+        dateOfBirth: p.dateOfBirth,
+        gender: p.gender,
+        nationality: p.nationality,
+        country: p.country,
+        status: p.status,
+        createdAt: p.createdAt,
+        
+        // Additional ID card information
+        serialNumber: p.serialNumber,
+        expiryDate: p.expiryDate,
+        address: p.address,
+        documentCondition: p.documentCondition,
+        
+        // Confidence scores
+        overallConfidence: p.overallConfidence,
+        selfieMatchConfidence: p.selfieMatchConfidence,
+        selfieSpoofingRisk: p.selfieSpoofingRisk,
+        
+        // Image URLs
+        idFrontImageUrl: p.idFrontImageUrl,
+        idBackImageUrl: p.idBackImageUrl,
+        selfieImageUrl: p.selfieImageUrl,
+        
+        // Verification metadata
+        verificationAttempts: p.verificationAttempts || 0,
+        lastVerificationAttempt: p.lastVerificationAttempt,
+        rejectionReasons: p.rejectionReasons || [],
+        
+        // Verification statuses from Profile schema
+        idVerification: {
+          status: p.idVerificationStatus,
+          completed: !!p.idVerificationStatus,
+          completedAt: p.idVerificationStatus ? p.updatedAt : null
+        },
+        selfieVerification: {
+          status: p.selfieVerificationStatus,
+          completed: !!p.selfieVerificationStatus,
+          completedAt: p.selfieVerificationStatus ? p.updatedAt : null
+        }
       })),
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(users.length / limit),
-        totalUsers: users.length,
-        hasNext: endIndex < users.length,
-        hasPrev: startIndex > 0
+        totalPages: Math.ceil(total / limit),
+        totalUsers: total,
+        hasNext: skip + profiles.length < total,
+        hasPrev: page > 1
       }
     });
   } catch (error) {
     console.error('Admin verifications error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
 
-// Admin endpoint to get verification statistics
+/**
+ * Get verification statistics
+ */
 export const getStats = async (req, res) => {
   try {
-    const database = await readDatabase();
-    const users = database.users;
+    const [total, approved, rejected, pending] = await Promise.all([
+      Profile.countDocuments(),
+      Profile.countDocuments({ status: 'APPROVED' }),
+      Profile.countDocuments({ status: 'REJECTED' }),
+      Profile.countDocuments({ status: 'PENDING' })
+    ]);
 
-    const totalVerifications = users.length;
-    const approvedCount = users.filter(u => u.status === 'approved').length;
-    const rejectedCount = users.filter(u => u.status === 'rejected').length;
-    const pendingCount = users.filter(u => u.status === 'pending').length;
+    const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
-    const approvalRate = totalVerifications > 0
-      ? Math.round((approvedCount / totalVerifications) * 100)
-      : 0;
-
-    // Calculate average processing time (mock for now or calc if dates exist)
-    // For simplicity, we'll return the counts
-
-    res.json({
-      totalVerifications,
-      approvedCount,
-      rejectedCount,
-      pendingCount,
-      approvalRate
-    });
+    res.json({ totalVerifications: total, approvedCount: approved, rejectedCount: rejected, pendingCount: pending, approvalRate });
   } catch (error) {
     console.error('Admin stats error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
 
-// ============================================================================
-// SETTINGS ENDPOINTS
-// ============================================================================
-
-// Get current settings
+/**
+ * Get current settings (uses KycConfiguration)
+ */
 export const getSettings = async (req, res) => {
   try {
-    const settings = await readSettings();
-    const defaults = getDefaultSettings();
-    
+    const userId = req.auth?.userId;
+    let config = await KycConfiguration.findOne({ userId, environment: 'production' });
+
+    if (!config) {
+      const defaultConfig = createDefaultConfig(userId);
+      config = await KycConfiguration.create(defaultConfig);
+    }
+
     res.json({
-      settings,
-      defaults
+      settings: {
+        verificationRules: config.verificationSteps,
+        thresholds: {
+          ...flattenThresholds(config.idCardThresholds),
+          ...flattenSelfieThresholds(config.selfieThresholds),
+          minAge: config.validationRules.minAge,
+        }
+      },
+      defaults: PRESETS.balanced
     });
   } catch (error) {
     console.error('Get settings error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
 
-// Update settings
+/**
+ * Update settings
+ */
 export const updateSettings = async (req, res) => {
   try {
+    const userId = req.auth?.userId;
     const { verificationRules, thresholds } = req.body;
-    const currentSettings = await readSettings();
-    
-    // Validate verification rules
+
+    const config = await KycConfiguration.findOne({ userId, environment: 'production' });
+    if (!config) {
+      return res.status(404).json({ error: 'Configuration not found' });
+    }
+
     if (verificationRules) {
-      // At least one verification method must be enabled
-      if (!verificationRules.requireIdCard && !verificationRules.requireSelfie) {
-        return res.status(400).json({
-          status: STATUS.FAILED,
-          errors: [{
-            code: 'INVALID_SETTINGS',
-            message: 'At least one verification method (ID Card or Selfie) must be enabled'
-          }]
-        });
-      }
-      currentSettings.verificationRules = {
-        ...currentSettings.verificationRules,
-        ...verificationRules
-      };
+      Object.assign(config.verificationSteps, verificationRules);
     }
-    
-    // Validate and update thresholds
+
     if (thresholds) {
-      const validatedThresholds = validateThresholds(thresholds);
-      if (validatedThresholds.errors.length > 0) {
-        return res.status(400).json({
-          status: STATUS.FAILED,
-          errors: validatedThresholds.errors
-        });
-      }
-      currentSettings.thresholds = {
-        ...currentSettings.thresholds,
-        ...validatedThresholds.data
-      };
+      applyThresholdUpdates(config, thresholds);
     }
-    
-    // Update metadata
-    currentSettings.metadata = {
-      lastUpdated: new Date().toISOString(),
-      updatedBy: req.auth?.userId || 'admin'
-    };
-    
-    const success = await writeSettings(currentSettings);
-    
-    if (!success) {
-      return res.status(500).json({
-        status: STATUS.FAILED,
-        errors: [{ code: 'SAVE_FAILED', message: 'Failed to save settings' }]
-      });
-    }
-    
-    res.json({
-      success: true,
-      settings: currentSettings,
-      message: 'Settings updated successfully'
-    });
+
+    config.version += 1;
+    await config.save();
+
+    res.json({ success: true, settings: config, message: 'Settings updated successfully' });
   } catch (error) {
     console.error('Update settings error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
 
-// Reset settings to defaults
+/**
+ * Reset settings to defaults
+ */
 export const resetSettings = async (req, res) => {
   try {
-    const defaults = getDefaultSettings();
-    defaults.metadata = {
-      lastUpdated: new Date().toISOString(),
-      updatedBy: req.auth?.userId || 'admin'
-    };
-    
-    const success = await writeSettings(defaults);
-    
-    if (!success) {
-      return res.status(500).json({
-        status: STATUS.FAILED,
-        errors: [{ code: 'SAVE_FAILED', message: 'Failed to reset settings' }]
-      });
-    }
-    
-    res.json({
-      success: true,
-      settings: defaults,
-      message: 'Settings reset to defaults'
-    });
+    const userId = req.auth?.userId;
+    const defaultConfig = createDefaultConfig(userId);
+
+    const config = await KycConfiguration.findOneAndUpdate(
+      { userId, environment: 'production' },
+      defaultConfig,
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, settings: config, message: 'Settings reset to defaults' });
   } catch (error) {
     console.error('Reset settings error:', error);
-    res.status(500).json({
-      status: STATUS.FAILED,
-      errors: [ERRORS.INTERNAL_ERROR]
-    });
+    res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
 
-// Helper function to validate thresholds
-function validateThresholds(thresholds) {
-  const errors = [];
-  const data = {};
-  
-  // Confidence thresholds (0-1)
-  const confidenceFields = [
-    'fullNameConfidence',
-    'identityNumberConfidence',
-    'dateOfBirthConfidence',
-    'expiryDateConfidence',
-    'imageQuality',
-    'faceDetectionConfidence',
-    'spoofingRiskMax'
-  ];
-  
-  for (const field of confidenceFields) {
-    if (thresholds[field] !== undefined) {
-      const value = parseFloat(thresholds[field]);
-      if (isNaN(value) || value < 0 || value > 1) {
-        errors.push({
-          code: 'INVALID_THRESHOLD',
-          message: `${field} must be between 0 and 1`
-        });
-      } else {
-        data[field] = value;
-      }
-    }
-  }
-  
-  // Match confidence (0-100)
-  if (thresholds.matchConfidence !== undefined) {
-    const value = parseFloat(thresholds.matchConfidence);
-    if (isNaN(value) || value < 0 || value > 100) {
-      errors.push({
-        code: 'INVALID_THRESHOLD',
-        message: 'matchConfidence must be between 0 and 100'
-      });
-    } else {
-      data.matchConfidence = value;
-    }
-  }
-  
-  // Age constraints
-  if (thresholds.minAge !== undefined) {
-    const value = parseInt(thresholds.minAge);
-    if (isNaN(value) || value < 0 || value > 120) {
-      errors.push({
-        code: 'INVALID_THRESHOLD',
-        message: 'minAge must be between 0 and 120'
-      });
-    } else {
-      data.minAge = value;
-    }
-  }
-  
-  if (thresholds.maxAge !== undefined) {
-    const value = parseInt(thresholds.maxAge);
-    if (isNaN(value) || value < 0 || value > 150) {
-      errors.push({
-        code: 'INVALID_THRESHOLD',
-        message: 'maxAge must be between 0 and 150'
-      });
-    } else {
-      data.maxAge = value;
-    }
-  }
-  
-  // Validate minAge < maxAge
-  if (data.minAge !== undefined && data.maxAge !== undefined && data.minAge >= data.maxAge) {
-    errors.push({
-      code: 'INVALID_THRESHOLD',
-      message: 'minAge must be less than maxAge'
-    });
-  }
-  
-  return { errors, data };
-} 
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function flattenThresholds(idCardThresholds) {
+  return {
+    fullNameConfidence: idCardThresholds.minFullNameConfidence,
+    identityNumberConfidence: idCardThresholds.minIdentityNumberConfidence,
+    dateOfBirthConfidence: idCardThresholds.minDateOfBirthConfidence,
+    expiryDateConfidence: idCardThresholds.minExpiryDateConfidence,
+    imageQuality: idCardThresholds.minImageQuality,
+  };
+}
+
+function flattenSelfieThresholds(selfieThresholds) {
+  return {
+    matchConfidence: selfieThresholds.minMatchConfidence,
+    faceDetectionConfidence: selfieThresholds.minFacialFeatureConfidence,
+    spoofingRiskMax: selfieThresholds.maxSpoofingRisk,
+  };
+}
+
+function applyThresholdUpdates(config, thresholds) {
+  if (thresholds.fullNameConfidence) config.idCardThresholds.minFullNameConfidence = thresholds.fullNameConfidence;
+  if (thresholds.identityNumberConfidence) config.idCardThresholds.minIdentityNumberConfidence = thresholds.identityNumberConfidence;
+  if (thresholds.imageQuality) config.idCardThresholds.minImageQuality = thresholds.imageQuality;
+  if (thresholds.matchConfidence) config.selfieThresholds.minMatchConfidence = thresholds.matchConfidence;
+  if (thresholds.spoofingRiskMax) config.selfieThresholds.maxSpoofingRisk = thresholds.spoofingRiskMax;
+  if (thresholds.minAge) config.validationRules.minAge = thresholds.minAge;
+}

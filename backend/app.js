@@ -5,9 +5,16 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { clerkMiddleware } from '@clerk/express';
 import dotenv from 'dotenv';
+import logger from './lib/logger.js';
 import routes from './routes/index.js';
+import { connectDB } from './lib/mongodb.js';
 
 dotenv.config();
+
+// Initialize MongoDB
+connectDB().catch(err => {
+  logger.error({ msg: 'MongoDB connection failed, running without database', error: err.message });
+});
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,13 +34,13 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:3000',
       'http://127.0.0.1:3000'
     ];
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -48,8 +55,8 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-Requested-With',
     'Accept',
     'Origin',
@@ -85,7 +92,13 @@ app.use('/', routes);
 
 // Error handling
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  logger.error({
+    msg: 'Request error',
+    error: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    path: req.path,
+    method: req.method
+  });
   res.status(err.status || 500).json({
     success: false,
     error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
@@ -102,7 +115,10 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 KYC Flow API running on port ${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info({
+    msg: 'KYC Flow API server started',
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development',
+    healthCheck: `http://localhost:${PORT}/health`
+  });
 });
