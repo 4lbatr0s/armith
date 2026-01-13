@@ -32,15 +32,15 @@ const selfieValidationSchema = new mongoose.Schema(
         // Assessment
         lightingCondition: {
             type: String,
-            enum: ['GOOD', 'POOR', 'INSUFFICIENT'],
+            enum: ['EXCELLENT', 'GOOD', 'ACCEPTABLE', 'POOR', 'INSUFFICIENT'],
         },
         faceSize: {
             type: String,
-            enum: ['ADEQUATE', 'TOO_SMALL', 'TOO_LARGE'],
+            enum: ['OPTIMAL', 'ADEQUATE', 'TOO_SMALL', 'TOO_LARGE'],
         },
         faceCoverage: {
             type: String,
-            enum: ['CLEAR', 'PARTIALLY_COVERED', 'FULLY_COVERED'],
+            enum: ['FULLY_VISIBLE', 'CLEAR', 'PARTIALLY_OBSCURED', 'PARTIALLY_COVERED', 'SIGNIFICANTLY_OBSCURED', 'FULLY_COVERED', 'NOT_VISIBLE'],
         },
 
         // Confidence scores
@@ -54,7 +54,7 @@ const selfieValidationSchema = new mongoose.Schema(
             default: 'PENDING',
         },
         errors: [mongoose.Schema.Types.Mixed],
-        rejectionReasons: [String],
+        rejectionReasons: [mongoose.Schema.Types.Mixed],
     },
     {
         timestamps: true,

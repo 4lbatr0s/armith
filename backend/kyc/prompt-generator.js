@@ -13,19 +13,19 @@
  * @returns {string} Complete prompt for ID card verification
  */
 export function generateIdCardPrompt(config) {
-    const { idCardThresholds, validationRules, customThresholds } = config;
+  const { idCardThresholds, validationRules, customThresholds } = config;
 
-    const basePrompt = buildIdCardBasePrompt();
-    const thresholdsSection = buildIdCardThresholdsSection(idCardThresholds);
-    const validationSection = buildIdCardValidationSection(validationRules);
-    const customSection = buildCustomThresholdsSection(customThresholds);
-    const outputSection = buildIdCardOutputSection();
+  const basePrompt = buildIdCardBasePrompt();
+  const thresholdsSection = buildIdCardThresholdsSection(idCardThresholds);
+  const validationSection = buildIdCardValidationSection(validationRules);
+  const customSection = buildCustomThresholdsSection(customThresholds);
+  const outputSection = buildIdCardOutputSection();
 
-    return `${basePrompt}\n\n${thresholdsSection}\n\n${validationSection}${customSection}\n\n${outputSection}`;
+  return `${basePrompt}\n\n${thresholdsSection}\n\n${validationSection}${customSection}\n\n${outputSection}`;
 }
 
 function buildIdCardBasePrompt() {
-    return `You are an expert document verification system analyzing a Turkish Republic Identity Card (Türkiye Cumhuriyeti Kimlik Kartı).
+  return `You are an expert document verification system analyzing a Turkish Republic Identity Card (Türkiye Cumhuriyeti Kimlik Kartı).
 
 # CONTEXT
 You will receive 1-2 images:
@@ -34,12 +34,10 @@ You will receive 1-2 images:
 
 # EXTRACTION REQUIREMENTS
 
-## 1. PERSONAL INFORMATION
-Extract these fields with exact formatting:
-
-- **fullName**: Complete name in UPPERCASE Turkish alphabet
+- **firstName**: Given name(s) in UPPERCASE Turkish alphabet
+- **lastName**: Surname in UPPERCASE Turkish alphabet
   - Valid chars: A-Z, ÇĞİÖŞÜ
-  - Format: "SURNAME GIVEN_NAME(S)"
+  - Format: Separate given names and surname. Use "firstName" and "lastName" keys.
 
 - **identityNumber**: TC Kimlik No (11-digit unique identifier)
   - Must be exactly 11 numeric digits
@@ -90,18 +88,16 @@ Analyze security features:
 }
 
 function buildIdCardThresholdsSection(thresholds) {
-    return `# CONFIDENCE THRESHOLDS (CLIENT-SPECIFIC)
+  return `# CONFIDENCE THRESHOLDS (CLIENT-SPECIFIC)
 
 You MUST meet these minimum confidence scores:
 
 - **Overall Confidence**: >= ${thresholds.minOverallConfidence.toFixed(2)}
-- **Full Name**: >= ${thresholds.minFullNameConfidence.toFixed(2)}
+- **First Name & Last Name**: >= ${thresholds.minFullNameConfidence.toFixed(2)}
 - **Identity Number**: >= ${thresholds.minIdentityNumberConfidence.toFixed(2)}
 - **Date of Birth**: >= ${thresholds.minDateOfBirthConfidence.toFixed(2)}
 - **Expiry Date**: >= ${thresholds.minExpiryDateConfidence.toFixed(2)}
 - **MRZ**: >= ${thresholds.minMrzConfidence.toFixed(2)}
-- **Gender**: >= ${thresholds.minGenderConfidence.toFixed(2)}
-- **Serial Number**: >= ${thresholds.minSerialNumberConfidence.toFixed(2)}
 - **Image Quality**: >= ${thresholds.minImageQuality.toFixed(2)}
 - **Max Tampering Risk**: <= ${thresholds.maxTamperingRisk.toFixed(2)}
 - **Acceptable Conditions**: ${thresholds.acceptableDocumentConditions.join(', ')}
@@ -115,10 +111,10 @@ You MUST meet these minimum confidence scores:
 }
 
 function buildIdCardValidationSection(rules) {
-    let section = '# VALIDATION RULES\n\n';
+  let section = '# VALIDATION RULES\n\n';
 
-    if (rules.enforceTcChecksumValidation) {
-        section += `## TC Number Checksum
+  if (rules.enforceTcChecksumValidation) {
+    section += `## TC Number Checksum
 Turkish ID numbers have built-in validation:
 1. Sum of digits 1,3,5,7,9 × 7 minus sum at 2,4,6,8 → mod 10 = 10th digit
 2. Sum of digits 1-10 → mod 10 = 11th digit
@@ -128,28 +124,28 @@ Turkish ID numbers have built-in validation:
 - Set identityNumberConfidence to 0.0
 
 `;
-    }
+  }
 
-    if (rules.enforceAgeCheck) {
-        section += `## Age Validation
+  if (rules.enforceAgeCheck) {
+    section += `## Age Validation
 - Calculate age from dateOfBirth
 - Must be >= ${rules.minAge} years old
 - If age < ${rules.minAge}, add error: "UNDERAGE_APPLICANT"
 
 `;
-    }
+  }
 
-    if (rules.enforceExpiryCheck) {
-        section += `## Expiry Validation
+  if (rules.enforceExpiryCheck) {
+    section += `## Expiry Validation
 - Compare expiryDate with current date
 - If expired, add error: "EXPIRED_DOCUMENT"
 - If expiring within ${rules.expiryWarningDays} days, add warning: "DOCUMENT_EXPIRING_SOON"
 
 `;
-    }
+  }
 
-    if (rules.enforceMrzCrossValidation) {
-        section += `## MRZ Cross-Validation
+  if (rules.enforceMrzCrossValidation) {
+    section += `## MRZ Cross-Validation
 Compare MRZ data with visual data (must match exactly):
 - MRZ document number vs serialNumber
 - MRZ birth date vs dateOfBirth
@@ -159,52 +155,52 @@ Compare MRZ data with visual data (must match exactly):
 If ANY mismatch, add error: "MRZ_VISUAL_MISMATCH"
 
 `;
-    }
+  }
 
-    if (rules.enforceNameFormat) {
-        section += `## Name Format Validation
+  if (rules.enforceNameFormat) {
+    section += `## Name Format Validation
 - Name must only contain A-Z and Turkish letters (ÇĞİÖŞÜ)
 - No numbers or special characters (except space)
 - If invalid, add error: "INVALID_NAME_FORMAT"
 
 `;
-    }
+  }
 
-    if (rules.requireHologramDetection) {
-        section += `## Hologram Detection
+  if (rules.requireHologramDetection) {
+    section += `## Hologram Detection
 **REQUIRED**: Hologram must be visible.
 If not detected, add error: "HOLOGRAM_NOT_DETECTED"
 
 `;
-    }
+  }
 
-    if (!rules.allowDamagedDocuments) {
-        section += `## Document Condition Restriction
+  if (!rules.allowDamagedDocuments) {
+    section += `## Document Condition Restriction
 Only 'excellent' and 'good' conditions are acceptable.
 If documentCondition is 'fair' or 'poor', add error: "UNACCEPTABLE_DOCUMENT_CONDITION"
 
 `;
-    }
+  }
 
-    return section;
+  return section;
 }
 
 function buildCustomThresholdsSection(customThresholds) {
-    if (!customThresholds || Object.keys(customThresholds).length === 0) {
-        return '';
-    }
+  if (!customThresholds || Object.keys(customThresholds).length === 0) {
+    return '';
+  }
 
-    let section = '\n# CUSTOM THRESHOLDS (CLIENT-SPECIFIC)\n\n';
-    for (const [key, threshold] of Object.entries(customThresholds)) {
-        const desc = threshold.description ? ` - ${threshold.description}` : '';
-        section += `- **${key}**: ${threshold.value} (${threshold.type})${desc}\n`;
-    }
-    section += '\nApply these thresholds as additional validation criteria.\n';
-    return section;
+  let section = '\n# CUSTOM THRESHOLDS (CLIENT-SPECIFIC)\n\n';
+  for (const [key, threshold] of Object.entries(customThresholds)) {
+    const desc = threshold.description ? ` - ${threshold.description}` : '';
+    section += `- **${key}**: ${threshold.value} (${threshold.type})${desc}\n`;
+  }
+  section += '\nApply these thresholds as additional validation criteria.\n';
+  return section;
 }
 
 function buildIdCardOutputSection() {
-    return `# ERROR CODES
+  return `# ERROR CODES
 
 Use these error codes:
 - MISSING_REQUIRED_FIELD (critical)
@@ -224,7 +220,8 @@ Use these error codes:
 
 {
   "extraction": {
-    "fullName": "string|null",
+    "firstName": "string|null",
+    "lastName": "string|null",
     "identityNumber": "string|null",
     "dateOfBirth": "YYYY-MM-DD|null",
     "gender": "M|F|null",
@@ -235,7 +232,17 @@ Use these error codes:
   },
   "mrz": {
     "raw": "string|null",
-    "parsed": { ... },
+    "parsed": {
+      "documentType": "string|null",
+      "issuingCountry": "string|null",
+      "documentNumber": "string|null",
+      "dateOfBirth": "YYMMDD|null",
+      "sex": "M|F|null",
+      "expiryDate": "YYMMDD|null",
+      "nationality": "string|null",
+      "surname": "string|null",
+      "givenNames": "string|null"
+    },
     "checksumValid": true|false|null,
     "mrzConfidence": 0.0-1.0
   },
@@ -254,18 +261,17 @@ Use these error codes:
     "countryCode": "tr"
   },
   "confidence": {
-    "fullNameConfidence": 0.0-1.0,
+    "firstNameConfidence": 0.0-1.0,
+    "lastNameConfidence": 0.0-1.0,
     "identityNumberConfidence": 0.0-1.0,
     "dateOfBirthConfidence": 0.0-1.0,
     "expiryDateConfidence": 0.0-1.0,
     "mrzConfidence": 0.0-1.0,
-    "genderConfidence": 0.0-1.0,
-    "serialNumberConfidence": 0.0-1.0,
     "overallConfidence": 0.0-1.0
   },
   "validation": {
     "isValid": true|false,
-    "errors": [{ "code": "string", "field": "string", "message": "string", "severity": "critical|warning" }]
+    "errors": [{ "code": "string", "field": "string", "message": "string", "severity": "critical|warning", "threshold": "string|null" }]
   },
   "metadata": {
     "processingTime": "ISO timestamp",
@@ -273,7 +279,7 @@ Use these error codes:
   }
 }
 
-**CRITICAL**: Return ONLY valid JSON. No markdown, no explanations.`;
+**CRITICAL**: Return ONLY valid JSON. All fields defined in the schema are MANDATORY. If a field is not applicable or not found, return "null" for that field (do not omit it). No markdown, no explanations.`;
 }
 
 // ============================================================================
@@ -286,29 +292,29 @@ Use these error codes:
  * @returns {string} Complete prompt for selfie verification
  */
 export function generateSelfiePrompt(config) {
-    const { selfieThresholds, customThresholds } = config;
+  const { selfieThresholds, customThresholds } = config;
 
-    const basePrompt = buildSelfieBasePrompt(selfieThresholds);
-    const thresholdsSection = buildSelfieThresholdsSection(selfieThresholds);
-    const customSection = buildCustomThresholdsSection(customThresholds);
-    const outputSection = buildSelfieOutputSection();
+  const basePrompt = buildSelfieBasePrompt(selfieThresholds);
+  const thresholdsSection = buildSelfieThresholdsSection(selfieThresholds);
+  const customSection = buildCustomThresholdsSection(customThresholds);
+  const outputSection = buildSelfieOutputSection();
 
-    return `${basePrompt}\n\n${thresholdsSection}${customSection}\n\n${outputSection}`;
+  return `${basePrompt}\n\n${thresholdsSection}${customSection}\n\n${outputSection}`;
 }
 
 function buildSelfieBasePrompt(thresholds) {
-    const imageCount = thresholds.requireMultipleAngles ? '3-4' : '2-3';
+  const imageCount = thresholds.requireMultipleAngles ? '3-4' : '2-3';
 
-    return `You are an expert biometric verification system performing liveness detection and face matching.
+  return `You are an expert biometric verification system performing liveness detection and face matching.
 
 # CONTEXT
 You will receive ${imageCount} images:
 1. **ID Card Front** - Contains embedded ID photo (reference face)
 2. **Live Selfie #1** - Primary selfie for verification
 ${thresholds.requireMultipleAngles ?
-            `3. **Live Selfie #2** - Secondary angle for liveness
+      `3. **Live Selfie #2** - Secondary angle for liveness
 4. **Live Selfie #3** (optional) - Tertiary angle` :
-            `3. **Live Selfie #2** (optional) - Secondary angle`}
+      `3. **Live Selfie #2** (optional) - Secondary angle`}
 
 Task: Verify selfie(s) match the ID photo AND detect spoofing attempts.
 
@@ -361,7 +367,7 @@ Check lighting, face size, coverage, and technical quality.`;
 }
 
 function buildSelfieThresholdsSection(thresholds) {
-    return `# THRESHOLDS (CLIENT-SPECIFIC)
+  return `# THRESHOLDS (CLIENT-SPECIFIC)
 
 - **Match Confidence**: >= ${thresholds.minMatchConfidence}%
 - **Max Spoofing Risk**: <= ${thresholds.maxSpoofingRisk.toFixed(2)}
@@ -381,7 +387,7 @@ ${thresholds.requireMultipleAngles ? `- **Min Angle Difference**: ${thresholds.m
 }
 
 function buildSelfieOutputSection() {
-    return `# ERROR CODES
+  return `# ERROR CODES
 
 - NO_FACE_IN_ID (critical)
 - NO_FACE_IN_SELFIE (critical)
@@ -431,7 +437,7 @@ function buildSelfieOutputSection() {
   },
   "validation": {
     "status": "pass|fail|review",
-    "errors": [{ "code": "string", "field": "string", "message": "string", "severity": "critical|warning" }]
+    "errors": [{ "code": "string", "field": "string", "message": "string", "severity": "critical|warning", "threshold": "string|null" }]
   },
   "explainability": {
     "matchingReasons": ["string"],
@@ -445,5 +451,5 @@ function buildSelfieOutputSection() {
   }
 }
 
-**CRITICAL**: Return ONLY valid JSON. No markdown, no explanations.`;
+**CRITICAL**: Return ONLY valid JSON. All fields defined in the schema are MANDATORY. If a field is not applicable or not found, return "null" for that field (do not omit it). No markdown, no explanations.`;
 }

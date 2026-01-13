@@ -12,6 +12,8 @@ const profileSchema = new mongoose.Schema(
             index: true,
         },
         fullName: String,
+        firstName: String,
+        lastName: String,
         identityNumber: String,
         dateOfBirth: Date,
         gender: String,
@@ -39,24 +41,24 @@ const profileSchema = new mongoose.Schema(
             enum: ['PENDING', 'APPROVED', 'REJECTED', 'FAILED', 'UNDER_REVIEW', null],
             default: null,
         },
-        
+
         // Additional ID card information (from IdCardValidation)
         serialNumber: String, // Document serial number
         expiryDate: Date, // Document expiry date
         address: String, // Address from ID card
         documentCondition: {
             type: String,
-            enum: ['GOOD', 'DAMAGED', 'POOR', null],
+            enum: ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'DAMAGED', null],
             default: null,
         },
-        
+
         // Confidence scores summary (for quick access)
         overallConfidence: {
             type: Number,
             min: 0,
             max: 1,
         }, // Overall confidence from ID verification
-        
+
         // Selfie verification summary
         selfieMatchConfidence: {
             type: Number,
@@ -68,20 +70,20 @@ const profileSchema = new mongoose.Schema(
             min: 0,
             max: 1,
         }, // Spoofing risk (0-1)
-        
+
         // Image URLs (quick access without joining)
         idFrontImageUrl: String,
         idBackImageUrl: String,
         selfieImageUrl: String, // Primary selfie image
-        
+
         // Verification metadata
         verificationAttempts: {
             type: Number,
             default: 0,
         }, // Number of verification attempts
         lastVerificationAttempt: Date, // Last verification attempt timestamp
-        rejectionReasons: [String], // Summary of rejection reasons
-        
+        rejectionReasons: [mongoose.Schema.Types.Mixed], // Structured rejection reasons with code and field
+
         // Additional metadata
         notes: String, // Admin notes about this profile
         tags: [String], // Tags for categorization/filtering
@@ -95,11 +97,11 @@ const profileSchema = new mongoose.Schema(
 // Compound unique index - only when identityNumber is not null
 // Using partial index to avoid duplicate key errors with null values
 profileSchema.index(
-  { country: 1, identityNumber: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { identityNumber: { $ne: null } }
-  }
+    { country: 1, identityNumber: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { identityNumber: { $ne: null } }
+    }
 );
 
 export const Profile = mongoose.model('Profile', profileSchema);

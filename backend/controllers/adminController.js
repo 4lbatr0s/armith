@@ -13,6 +13,7 @@ import { createDefaultConfig, PRESETS } from '../kyc/defaults.js';
 export const getVerifications = async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
+    
     const skip = (page - 1) * limit;
 
     const filter = status ? { status } : {};

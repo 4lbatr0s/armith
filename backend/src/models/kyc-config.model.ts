@@ -1,8 +1,3 @@
-/**
- * KycConfiguration Model
- * Customer-specific KYC verification settings
- */
-
 import mongoose from 'mongoose';
 
 const kycConfigurationSchema = new mongoose.Schema(
@@ -18,6 +13,13 @@ const kycConfigurationSchema = new mongoose.Schema(
             required: true,
         },
         description: String,
+        countryCode: {
+            type: String,
+            default: 'TR',
+            required: true,
+            uppercase: true,
+            trim: true,
+        },
 
         // Configuration objects
         verificationSteps: {
@@ -58,6 +60,7 @@ const kycConfigurationSchema = new mongoose.Schema(
         validationRules: {
             enforceAgeCheck: { type: Boolean, default: true },
             minAge: { type: Number, default: 18 },
+            maxAge: { type: Number, default: 120 },
             enforceExpiryCheck: { type: Boolean, default: true },
             expiryWarningDays: { type: Number, default: 30 },
             enforceTcChecksumValidation: { type: Boolean, default: true },
@@ -88,12 +91,6 @@ const kycConfigurationSchema = new mongoose.Schema(
             enum: ['test', 'staging', 'production'],
             default: 'production',
         },
-        countryCode: {
-            type: String,
-            default: 'TR',
-            uppercase: true,
-            index: true,
-        }
     },
     {
         timestamps: true,
@@ -101,7 +98,7 @@ const kycConfigurationSchema = new mongoose.Schema(
     }
 );
 
-// Unique config per user per environment per country
-kycConfigurationSchema.index({ userId: 1, environment: 1, countryCode: 1 }, { unique: true });
+// Unique config per user per country per environment
+kycConfigurationSchema.index({ userId: 1, countryCode: 1, environment: 1 }, { unique: true });
 
 export const KycConfiguration = mongoose.model('KycConfiguration', kycConfigurationSchema);

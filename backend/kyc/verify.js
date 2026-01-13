@@ -15,8 +15,14 @@ import {
   validateDate,
   determineStatus
 } from './config.js';
-import { ID_PROMPT, SELFIE_PROMPT } from './prompts.js';
 import { generateIdCardPrompt, generateSelfiePrompt } from './prompt-generator.js';
+import {
+  ID_VERIFICATION_SCHEMA,
+  SELFIE_VERIFICATION_SCHEMA,
+  IdVerificationSchema,
+  SelfieVerificationSchema
+} from './schemas.js';
+import { createDefaultConfig } from './defaults.js';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -51,14 +57,23 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
       imageContent.push({ type: 'image_url', image_url: { url: backImageUrl } });
     }
 
-    // Use dynamic prompt if config provided, otherwise fall back to static
-    const prompt = config ? generateIdCardPrompt(config) : ID_PROMPT;
+    // Use dynamic prompt (use defaults if config not provided)
+    const effectiveConfig = config || createDefaultConfig('system');
+    const prompt = generateIdCardPrompt(effectiveConfig);
 
-    // Call Groq API
+    // Call Groq API with structured output
     const response = await groq.chat.completions.create({
       model: MODEL,
       temperature: TEMPERATURE,
       max_tokens: MAX_TOKENS,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'id_verification_response',
+          strict: true,
+          schema: ID_VERIFICATION_SCHEMA
+        }
+      },
       messages: [
         { role: 'system', content: prompt },
         {
@@ -71,9 +86,9 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
       ]
     });
 
-    // Parse JSON response
-    const data = parseJsonResponse(response.choices[0]?.message?.content);
-    if (!data) {
+    // Parse JSON response (structured output guarantees valid JSON)
+    const rawData = parseJsonResponse(response.choices[0]?.message?.content);
+    if (!rawData) {
       return {
         success: false,
         status: STATUS.FAILED,
@@ -81,11 +96,37 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
       };
     }
 
+    // Validate with Zod schema
+    const validationResult = IdVerificationSchema.safeParse(rawData);
+    if (!validationResult.success) {
+      logger.warn({ errors: validationResult.error.errors }, 'Zod validation failed for ID verification');
+      return {
+        success: false,
+        status: STATUS.FAILED,
+        error: ERRORS.INVALID_JSON_RESPONSE,
+        details: 'Response does not match expected schema'
+      };
+    }
+
+    const data = validationResult.data;
+
+    // Extract data from nested structure
+    const extractedData = {
+      fullName: data.extraction.fullName,
+      identityNumber: data.extraction.identityNumber,
+      dateOfBirth: data.extraction.dateOfBirth,
+      gender: data.extraction.gender,
+      serialNumber: data.extraction.serialNumber,
+      expiryDate: data.extraction.expiryDate,
+      nationality: data.extraction.nationality,
+      address: data.extraction.address
+    };
+
     // Validate extracted data
-    const errors = validateIdData(data);
+    const errors = validateIdData(extractedData);
 
     // Merge LLM-detected errors with validation errors
-    const allErrors = [...(data.errors || []), ...errors];
+    const allErrors = [...(data.validation?.errors || []), ...errors];
     const uniqueErrors = deduplicateErrors(allErrors);
 
     // Determine status
@@ -93,19 +134,19 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
 
     // Parse MRZ if available
     let mrzInfo = null;
-    if (data.mrz) {
+    if (data.mrz?.raw) {
       try {
-        mrzInfo = parseMrz(data.mrz);
+        mrzInfo = parseMrz(data.mrz.raw);
 
         // Log MRZ information (LLM returned and parsed)
         logger.info({
           msg: 'MRZ parsing completed',
           mrz: {
-            raw: data.mrz, // MRZ string returned by LLM
+            raw: data.mrz.raw, // MRZ string returned by LLM
             parsed: mrzInfo // Parsed MRZ data from mrz package
           },
           verification: {
-            hasMrz: !!data.mrz,
+            hasMrz: !!data.mrz?.raw,
             parseSuccess: !!mrzInfo,
             format: mrzInfo?.format || null,
             valid: mrzInfo?.valid ?? null
@@ -115,7 +156,7 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
         logger.warn({
           msg: 'MRZ parsing failed',
           error: error.message,
-          rawMrz: data.mrz
+          rawMrz: data.mrz?.raw
         });
         // Continue without mrzInfo if parsing fails
       }
@@ -131,25 +172,26 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
       success: true,
       status,
       data: {
-        fullName: data.fullName,
-        identityNumber: data.identityNumber,
-        dateOfBirth: data.dateOfBirth,
-        expiryDate: data.expiryDate,
-        gender: normalizeGender(data.gender),
-        nationality: data.nationality,
-        serialNumber: data.serialNumber,
-        mrz: data.mrz, // Raw MRZ string (keep as is)
+        fullName: extractedData.fullName,
+        identityNumber: extractedData.identityNumber,
+        dateOfBirth: extractedData.dateOfBirth,
+        expiryDate: extractedData.expiryDate,
+        gender: normalizeGender(extractedData.gender),
+        nationality: extractedData.nationality,
+        serialNumber: extractedData.serialNumber,
+        mrz: data.mrz?.raw || null, // Raw MRZ string
         mrzInfo: mrzInfo, // Parsed MRZ data
-        address: data.address,
-        documentCondition: data.documentCondition,
-        countryCode: data.countryCode || 'tr'
+        address: extractedData.address,
+        documentCondition: data.authenticity?.documentCondition || null,
+        countryCode: data.quality?.countryCode || 'tr'
       },
       confidence: {
-        fullName: data.fullNameConfidence,
-        identityNumber: data.identityNumberConfidence,
-        dateOfBirth: data.dateOfBirthConfidence,
-        expiryDate: data.expiryDateConfidence,
-        imageQuality: data.imageQuality
+        firstName: data.confidence?.firstNameConfidence || 0,
+        lastName: data.confidence?.lastNameConfidence || 0,
+        identityNumber: data.confidence?.identityNumberConfidence || 0,
+        dateOfBirth: data.confidence?.dateOfBirthConfidence || 0,
+        expiryDate: data.confidence?.expiryDateConfidence || 0,
+        imageQuality: data.quality?.imageQuality || 0
       },
       errors: uniqueErrors
     };
@@ -187,14 +229,23 @@ export async function verifySelfie(idPhotoUrl, selfieUrls, config = null) {
       ...selfies.map(url => ({ type: 'image_url', image_url: { url } }))
     ];
 
-    // Use dynamic prompt if config provided, otherwise fall back to static
-    const prompt = config ? generateSelfiePrompt(config) : SELFIE_PROMPT;
+    // Use dynamic prompt (use defaults if config not provided)
+    const effectiveConfig = config || createDefaultConfig('system');
+    const prompt = generateSelfiePrompt(effectiveConfig);
 
-    // Call Groq API
+    // Call Groq API with structured output
     const response = await groq.chat.completions.create({
       model: MODEL,
       temperature: TEMPERATURE,
       max_tokens: MAX_TOKENS,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'selfie_verification_response',
+          strict: true,
+          schema: SELFIE_VERIFICATION_SCHEMA
+        }
+      },
       messages: [
         { role: 'system', content: prompt },
         {
@@ -207,9 +258,9 @@ export async function verifySelfie(idPhotoUrl, selfieUrls, config = null) {
       ]
     });
 
-    // Parse JSON response
-    const data = parseJsonResponse(response.choices[0]?.message?.content);
-    if (!data) {
+    // Parse JSON response (structured output guarantees valid JSON)
+    const rawData = parseJsonResponse(response.choices[0]?.message?.content);
+    if (!rawData) {
       return {
         success: false,
         status: STATUS.FAILED,
@@ -217,14 +268,39 @@ export async function verifySelfie(idPhotoUrl, selfieUrls, config = null) {
       };
     }
 
-    // Coerce and normalize data
-    const normalizedData = normalizeSelfieData(data);
+    // Validate with Zod schema
+    const validationResult = SelfieVerificationSchema.safeParse(rawData);
+    if (!validationResult.success) {
+      logger.warn({ errors: validationResult.error.errors }, 'Zod validation failed for selfie verification');
+      return {
+        success: false,
+        status: STATUS.FAILED,
+        error: ERRORS.INVALID_JSON_RESPONSE,
+        details: 'Response does not match expected schema'
+      };
+    }
+
+    const data = validationResult.data;
+
+    // Extract and normalize data from nested structure
+    const normalizedData = {
+      isMatch: data.biometricMatch.isMatch,
+      matchConfidence: data.biometricMatch.matchConfidence,
+      spoofingRisk: data.liveness.spoofingRisk,
+      faceCount: data.faceDetection.selfie1FaceCount,
+      lightingCondition: data.imageQuality.lightingCondition,
+      faceSize: data.imageQuality.faceSize,
+      faceCoverage: data.imageQuality.faceCoverage,
+      faceDetectionConfidence: data.faceDetection.faceDetectionConfidence,
+      imageQuality: data.imageQuality.selfie1Quality,
+      imageQualityIssues: data.imageQuality.qualityIssues
+    };
 
     // Validate selfie data
     const errors = validateSelfieData(normalizedData);
 
     // Merge LLM-detected errors with validation errors
-    const allErrors = [...(normalizedData.errors || []), ...errors];
+    const allErrors = [...(data.validation?.errors || []), ...errors];
     const uniqueErrors = deduplicateErrors(allErrors);
 
     // Determine status
@@ -331,23 +407,8 @@ function validateIdData(data) {
     errors.push(ERRORS.MISSING_EXPIRY_DATE);
   }
 
-  // Confidence threshold checks
-  if (data.fullNameConfidence !== undefined && data.fullNameConfidence < THRESHOLDS.fullNameConfidence) {
-    errors.push(ERRORS.MISSING_FULL_NAME);
-  }
-
-  if (data.identityNumberConfidence !== undefined && data.identityNumberConfidence < THRESHOLDS.identityNumberConfidence) {
-    errors.push(ERRORS.MISSING_IDENTITY_NUMBER);
-  }
-
-  if (data.imageQuality !== undefined && data.imageQuality < THRESHOLDS.imageQuality) {
-    errors.push(ERRORS.BLURRY_IMAGE);
-  }
-
-  // Document condition check
-  if (data.documentCondition === 'poor') {
-    errors.push(ERRORS.DAMAGED_ID);
-  }
+  // Note: Confidence and quality checks are now handled via Zod schema validation
+  // Additional business logic validation can be added here if needed
 
   return errors;
 }

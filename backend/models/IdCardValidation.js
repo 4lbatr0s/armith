@@ -25,6 +25,8 @@ const idCardValidationSchema = new mongoose.Schema(
 
         // Extracted data
         fullName: String,
+        firstName: String,
+        lastName: String,
         identityNumber: String,
         dateOfBirth: Date,
         expiryDate: Date,
@@ -38,11 +40,13 @@ const idCardValidationSchema = new mongoose.Schema(
         // Assessment
         documentCondition: {
             type: String,
-            enum: ['GOOD', 'DAMAGED', 'POOR'],
+            enum: ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'],
         },
 
         // Confidence scores (0-1)
         fullNameConfidence: Number,
+        firstNameConfidence: Number,
+        lastNameConfidence: Number,
         identityNumberConfidence: Number,
         dateOfBirthConfidence: Number,
         expiryDateConfidence: Number,
@@ -55,7 +59,7 @@ const idCardValidationSchema = new mongoose.Schema(
             default: 'PENDING',
         },
         errors: [mongoose.Schema.Types.Mixed],
-        rejectionReasons: [String],
+        rejectionReasons: [mongoose.Schema.Types.Mixed],
     },
     {
         timestamps: true,

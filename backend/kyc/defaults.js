@@ -148,14 +148,16 @@ export const PRESETS = {
 /**
  * Create default configuration for a user
  * @param {string} userId - User ID
+ * @param {string} countryCode - Country code (default: 'TR')
  * @param {string} [environment='production'] - Environment
  * @returns {Object} Default configuration object
  */
-export function createDefaultConfig(userId, environment = 'production') {
+export function createDefaultConfig(userId, countryCode = 'TR', environment = 'production') {
     return {
         userId,
-        name: 'Default Configuration',
-        description: 'Standard KYC verification settings',
+        countryCode: countryCode.toUpperCase(),
+        name: `${countryCode.toUpperCase()} Default Configuration`,
+        description: `Standard KYC verification settings for ${countryCode.toUpperCase()}`,
         verificationSteps: { ...DEFAULT_VERIFICATION_STEPS },
         idCardThresholds: { ...DEFAULT_ID_CARD_THRESHOLDS },
         selfieThresholds: { ...DEFAULT_SELFIE_THRESHOLDS },
@@ -173,15 +175,17 @@ export function createDefaultConfig(userId, environment = 'production') {
  * Create configuration from preset
  * @param {'strict'|'balanced'|'lenient'} preset - Preset name
  * @param {string} userId - User ID
+ * @param {string} countryCode - Country code
  * @param {string} [environment='production'] - Environment
  * @returns {Object} Configuration from preset
  */
-export function createFromPreset(preset, userId, environment = 'production') {
+export function createFromPreset(preset, userId, countryCode = 'TR', environment = 'production') {
     const presetConfig = PRESETS[preset] || PRESETS.balanced;
 
     return {
         userId,
-        name: presetConfig.name,
+        countryCode: countryCode.toUpperCase(),
+        name: `${countryCode.toUpperCase()} ${presetConfig.name}`,
         description: presetConfig.description,
         verificationSteps: { ...presetConfig.verificationSteps },
         idCardThresholds: { ...presetConfig.idCardThresholds },

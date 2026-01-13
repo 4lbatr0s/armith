@@ -3,13 +3,14 @@
  * Handles ID card and selfie verification endpoints
  */
 
-import { ERRORS, STATUS } from '../kyc/config.js';
+import { ERRORS, STATUS, formatStructuredError, THRESHOLDS } from '../kyc/config.js';
 import { verifyId as kycVerifyId, verifySelfie as kycVerifySelfie } from '../kyc/verify.js';
 import { IdCheckRequestSchema, SelfieCheckRequestSchema, validateRequest } from '../schemas.js';
 import storageService from '../services/storageService.js';
 import { Profile, IdCardValidation, SelfieValidation, KycConfiguration } from '../models/index.js';
 import { createDefaultConfig } from '../kyc/defaults.js';
 import logger from '../lib/logger.js';
+import { VerificationService } from '../src/services/verification.service.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -34,13 +35,28 @@ function getVerificationRulesFromConfig(config) {
   return config ? config.verificationSteps : { requireIdCard: true, requireSelfie: true };
 }
 
+// Deduplicate rejection reasons by numericCode
+const deduplicateReasons = (existing, newReasons) => {
+  const seen = new Set();
+  return [...(existing || []), ...newReasons].filter(reason => {
+    if (!reason || !reason.numericCode) return true; // Keep old strings or non-standard objects
+    if (seen.has(reason.numericCode)) return false;
+    seen.add(reason.numericCode);
+    return true;
+  });
+};
+
 // ============================================================================
 // ENDPOINTS
 // ============================================================================ //
 
 export const getSupportedCountries = async (req, res) => {
   res.json({
-    countries: [{ code: 'TR', name: 'Turkey', supportedDocuments: ['NATIONAL_ID'] }]
+    countries: [
+      { code: 'TR', name: 'Turkey', supportedDocuments: ['NATIONAL_ID'] },
+      { code: 'DE', name: 'Germany', supportedDocuments: ['NATIONAL_ID', 'PASSPORT'] },
+      { code: 'GB', name: 'United Kingdom', supportedDocuments: ['NATIONAL_ID', 'PASSPORT', 'DRIVING_LICENSE'] }
+    ]
   });
 };
 
@@ -54,7 +70,7 @@ export const getLLMStatus = async (req, res) => {
       llmService: {
         initialized: true,
         model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-        supportedCountries: ['tr']
+        supportedCountries: ['TR', 'DE', 'GB']
       },
       message: 'KYC Service status retrieved successfully'
     });
@@ -106,7 +122,7 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
 export const generateUploadUrl = async (req, res) => {
   try {
     const { fileType, userId, documentType } = req.body;
-    
+
     // Validate documentType if provided
     const validDocumentTypes = ['id-front', 'id-back', 'selfie'];
     if (documentType && !validDocumentTypes.includes(documentType)) {
@@ -118,7 +134,7 @@ export const generateUploadUrl = async (req, res) => {
         }]
       });
     }
-    
+
     const uploadData = await storageService.generatePresignedUploadUrl(fileType, userId, documentType);
 
     res.json({
@@ -140,39 +156,48 @@ export const generateUploadUrl = async (req, res) => {
 export const verifyId = async (req, res) => {
   try {
     const validation = validateRequest(IdCheckRequestSchema, req.body);
+
     if (!validation.success) {
+
       logger.warn({ details: validation.details }, 'Invalid ID verification request');
+
       return res.status(400).json({
         status: STATUS.FAILED,
-        errors: validation.details.map(d => ({ code: 'INVALID_REQUEST', message: `${d.field}: ${d.message}` }))
+        errors: validation.details.map(d => ({ code: ERRORS.INVALID_REQUEST.code, message: `${d.field}: ${d.message}` }))
       });
     }
 
-    const { countryCode, frontImageUrl, backImageUrl } = validation.data;
-
-    if (countryCode.toLowerCase() !== 'tr') {
-      return res.status(400).json({ status: STATUS.FAILED, errors: [{ code: 'UNSUPPORTED_COUNTRY', message: 'Only Turkish ID (TR) is supported' }] });
-    }
-
-    if (!storageService.isValidImageUrl(frontImageUrl) || (backImageUrl && !storageService.isValidImageUrl(backImageUrl))) {
-      return res.status(400).json({ status: STATUS.FAILED, errors: [ERRORS.INVALID_IMAGE_URL] });
-    }
+    const { countryCode = 'TR', frontImageUrl, backImageUrl } = validation.data;
 
     const authUserId = req.auth?.userId;
+
     const userConfig = await getUserConfig(authUserId);
-    const verificationRules = getVerificationRulesFromConfig(userConfig);
 
-    logger.info({ authUserId, countryCode }, 'Starting ID verification');
+    // Ensure config has correct countryCode
+    const effectiveConfig = {
 
-    // Call KYC verification
-    const result = await kycVerifyId(frontImageUrl, backImageUrl, userConfig);
+      ...(userConfig?.toObject() || createDefaultConfig(authUserId || 'system', countryCode)),
+
+      countryCode: countryCode.toUpperCase()
+    };
+
+    logger.info({ authUserId, countryCode }, 'Starting ID verification with new flow');
+
+    // Call NEW Verification Service
+    const result = await VerificationService.verifyId(effectiveConfig, {
+      front: frontImageUrl,
+      back: backImageUrl
+    });
 
     if (!result.success) {
+
       logger.error({ result }, 'ID verification failed internally');
-      return res.status(500).json({ status: result.status, errors: [result.error] });
+
+      return res.status(500).json({ status: result.status, errors: result.errors });
     }
 
-    const rejectionReasons = result.errors.map(e => e.message);
+    const verificationRules = effectiveConfig.verificationSteps || { requireIdCard: true, requireSelfie: true };
+    const rejectionReasons = result.errors.map(e => formatStructuredError(e.code, e.field, e.message));
 
     // Determine overall status
     let overallStatus = result.status;
@@ -183,7 +208,7 @@ export const verifyId = async (req, res) => {
     // Find or create Profile
     // Try to find existing profile by userId first, or by country+identityNumber if identityNumber exists
     let profile = await Profile.findOne({ userId: authUserId });
-    
+
     if (!profile && result.data?.identityNumber) {
       // Try to find by country + identityNumber
       profile = await Profile.findOne({
@@ -197,40 +222,45 @@ export const verifyId = async (req, res) => {
       profile.country = countryCode.toUpperCase();
       profile.status = overallStatus.toUpperCase();
       profile.idVerificationStatus = result.status.toUpperCase();
-      
+
       // Only update ID card information if ID verification is APPROVED
       if (result.status === STATUS.APPROVED) {
-        profile.fullName = result.data?.fullName || profile.fullName;
+        profile.fullName = `${result.data?.firstName} ${result.data?.lastName}`.trim() || profile.fullName;
+        profile.firstName = result.data?.firstName || profile.firstName;
+        profile.lastName = result.data?.lastName || profile.lastName;
         profile.identityNumber = result.data?.identityNumber || profile.identityNumber;
         profile.dateOfBirth = result.data?.dateOfBirth ? new Date(result.data.dateOfBirth) : profile.dateOfBirth;
         profile.gender = result.data?.gender || profile.gender;
         profile.nationality = result.data?.nationality || profile.nationality;
-        
+
         // Additional ID card information
         profile.serialNumber = result.data?.serialNumber || profile.serialNumber;
         profile.expiryDate = result.data?.expiryDate ? new Date(result.data.expiryDate) : profile.expiryDate;
         profile.address = result.data?.address || profile.address;
         profile.documentCondition = result.data?.documentCondition?.toUpperCase() || profile.documentCondition;
         profile.overallConfidence = result.confidence?.overallConfidence || result.confidence?.imageQuality || profile.overallConfidence;
-        
+
         // Image URLs
         profile.idFrontImageUrl = frontImageUrl;
         if (backImageUrl) profile.idBackImageUrl = backImageUrl;
       }
-      
+
       // Verification metadata (always update)
       profile.verificationAttempts = (profile.verificationAttempts || 0) + 1;
       profile.lastVerificationAttempt = new Date();
       if (rejectionReasons.length > 0) {
-        profile.rejectionReasons = [...(profile.rejectionReasons || []), ...rejectionReasons];
+        profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
       }
-      
+
       await profile.save();
+
     } else {
       // Create new profile
       profile = await Profile.create({
         userId: authUserId,
-        fullName: result.data?.fullName,
+        fullName: `${result.data?.firstName} ${result.data?.lastName}`.trim(),
+        firstName: result.data?.firstName,
+        lastName: result.data?.lastName,
         identityNumber: result.data?.identityNumber,
         dateOfBirth: result.data?.dateOfBirth ? new Date(result.data.dateOfBirth) : null,
         gender: result.data?.gender,
@@ -238,18 +268,18 @@ export const verifyId = async (req, res) => {
         country: countryCode.toUpperCase(),
         status: overallStatus.toUpperCase(),
         idVerificationStatus: result.status.toUpperCase(),
-        
+
         // Additional ID card information
         serialNumber: result.data?.serialNumber,
         expiryDate: result.data?.expiryDate ? new Date(result.data.expiryDate) : null,
         address: result.data?.address,
         documentCondition: result.data?.documentCondition?.toUpperCase(),
         overallConfidence: result.confidence?.overallConfidence || result.confidence?.imageQuality,
-        
+
         // Image URLs
         idFrontImageUrl: frontImageUrl,
         idBackImageUrl: backImageUrl || null,
-        
+
         // Verification metadata
         verificationAttempts: 1,
         lastVerificationAttempt: new Date(),
@@ -263,22 +293,27 @@ export const verifyId = async (req, res) => {
       countryCode: countryCode.toUpperCase(),
       frontImageUrl,
       backImageUrl,
-      fullName: result.data?.fullName,
+      fullName: `${result.data?.firstName} ${result.data?.lastName}`.trim(),
+      firstName: result.data?.firstName,
+      lastName: result.data?.lastName,
       identityNumber: result.data?.identityNumber,
       dateOfBirth: result.data?.dateOfBirth ? new Date(result.data.dateOfBirth) : null,
       expiryDate: result.data?.expiryDate ? new Date(result.data.expiryDate) : null,
       gender: result.data?.gender,
       nationality: result.data?.nationality,
       serialNumber: result.data?.serialNumber,
-      mrz: result.data?.mrz,
-      mrzInfo: result.data?.mrzInfo,
+      mrz: result.mrz?.raw,
+      mrzInfo: result.mrz?.parsed,
       address: result.data?.address,
       documentCondition: result.data?.documentCondition?.toUpperCase(),
-      fullNameConfidence: result.confidence?.fullName,
-      identityNumberConfidence: result.confidence?.identityNumber,
-      dateOfBirthConfidence: result.confidence?.dateOfBirth,
-      expiryDateConfidence: result.confidence?.expiryDate,
-      imageQuality: result.confidence?.imageQuality,
+      fullNameConfidence: Math.min(result.confidence?.firstNameConfidence || 0, result.confidence?.lastNameConfidence || 0),
+      firstNameConfidence: result.confidence?.firstNameConfidence,
+      lastNameConfidence: result.confidence?.lastNameConfidence,
+      identityNumberConfidence: result.confidence?.identityNumberConfidence,
+      dateOfBirthConfidence: result.confidence?.dateOfBirthConfidence,
+      expiryDateConfidence: result.confidence?.expiryDateConfidence,
+      mrzConfidence: result.confidence?.mrzConfidence,
+      imageQuality: result.confidence?.imageQuality || result.data?.quality?.imageQuality,
       status: result.status.toUpperCase(),
       errors: result.errors,
       rejectionReasons,
@@ -286,11 +321,21 @@ export const verifyId = async (req, res) => {
 
     logger.info({ profileId: profile._id, status: overallStatus }, 'ID verification completed');
 
+    const confidenceScores = [
+      { threshold: effectiveConfig.idCardThresholds?.minFullNameConfidence || THRESHOLDS.fullNameConfidence, confidenceValueName: 'firstName', confidenceScore: result.confidence?.firstNameConfidence },
+      { threshold: effectiveConfig.idCardThresholds?.minFullNameConfidence || THRESHOLDS.fullNameConfidence, confidenceValueName: 'lastName', confidenceScore: result.confidence?.lastNameConfidence },
+      { threshold: effectiveConfig.idCardThresholds?.minIdentityNumberConfidence || THRESHOLDS.identityNumberConfidence, confidenceValueName: 'identityNumber', confidenceScore: result.confidence?.identityNumberConfidence },
+      { threshold: effectiveConfig.idCardThresholds?.minDateOfBirthConfidence || THRESHOLDS.dateOfBirthConfidence, confidenceValueName: 'dateOfBirth', confidenceScore: result.confidence?.dateOfBirthConfidence },
+      { threshold: effectiveConfig.idCardThresholds?.minExpiryDateConfidence || THRESHOLDS.expiryDateConfidence, confidenceValueName: 'expiryDate', confidenceScore: result.confidence?.expiryDateConfidence },
+      { threshold: effectiveConfig.idCardThresholds?.minImageQuality || THRESHOLDS.imageQuality, confidenceValueName: 'imageQuality', confidenceScore: result.confidence?.imageQuality || result.data?.quality?.imageQuality }
+    ];
+
     res.json({
       status: overallStatus,
       idStatus: result.status,
       data: result.data,
       confidence: result.confidence,
+      confidenceScores,
       errors: result.errors,
       rejectionReasons,
       profileId: profile._id,
@@ -300,7 +345,7 @@ export const verifyId = async (req, res) => {
     });
 
   } catch (error) {
-    logger.error({ error }, 'Unexpected error in verifyId');
+    logger.error({ error: error.message, stack: error.stack }, 'Unexpected error in verifyId');
     res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
@@ -315,7 +360,7 @@ export const verifySelfie = async (req, res) => {
       logger.warn({ details: validation.details }, 'Invalid selfie verification request');
       return res.status(400).json({
         status: STATUS.FAILED,
-        errors: validation.details.map(d => ({ code: 'INVALID_REQUEST', message: `${d.field}: ${d.message}` }))
+        errors: validation.details.map(d => ({ code: ERRORS.INVALID_REQUEST.code, message: `${d.field}: ${d.message}` }))
       });
     }
 
@@ -341,7 +386,7 @@ export const verifySelfie = async (req, res) => {
       return res.status(500).json({ status: result.status, errors: [result.error] });
     }
 
-    const rejectionReasons = result.errors.map(e => e.message);
+    const rejectionReasons = result.errors.map(e => formatStructuredError(e.code, e.field, e.message));
     let overallStatus = result.status;
 
     // Update profile if profileId provided
@@ -366,19 +411,19 @@ export const verifySelfie = async (req, res) => {
         profile.status = overallStatus.toUpperCase();
         profile.selfieVerificationStatus = result.status.toUpperCase();
         profile.idVerificationStatus = idStatus;
-        
+
         // Selfie verification summary
         profile.selfieMatchConfidence = result.data?.matchConfidence || profile.selfieMatchConfidence;
         profile.selfieSpoofingRisk = result.data?.spoofingRisk || profile.selfieSpoofingRisk;
         profile.selfieImageUrl = selfieUrls[0] || profile.selfieImageUrl;
-        
+
         // Verification metadata
         profile.verificationAttempts = (profile.verificationAttempts || 0) + 1;
         profile.lastVerificationAttempt = new Date();
         if (rejectionReasons.length > 0) {
-          profile.rejectionReasons = [...(profile.rejectionReasons || []), ...rejectionReasons];
+          profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
         }
-        
+
         await profile.save();
 
         // Create SelfieValidation
@@ -407,10 +452,17 @@ export const verifySelfie = async (req, res) => {
       }
     }
 
+    const confidenceScores = [
+      { threshold: userConfig?.selfieThresholds?.minMatchConfidence || THRESHOLDS.matchConfidence, confidenceValueName: 'matchConfidence', confidenceScore: result.data?.matchConfidence },
+      { threshold: userConfig?.selfieThresholds?.minFacialFeatureConfidence || THRESHOLDS.faceDetectionConfidence, confidenceValueName: 'faceDetectionConfidence', confidenceScore: result.data?.faceDetectionConfidence },
+      { threshold: userConfig?.selfieThresholds?.maxSpoofingRisk || THRESHOLDS.spoofingRiskMax, confidenceValueName: 'spoofingRisk', confidenceScore: result.data?.spoofingRisk }
+    ];
+
     res.json({
       status: overallStatus,
       selfieStatus: result.status,
       data: result.data,
+      confidenceScores,
       errors: result.errors,
       rejectionReasons,
       images: { idPhoto: idPhotoUrl, selfies: selfieUrls },
@@ -419,7 +471,7 @@ export const verifySelfie = async (req, res) => {
     });
 
   } catch (error) {
-    logger.error({ error }, 'Unexpected error in verifySelfie');
+    logger.error({ error: error.message, stack: error.stack }, 'Unexpected error in verifySelfie');
     res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
   }
 };
@@ -471,6 +523,8 @@ export const getUserStatus = async (req, res) => {
     // Get profile data (if ID is approved, use profile data; otherwise use validation data)
     const idData = idApproved && profile.idVerificationStatus === 'APPROVED' ? {
       fullName: profile.fullName,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
       identityNumber: profile.identityNumber,
       dateOfBirth: profile.dateOfBirth,
       expiryDate: profile.expiryDate,
@@ -481,6 +535,8 @@ export const getUserStatus = async (req, res) => {
       documentCondition: profile.documentCondition,
     } : (idValidation ? {
       fullName: idValidation.fullName,
+      firstName: idValidation.firstName,
+      lastName: idValidation.lastName,
       identityNumber: idValidation.identityNumber,
       dateOfBirth: idValidation.dateOfBirth,
       expiryDate: idValidation.expiryDate,
@@ -501,6 +557,7 @@ export const getUserStatus = async (req, res) => {
       id: profile._id,
       status: profile.status,
       country: profile.country,
+      rejectionReasons: profile.rejectionReasons || [],
       createdAt: profile.createdAt,
       verificationRules,
       progress: {
@@ -513,22 +570,39 @@ export const getUserStatus = async (req, res) => {
         data: idData ? { ...idData, ...mrzData } : null,
         confidence: {
           fullName: idValidation.fullNameConfidence,
+          firstName: idValidation.firstNameConfidence,
+          lastName: idValidation.lastNameConfidence,
           identityNumber: idValidation.identityNumberConfidence,
           dateOfBirth: idValidation.dateOfBirthConfidence,
           expiryDate: idValidation.expiryDateConfidence,
           imageQuality: idValidation.imageQuality,
         },
+        confidenceScores: [
+          { threshold: thresholds.fullNameConfidence, confidenceValueName: 'firstName', confidenceScore: idValidation.firstNameConfidence },
+          { threshold: thresholds.fullNameConfidence, confidenceValueName: 'lastName', confidenceScore: idValidation.lastNameConfidence },
+          { threshold: thresholds.identityNumberConfidence, confidenceValueName: 'identityNumber', confidenceScore: idValidation.identityNumberConfidence },
+          { threshold: thresholds.dateOfBirthConfidence, confidenceValueName: 'dateOfBirth', confidenceScore: idValidation.dateOfBirthConfidence },
+          { threshold: thresholds.expiryDateConfidence, confidenceValueName: 'expiryDate', confidenceScore: idValidation.expiryDateConfidence },
+          { threshold: thresholds.imageQuality, confidenceValueName: 'imageQuality', confidenceScore: idValidation.imageQuality }
+        ],
+        rejectionReasons: idValidation.rejectionReasons || [],
         errors: idValidation.errors || [],
       } : null,
       selfieVerification: selfieValidation ? {
         status: selfieValidation.status,
         data: { isMatch: selfieValidation.isMatch, matchConfidence: selfieValidation.matchConfidence, spoofingRisk: selfieValidation.spoofingRisk },
+        confidenceScores: [
+          { threshold: thresholds.matchConfidence, confidenceValueName: 'matchConfidence', confidenceScore: selfieValidation.matchConfidence },
+          { threshold: thresholds.faceDetectionConfidence, confidenceValueName: 'faceDetectionConfidence', confidenceScore: selfieValidation.faceDetectionConfidence },
+          { threshold: thresholds.spoofingRiskMax, confidenceValueName: 'spoofingRisk', confidenceScore: selfieValidation.spoofingRisk }
+        ],
+        rejectionReasons: selfieValidation.rejectionReasons || [],
         errors: selfieValidation.errors || [],
       } : null,
-      images: { 
-        idFront: profile.idFrontImageUrl || idValidation?.frontImageUrl, 
-        idBack: profile.idBackImageUrl || idValidation?.backImageUrl, 
-        selfie: profile.selfieImageUrl || selfieValidation?.selfieUrls?.[0] 
+      images: {
+        idFront: profile.idFrontImageUrl || idValidation?.frontImageUrl,
+        idBack: profile.idBackImageUrl || idValidation?.backImageUrl,
+        selfie: profile.selfieImageUrl || selfieValidation?.selfieUrls?.[0]
       },
       thresholds,
     });
