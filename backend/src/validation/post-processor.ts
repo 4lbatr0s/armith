@@ -1,11 +1,12 @@
 import { CountryValidatorFactory } from './country-validator.factory.js';
 import { AgeValidator } from './base/age.validator.js';
 import { ExpiryValidator } from './base/expiry.validator.js';
-import { ConfidenceValidator } from './base/confidence.validator.js';
+import { evaluateIdThresholdErrors } from '../../thresholds/evaluate.js';
 import { ValidationError, ValidationResult } from './country-validator.interface.js';
+import type { KycConfigParsed } from '../../thresholds/resolve.js';
 
 export class IdCardPostProcessor {
-    static validate(data: any, config: any): ValidationResult {
+    static validate(data: any, config: KycConfigParsed): ValidationResult {
         const allErrors: ValidationError[] = [];
 
         // 1. Country-specific validation
@@ -36,34 +37,9 @@ export class IdCardPostProcessor {
             allErrors.push(...expiryResult.errors);
         }
 
-        // 4. Confidence validations
-        const confidenceThresholds = config.idCardThresholds;
-        const scores = data.confidence;
+        allErrors.push(...evaluateIdThresholdErrors(data, config));
 
-        if (scores) {
-            const confidenceChecks = [
-                { field: 'firstName', score: scores.firstNameConfidence, threshold: confidenceThresholds.minFullNameConfidence },
-                { field: 'lastName', score: scores.lastNameConfidence, threshold: confidenceThresholds.minFullNameConfidence },
-                { field: 'identityNumber', score: scores.identityNumberConfidence, threshold: confidenceThresholds.minIdentityNumberConfidence },
-                { field: 'dateOfBirth', score: scores.dateOfBirthConfidence, threshold: confidenceThresholds.minDateOfBirthConfidence },
-                { field: 'expiryDate', score: scores.expiryDateConfidence, threshold: confidenceThresholds.minExpiryDateConfidence },
-            ];
-
-            for (const check of confidenceChecks) {
-                if (check.score !== undefined) {
-                    const res = ConfidenceValidator.validate(check.field, check.score, check.threshold);
-                    allErrors.push(...res.errors);
-                }
-            }
-        }
-
-        // 5. Document condition
-        const condition = data.authenticity?.documentCondition;
-        if (condition && !config.idCardThresholds.acceptableDocumentConditions.includes(condition.toLowerCase())) {
-            allErrors.push(new ValidationError('POOR_DOCUMENT_CONDITION', `Document condition '${condition}' is not acceptable.`, 'documentCondition'));
-        }
-
-        // 6. Hologram
+        // 5. Hologram
         if (config.validationRules.requireHologramDetection && !data.authenticity?.hologramPresence) {
             allErrors.push(new ValidationError('MISSING_HOLOGRAM', 'Hologram could not be detected on the document.', 'authenticity', 'warning'));
         }

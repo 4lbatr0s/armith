@@ -15,26 +15,10 @@ export const STATUS = {
 };
 
 // ============================================================================
-// THRESHOLDS
+// THRESHOLDS (flat legacy DTO; numeric source of truth: thresholds/defaults.ts)
 // ============================================================================
 
-export const THRESHOLDS = {
-  // ID verification
-  fullNameConfidence: 0.8,
-  identityNumberConfidence: 0.95,
-  dateOfBirthConfidence: 0.9,
-  expiryDateConfidence: 0.9,
-  imageQuality: 0.7,
-
-  // Selfie verification
-  matchConfidence: 80,        // percentage
-  faceDetectionConfidence: 0.8,
-  spoofingRiskMax: 0.3,       // max allowed spoofing risk
-
-  // Age constraints
-  minAge: 18,
-  maxAge: 120
-};
+export { FLAT_LEGACY_THRESHOLDS as THRESHOLDS } from '../thresholds/defaults.js';
 
 // ============================================================================
 // ERROR CODES
@@ -230,13 +214,9 @@ export function determineStatus(errors, options = {}) {
     return STATUS.FAILED;
   }
 
-  // No errors = approved
   if (errors.length === 0) {
-    // For selfie, also check match result
     if (options.isMatch !== undefined) {
-      return options.isMatch && (options.matchConfidence >= THRESHOLDS.matchConfidence)
-        ? STATUS.APPROVED
-        : STATUS.REJECTED;
+      return options.isMatch ? STATUS.APPROVED : STATUS.REJECTED;
     }
     return STATUS.APPROVED;
   }

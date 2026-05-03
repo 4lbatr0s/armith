@@ -1,67 +1,87 @@
 import { z } from 'zod';
+import {
+    DEFAULT_VERIFICATION_STEPS,
+    DEFAULT_ID_CARD_THRESHOLDS,
+    DEFAULT_SELFIE_THRESHOLDS,
+    DEFAULT_VALIDATION_RULES
+} from '../../thresholds/defaults.js';
 
 export const KycConfigSchema = z.object({
     userId: z.string(),
     organizationId: z.string().optional(),
-    name: z.string(),
+    name: z.string().default('KYC Configuration'),
     description: z.string().optional(),
     countryCode: z.string().length(2).toUpperCase().default('TR'),
     environment: z.enum(['test', 'staging', 'production']).default('production'),
 
     verificationSteps: z.object({
-        requireIdCard: z.boolean().default(true),
-        requireSelfie: z.boolean().default(true),
-        logicOperator: z.enum(['AND', 'OR']).default('AND'),
-        allowPartialSubmission: z.boolean().default(false),
-    }).default({}),
+        requireIdCard: z.boolean(),
+        requireSelfie: z.boolean(),
+        logicOperator: z.enum(['AND', 'OR']),
+        allowPartialSubmission: z.boolean()
+    }).default(() => ({ ...DEFAULT_VERIFICATION_STEPS })),
 
-    idCardThresholds: z.object({
-        minOverallConfidence: z.number().default(0.85),
-        minFullNameConfidence: z.number().default(0.80),
-        minIdentityNumberConfidence: z.number().default(0.90),
-        minDateOfBirthConfidence: z.number().default(0.85),
-        minExpiryDateConfidence: z.number().default(0.85),
-        minMrzConfidence: z.number().default(0.80),
-        minImageQuality: z.number().default(0.60),
-        maxTamperingRisk: z.number().default(0.40),
-        minGenderConfidence: z.number().default(0.75),
-        minSerialNumberConfidence: z.number().default(0.80),
-        acceptableDocumentConditions: z.array(z.string()).default(['excellent', 'good', 'fair']),
-    }).default({}),
+    idCardThresholds: z
+        .object({
+            minOverallConfidence: z.number(),
+            minFullNameConfidence: z.number(),
+            minIdentityNumberConfidence: z.number(),
+            minDateOfBirthConfidence: z.number(),
+            minExpiryDateConfidence: z.number(),
+            minMrzConfidence: z.number(),
+            minImageQuality: z.number(),
+            maxTamperingRisk: z.number(),
+            minGenderConfidence: z.number(),
+            minSerialNumberConfidence: z.number(),
+            acceptableDocumentConditions: z.array(z.string())
+        })
+        .default(() => ({
+            ...DEFAULT_ID_CARD_THRESHOLDS,
+            acceptableDocumentConditions: [...DEFAULT_ID_CARD_THRESHOLDS.acceptableDocumentConditions]
+        })),
 
-    selfieThresholds: z.object({
-        minMatchConfidence: z.number().default(85),
-        maxSpoofingRisk: z.number().default(0.35),
-        minImageQuality: z.number().default(0.60),
-        minLivenessConfidence: z.number().default(0.70),
-        requiredFaceCount: z.number().default(1),
-        allowedLightingConditions: z.array(z.string()).default(['excellent', 'good', 'acceptable']),
-        allowedFaceSizes: z.array(z.string()).default(['optimal', 'adequate']),
-        allowedFaceCoverage: z.array(z.string()).default(['fully_visible', 'partially_obscured']),
-        minFacialFeatureConfidence: z.number().default(0.70),
-        requireMultipleAngles: z.boolean().default(false),
-        minAngleDifference: z.number().default(15),
-    }).default({}),
+    selfieThresholds: z
+        .object({
+            minMatchConfidence: z.number(),
+            maxSpoofingRisk: z.number(),
+            minImageQuality: z.number(),
+            minLivenessConfidence: z.number(),
+            requiredFaceCount: z.number(),
+            allowedLightingConditions: z.array(z.string()),
+            allowedFaceSizes: z.array(z.string()),
+            allowedFaceCoverage: z.array(z.string()),
+            minFacialFeatureConfidence: z.number(),
+            requireMultipleAngles: z.boolean(),
+            minAngleDifference: z.number()
+        })
+        .default(() => ({
+            ...DEFAULT_SELFIE_THRESHOLDS,
+            allowedLightingConditions: [...DEFAULT_SELFIE_THRESHOLDS.allowedLightingConditions],
+            allowedFaceSizes: [...DEFAULT_SELFIE_THRESHOLDS.allowedFaceSizes],
+            allowedFaceCoverage: [...DEFAULT_SELFIE_THRESHOLDS.allowedFaceCoverage]
+        })),
 
-    validationRules: z.object({
-        enforceAgeCheck: z.boolean().default(true),
-        minAge: z.number().default(18),
-        maxAge: z.number().default(120),
-        enforceExpiryCheck: z.boolean().default(true),
-        expiryWarningDays: z.number().default(30),
-        enforceTcChecksumValidation: z.boolean().default(true),
-        enforceMrzCrossValidation: z.boolean().default(true),
-        requireHologramDetection: z.boolean().default(false),
-        enforceNameFormat: z.boolean().default(true),
-        allowDamagedDocuments: z.boolean().default(true),
-        enforceGenderConsistency: z.boolean().default(false),
-        maxVerificationRetries: z.number().default(3),
-        retryCooldownMinutes: z.number().default(5),
-    }).default({}),
+    validationRules: z
+        .object({
+            enforceAgeCheck: z.boolean(),
+            minAge: z.number(),
+            maxAge: z.number(),
+            enforceExpiryCheck: z.boolean(),
+            expiryWarningDays: z.number(),
+            enforceTcChecksumValidation: z.boolean(),
+            enforceMrzCrossValidation: z.boolean(),
+            requireHologramDetection: z.boolean(),
+            enforceNameFormat: z.boolean(),
+            allowDamagedDocuments: z.boolean(),
+            enforceGenderConsistency: z.boolean(),
+            maxVerificationRetries: z.number(),
+            retryCooldownMinutes: z.number()
+        })
+        .default(() => ({ ...DEFAULT_VALIDATION_RULES })),
 
     customThresholds: z.record(z.any()).default({}),
     isActive: z.boolean().default(true),
-    version: z.number().default(1),
+    version: z.number().default(1)
 });
 
 export type KycConfig = z.infer<typeof KycConfigSchema>;

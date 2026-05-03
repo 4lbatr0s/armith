@@ -28,9 +28,21 @@ prompt: |
   - Max Tampering Risk: <= {{idCardThresholds.maxTamperingRisk}}
   - Acceptable Conditions: {{#each idCardThresholds.acceptableDocumentConditions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
 
+  {{#if hasCustomThresholds}}
+  # CUSTOM THRESHOLDS (CLIENT-SPECIFIC)
+
+  {{#each customThresholdEntries}}
+  - **{{key}}**: {{value}} ({{type}}){{description}}
+  {{/each}}
+
+  Apply these thresholds as additional validation criteria.
+
+  {{/if}}
+
   # VALIDATION RULES
   - Enforce TC Checksum: {{validationRules.enforceTcChecksumValidation}}
   - Min Age: {{validationRules.minAge}}
+  - Max Age: {{validationRules.maxAge}}
   - Enforce Expiry Check: {{validationRules.enforceExpiryCheck}}
   - Expiry Warning Days: {{validationRules.expiryWarningDays}}
   - MRZ Cross-Validation: {{validationRules.enforceMrzCrossValidation}}

@@ -8,14 +8,13 @@ import Groq from 'groq-sdk';
 import { parse } from 'mrz';
 import logger from '../lib/logger.js';
 import {
-  THRESHOLDS,
   ERRORS,
   STATUS,
   validateTcKimlik,
   validateDate,
   determineStatus
 } from './config.js';
-import { generateIdCardPrompt, generateSelfiePrompt } from './prompt-generator.js';
+import { generateSelfiePrompt } from '../prompts/load-prompt.js';
 import {
   ID_VERIFICATION_SCHEMA,
   SELFIE_VERIFICATION_SCHEMA,
@@ -23,6 +22,8 @@ import {
   SelfieVerificationSchema
 } from './schemas.js';
 import { createDefaultConfig } from './defaults.js';
+import { resolveKycConfig } from '../thresholds/resolve.js';
+import { evaluateSelfieRules } from '../thresholds/evaluate.js';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -284,20 +285,29 @@ export async function verifySelfie(idPhotoUrl, selfieUrls, config = null) {
 
     // Extract and normalize data from nested structure
     const normalizedData = {
-      isMatch: data.biometricMatch.isMatch,
-      matchConfidence: data.biometricMatch.matchConfidence,
-      spoofingRisk: data.liveness.spoofingRisk,
-      faceCount: data.faceDetection.selfie1FaceCount,
-      lightingCondition: data.imageQuality.lightingCondition,
-      faceSize: data.imageQuality.faceSize,
-      faceCoverage: data.imageQuality.faceCoverage,
-      faceDetectionConfidence: data.faceDetection.faceDetectionConfidence,
-      imageQuality: data.imageQuality.selfie1Quality,
-      imageQualityIssues: data.imageQuality.qualityIssues
+      isMatch: data.biometricMatch.isMatch === true || data.biometricMatch.isMatch === 'true',
+      matchConfidence: parseFloat(data.biometricMatch.matchConfidence) || 0,
+      spoofingRisk: parseFloat(data.liveness.spoofingRisk) || 0,
+      faceCount: (() => {
+        const fc = data.faceDetection.selfie1FaceCount;
+        if (typeof fc === 'number' && Number.isFinite(fc)) return fc;
+        const parsed = parseInt(String(fc ?? '').trim(), 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+      })(),
+      lightingCondition: data.imageQuality.lightingCondition || 'good',
+      faceSize: data.imageQuality.faceSize || 'adequate',
+      faceCoverage: data.imageQuality.faceCoverage || 'fully_visible',
+      faceDetectionConfidence: parseFloat(data.faceDetection.faceDetectionConfidence) || 0,
+      imageQuality: parseFloat(data.imageQuality.selfie1Quality) || 0,
+      imageQualityIssues: Array.isArray(data.imageQuality.qualityIssues) ? data.imageQuality.qualityIssues : []
     };
 
-    // Validate selfie data
-    const errors = validateSelfieData(normalizedData);
+    const effectiveConfigPlain = config?.toObject
+      ? config.toObject()
+      : (config ?? createDefaultConfig('system'));
+
+    const resolved = resolveKycConfig(effectiveConfigPlain);
+    const errors = evaluateSelfieRules(normalizedData, resolved);
 
     // Merge LLM-detected errors with validation errors
     const allErrors = [...(data.validation?.errors || []), ...errors];
@@ -409,76 +419,6 @@ function validateIdData(data) {
 
   // Note: Confidence and quality checks are now handled via Zod schema validation
   // Additional business logic validation can be added here if needed
-
-  return errors;
-}
-
-/**
- * Normalize selfie data with type coercion
- */
-function normalizeSelfieData(data) {
-  return {
-    isMatch: data.isMatch === true || data.isMatch === 'true',
-    matchConfidence: parseFloat(data.matchConfidence) || 0,
-    spoofingRisk: parseFloat(data.spoofingRisk) || 0,
-    faceCount: parseInt(data.faceCount) || 0,
-    lightingCondition: data.lightingCondition || 'good',
-    faceSize: data.faceSize || 'adequate',
-    faceCoverage: data.faceCoverage || 'clear',
-    faceDetectionConfidence: parseFloat(data.faceDetectionConfidence) || 0,
-    imageQuality: parseFloat(data.imageQuality) || 0,
-    imageQualityIssues: Array.isArray(data.imageQualityIssues) ? data.imageQualityIssues : [],
-    errors: Array.isArray(data.errors) ? data.errors : []
-  };
-}
-
-/**
- * Validate selfie data and return array of errors
- */
-function validateSelfieData(data) {
-  const errors = [];
-
-  // Face detection
-  if (data.faceCount === 0) {
-    errors.push(ERRORS.NO_FACE_DETECTED);
-  } else if (data.faceCount > 1) {
-    errors.push(ERRORS.MULTIPLE_FACES);
-  }
-
-  // Match confidence
-  if (!data.isMatch || data.matchConfidence < THRESHOLDS.matchConfidence) {
-    errors.push(ERRORS.LOW_MATCH_CONFIDENCE);
-  }
-
-  // Spoofing risk
-  if (data.spoofingRisk > THRESHOLDS.spoofingRiskMax) {
-    errors.push(ERRORS.SPOOFING_DETECTED);
-  }
-
-  // Image quality
-  if (data.imageQuality < THRESHOLDS.imageQuality) {
-    errors.push(ERRORS.POOR_IMAGE_QUALITY);
-  }
-
-  // Face detection confidence
-  if (data.faceDetectionConfidence < THRESHOLDS.faceDetectionConfidence) {
-    errors.push(ERRORS.NO_FACE_DETECTED);
-  }
-
-  // Lighting condition
-  if (data.lightingCondition === 'insufficient') {
-    errors.push(ERRORS.INSUFFICIENT_LIGHTING);
-  }
-
-  // Face size
-  if (data.faceSize === 'too_small') {
-    errors.push(ERRORS.FACE_TOO_SMALL);
-  }
-
-  // Face coverage
-  if (data.faceCoverage !== 'clear') {
-    errors.push(ERRORS.FACE_PARTIALLY_COVERED);
-  }
 
   return errors;
 }

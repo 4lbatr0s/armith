@@ -6,6 +6,8 @@
 import { ERRORS, STATUS } from '../kyc/config.js';
 import { Profile, IdCardValidation, SelfieValidation, KycConfiguration } from '../models/index.js';
 import { createDefaultConfig, PRESETS } from '../kyc/defaults.js';
+import { resolveKycConfig } from '../thresholds/resolve.js';
+import { flattenedThresholdPayload, applyFlatThresholdPatches } from '../thresholds/api-shape.js';
 
 /**
  * Get all verifications (admin endpoint)
@@ -120,9 +122,7 @@ export const getSettings = async (req, res) => {
       settings: {
         verificationRules: config.verificationSteps,
         thresholds: {
-          ...flattenThresholds(config.idCardThresholds),
-          ...flattenSelfieThresholds(config.selfieThresholds),
-          minAge: config.validationRules.minAge,
+          ...flattenedThresholdPayload(resolveKycConfig(config.toObject())),
         }
       },
       defaults: PRESETS.balanced
@@ -151,7 +151,7 @@ export const updateSettings = async (req, res) => {
     }
 
     if (thresholds) {
-      applyThresholdUpdates(config, thresholds);
+      applyFlatThresholdPatches(config, thresholds);
     }
 
     config.version += 1;
@@ -188,30 +188,3 @@ export const resetSettings = async (req, res) => {
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-function flattenThresholds(idCardThresholds) {
-  return {
-    fullNameConfidence: idCardThresholds.minFullNameConfidence,
-    identityNumberConfidence: idCardThresholds.minIdentityNumberConfidence,
-    dateOfBirthConfidence: idCardThresholds.minDateOfBirthConfidence,
-    expiryDateConfidence: idCardThresholds.minExpiryDateConfidence,
-    imageQuality: idCardThresholds.minImageQuality,
-  };
-}
-
-function flattenSelfieThresholds(selfieThresholds) {
-  return {
-    matchConfidence: selfieThresholds.minMatchConfidence,
-    faceDetectionConfidence: selfieThresholds.minFacialFeatureConfidence,
-    spoofingRiskMax: selfieThresholds.maxSpoofingRisk,
-  };
-}
-
-function applyThresholdUpdates(config, thresholds) {
-  if (thresholds.fullNameConfidence) config.idCardThresholds.minFullNameConfidence = thresholds.fullNameConfidence;
-  if (thresholds.identityNumberConfidence) config.idCardThresholds.minIdentityNumberConfidence = thresholds.identityNumberConfidence;
-  if (thresholds.imageQuality) config.idCardThresholds.minImageQuality = thresholds.imageQuality;
-  if (thresholds.matchConfidence) config.selfieThresholds.minMatchConfidence = thresholds.matchConfidence;
-  if (thresholds.spoofingRiskMax) config.selfieThresholds.maxSpoofingRisk = thresholds.spoofingRiskMax;
-  if (thresholds.minAge) config.validationRules.minAge = thresholds.minAge;
-}

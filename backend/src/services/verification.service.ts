@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk';
-import { PromptGenerator } from '../prompts/prompt-generator.js';
+import { generateIdCardPrompt } from '../../prompts/load-prompt.js';
 import { IdCardPostProcessor } from '../validation/post-processor.js';
 import { KycConfigSchema } from '../schemas/config.schema.js';
 import { IdVerificationSchema, ID_VERIFICATION_SCHEMA } from '../../kyc/schemas.js'; // Reusing existing schema for now or move it to src
@@ -16,7 +16,7 @@ export class VerificationService {
             const config = KycConfigSchema.parse(configInput);
 
             // 2. Generate Prompt
-            const prompt = PromptGenerator.generateIdCardPrompt(config);
+            const prompt = generateIdCardPrompt(config);
 
             // 3. Call LLM
             const imageContent = [
