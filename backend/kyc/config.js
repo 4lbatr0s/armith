@@ -135,7 +135,15 @@ const errorCodeToText = Object.entries(ERRORS).reduce((acc, [key, val]) => {
 function coerceLookupCode(raw) {
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-  if (typeof raw === 'string' && /^\d+$/.test(raw)) return Number(raw);
+  if (typeof raw === 'string' && /^\d+$/.test(raw.trim())) return Number(raw.trim());
+  if (typeof raw === 'object') {
+    if (raw.$numberInt != null) return coerceLookupCode(String(raw.$numberInt));
+    if (raw.$numberLong != null) return coerceLookupCode(String(raw.$numberLong));
+    if (typeof raw.valueOf === 'function' && raw.valueOf !== Object.prototype.valueOf) {
+      const v = raw.valueOf();
+      if (v !== raw) return coerceLookupCode(v);
+    }
+  }
   return raw;
 }
 
@@ -172,9 +180,43 @@ export function formatStructuredError(error, field = '', customMessage = '') {
     errorObj = { code: 9999, textCode: 'UNKNOWN_ERROR', message: msgOut || 'Unknown error' };
   }
 
-  const textCode = errorObj.textCode || errorCodeToText[errorObj.code] || 'UNKNOWN_ERROR';
-  const numericCode =
-    typeof errorObj.code === 'number' ? errorObj.code : (ERRORS[textCode]?.code ?? 9999);
+  // Prefer numeric -> canonical textCode so we never keep placeholder UNKNOWN when code maps to ERRORS.
+  let textCode;
+  let numericCode;
+  if (typeof errorObj.code === 'number' && Number.isFinite(errorObj.code)) {
+    const mapKey = errorCodeToText[errorObj.code];
+    if (mapKey && ERRORS[mapKey]) {
+      textCode = ERRORS[mapKey].textCode;
+      numericCode = errorObj.code;
+    } else {
+      textCode = errorObj.textCode && errorObj.textCode !== 'UNKNOWN_ERROR' ? errorObj.textCode : 'UNKNOWN_ERROR';
+      numericCode = errorObj.code;
+    }
+  } else if (typeof errorObj.code === 'string' && ERRORS[errorObj.code]) {
+    textCode = ERRORS[errorObj.code].textCode;
+    numericCode = ERRORS[errorObj.code].code;
+  } else {
+    textCode = errorObj.textCode || errorCodeToText[errorObj.code] || 'UNKNOWN_ERROR';
+    numericCode =
+      typeof errorObj.code === 'number' && Number.isFinite(errorObj.code)
+        ? errorObj.code
+        : (ERRORS[textCode]?.code ?? 9999);
+  }
+
+  // Last pass: original object may carry numeric code under BSON / alternate keys.
+  if (textCode === 'UNKNOWN_ERROR' && error && typeof error === 'object') {
+    const n = coerceLookupCode(error.code) ?? coerceLookupCode(error.numericCode);
+    if (typeof n === 'number' && Number.isFinite(n)) {
+      const mapKey = errorCodeToText[n];
+      if (mapKey && ERRORS[mapKey]) {
+        textCode = ERRORS[mapKey].textCode;
+        numericCode = ERRORS[mapKey].code;
+      }
+    } else if (typeof error.code === 'string' && ERRORS[error.code]) {
+      textCode = ERRORS[error.code].textCode;
+      numericCode = ERRORS[error.code].code;
+    }
+  }
 
   return {
     textCode,

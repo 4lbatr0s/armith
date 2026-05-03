@@ -387,11 +387,13 @@ export const getUserStatus = async (req, res) => {
 
         const mrzData = idValidation ? { mrz: idValidation.mrz, mrzInfo: idValidation.mrzInfo } : null;
 
+        const mapStructuredReasons = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).map((r) => formatStructuredError(r)) : []);
+
         res.json({
             id: profile._id,
             status: profile.status,
             country: profile.country,
-            rejectionReasons: profile.rejectionReasons || [],
+            rejectionReasons: mapStructuredReasons(profile.rejectionReasons),
             createdAt: profile.createdAt,
             verificationRules,
             progress: {
@@ -426,8 +428,8 @@ export const getUserStatus = async (req, res) => {
                           typeof idValidation.toObject === 'function' ? idValidation.toObject() : idValidation,
                           resolved
                       ),
-                      rejectionReasons: idValidation.rejectionReasons || [],
-                      errors: idValidation.errors || []
+                      rejectionReasons: mapStructuredReasons(idValidation.rejectionReasons),
+                      errors: mapStructuredReasons(idValidation.errors)
                   }
                 : null,
             selfieVerification: selfieValidation
@@ -453,8 +455,8 @@ export const getUserStatus = async (req, res) => {
                               : selfieValidation,
                           resolved
                       ),
-                      rejectionReasons: selfieValidation.rejectionReasons || [],
-                      errors: selfieValidation.errors || []
+                      rejectionReasons: mapStructuredReasons(selfieValidation.rejectionReasons),
+                      errors: mapStructuredReasons(selfieValidation.errors)
                   }
                 : null,
             images: {

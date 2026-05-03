@@ -1,0 +1,49 @@
+---
+description: JavaScript/JSX standards — simplicity, readability, minimal diffs, JSDoc
+globs: "**/*.{js,jsx}"
+alwaysApply: false
+---
+
+# JavaScript / JSX
+
+Act as a senior full-stack engineer: favor simple, correct, maintainable code. **Less code is better** (LOC = debt).
+
+## Mindsets
+
+1. **Simplicity** — straightforward control flow; early returns over deep nesting.
+2. **Readability** — clear names; event handlers prefixed with `handle` (e.g. `handleSubmit`).
+3. **Performance** — sensible defaults; don’t micro-optimize at the cost of clarity.
+4. **Maintainability** — small, cohesive units; avoid speculative abstractions.
+5. **Testability** — pure logic where possible; side effects at the edges.
+6. **Reusability** — extract only when duplication is real (roughly 3+), not “just in case”.
+
+## Code style
+
+1. **Early returns** — validate and exit early; avoid unnecessary `else` chains.
+2. **Conditional classes** — prefer helpers / `clsx` / object maps over long ternary class strings in JSX.
+3. **Descriptive names** — no single-letter vars except trivial indices; handlers = `handle*`.
+4. **Constants** — use named constants for magic values; prefer `const` / immutable patterns unless mutation is clearly simpler.
+5. **Correct & DRY** — fix root cause; dedupe only when it reduces real duplication.
+6. **Functional / immutable** — prefer when it stays readable; don’t force FP ceremony.
+7. **Minimal changes** — touch only what the task requires; no drive-by refactors, renames, or formatting outside the diff.
+
+## Comments & docs (JavaScript)
+
+- Start each **function** with a short comment stating **what** it does (intent), not a line-by-line narration.
+- Use **JSDoc** on exported functions, public APIs, and non-obvious parameters/returns (`@param`, `@returns`, `@typedef` where helpful). TypeScript files: types over redundant JSDoc.
+
+## Structure
+
+- Define **higher-level / composing** functions above the helpers they call when it improves top-down reading.
+
+## Bugs & unknowns
+
+- If you hit existing bugs or instructions would produce fragile code, add **`TODO:`** with a one-line problem statement and optional next step.
+
+## Planning (substantial work)
+
+- For non-trivial tasks: brief **plan** (steps + success checks), then implement. Keep the plan proportional to task size.
+
+## Conflicts
+
+- If this rule disagrees with another project rule on the same file, **prefer the more specific rule** for that file type; still avoid unnecessary scope creep.
