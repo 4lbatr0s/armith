@@ -1,5 +1,27 @@
 import { Profile, IdCardValidation, SelfieValidation } from '../../models/index.js';
-import { STATUS } from '../../kyc/config.js';
+import { STATUS, formatStructuredError } from '../../kyc/config.js';
+
+function omitNullProps(obj) {
+    if (!obj || typeof obj !== 'object') return undefined;
+    const out = Object.fromEntries(Object.entries(obj).filter(([, v]) => v != null));
+    return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function shapePersistedErrors(errors) {
+    if (!Array.isArray(errors)) return [];
+    return errors.map(e => {
+        const s = formatStructuredError(e);
+        const raw = e && typeof e === 'object' ? e : {};
+        return {
+            code: s.numericCode,
+            textCode: s.code,
+            field: s.field,
+            message: s.message,
+            ...(raw.severity != null ? { severity: raw.severity } : {}),
+            ...(raw.threshold != null ? { threshold: raw.threshold } : {})
+        };
+    });
+}
 
 export function deduplicateReasons(existing, newReasons) {
     const seen = new Set();
@@ -106,7 +128,7 @@ export async function persistIdVerification({
         nationality: result.data?.nationality,
         serialNumber: result.data?.serialNumber,
         mrz: result.mrz?.raw,
-        mrzInfo: result.mrz?.parsed,
+        mrzInfo: omitNullProps(result.mrz?.parsed),
         address: result.data?.address,
         documentCondition: result.data?.documentCondition?.toUpperCase(),
         fullNameConfidence: Math.min(
@@ -120,8 +142,9 @@ export async function persistIdVerification({
         expiryDateConfidence: result.confidence?.expiryDateConfidence,
         mrzConfidence: result.confidence?.mrzConfidence,
         imageQuality: result.confidence?.imageQuality || result.data?.quality?.imageQuality,
+        documentVitalityScore: result.authenticity?.documentVitalityScore,
         status: result.status.toUpperCase(),
-        errors: result.errors,
+        errors: shapePersistedErrors(result.errors),
         rejectionReasons
     });
 
@@ -162,6 +185,8 @@ export async function persistSelfieVerification({
         isMatch: result.data?.isMatch,
         matchConfidence: result.data?.matchConfidence,
         spoofingRisk: result.data?.spoofingRisk,
+        livenessConfidence: result.data?.livenessConfidence,
+        livenessIndicators: result.data?.livenessIndicators,
         faceCount: result.data?.faceCount,
         imageQualityIssues: result.data?.imageQualityIssues,
         lightingCondition: result.data?.lightingCondition?.toUpperCase(),
@@ -170,7 +195,7 @@ export async function persistSelfieVerification({
         imageQuality: result.data?.imageQuality,
         faceDetectionConfidence: result.data?.faceDetectionConfidence,
         status: result.status.toUpperCase(),
-        errors: result.errors,
+        errors: shapePersistedErrors(result.errors),
         rejectionReasons
     });
 

@@ -3,16 +3,16 @@
  */
 
 import { ERRORS, STATUS, formatStructuredError } from '../kyc/config.js';
-import { verifySelfie as kycVerifySelfie } from '../kyc/verify.js';
 import { IdCheckRequestSchema, SelfieCheckRequestSchema, validateRequest } from '../schemas.js';
 import storageService from '../services/storageService.js';
 import { Profile, IdCardValidation, SelfieValidation } from '../models/index.js';
 import { createDefaultConfig } from '../kyc/defaults.js';
 import logger from '../lib/logger.js';
 import { VerificationService } from '../src/services/verification.service.js';
-import { getOrCreateUserKycDocument, buildEffectiveKycPlain } from '../services/kyc/runtimeConfig.js';
+import { getOrCreateUserKycConfig, buildEffectiveKycPlain } from '../services/kyc/runtimeConfig.js';
 import { deriveIdCheckpointStatus, computeProfileStatusAfterSelfie } from '../services/kyc/verificationOutcome.js';
 import { persistIdVerification, persistSelfieVerification } from '../services/kyc/persistence.js';
+import { assertImagesReadyForLlm } from '../services/kyc/verificationPrecheck.js';
 import {
     buildIdConfidenceRowsFromVerification,
     buildIdConfidenceRowsFromStoredRecord,
@@ -105,17 +105,26 @@ export const verifyId = async (req, res) => {
         }
 
         const { countryCode = 'TR', frontImageUrl, backImageUrl } = validation.data;
+
         const countryCodeUpper = countryCode.toUpperCase();
+        
         const authUserId = req.auth?.userId;
 
-        const userDoc = authUserId ? await getOrCreateUserKycDocument(authUserId) : null;
+        const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
+
         const { effectivePlain, resolved } = buildEffectiveKycPlain({
-            userDoc,
+            kycConfigDoc,
             countryCodeOverride: countryCodeUpper,
             anonymousUserLabel: authUserId || 'system'
         });
 
         logger.info({ authUserId, countryCode: countryCodeUpper }, 'Starting ID verification');
+
+        const urlsToCheck = backImageUrl ? [frontImageUrl, backImageUrl] : [frontImageUrl];
+        const preflight = await assertImagesReadyForLlm(urlsToCheck);
+        if (!preflight.ok) {
+            return res.status(400).json({ status: STATUS.FAILED, errors: [preflight.error] });
+        }
 
         const result = await VerificationService.verifyId(effectivePlain, {
             front: frontImageUrl,
@@ -127,7 +136,7 @@ export const verifyId = async (req, res) => {
             return res.status(500).json({ status: result.status, errors: result.errors });
         }
 
-        const rejectionReasons = result.errors.map(e => formatStructuredError(e.code, e.field, e.message));
+        const rejectionReasons = result.errors.map(e => formatStructuredError(e));
         const overallStatus = deriveIdCheckpointStatus(result.status, resolved.verificationSteps);
 
         const profile = await persistIdVerification({
@@ -183,36 +192,74 @@ export const verifySelfie = async (req, res) => {
         const { idPhotoUrl, selfieUrls, profileId: profileIdFromBody, verificationId } = validation.data;
         const profileId = profileIdFromBody || verificationId;
 
-        const allUrls = [idPhotoUrl, ...selfieUrls];
-        if (!allUrls.every(url => storageService.isValidImageUrl(url))) {
-            return res.status(400).json({ status: STATUS.FAILED, errors: [ERRORS.INVALID_IMAGE_URL] });
+        const authUserId = req.auth?.userId;
+        const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
+
+        let countryHint = 'TR';
+        if (profileId) {
+            const profileDoc = await Profile.findById(profileId).select('country userId').lean();
+            if (!profileDoc) {
+                return res.status(404).json({
+                    status: STATUS.FAILED,
+                    errors: [{ code: ERRORS.INVALID_REQUEST.code, message: 'Profile not found.' }]
+                });
+            }
+            if (authUserId && profileDoc.userId && profileDoc.userId !== authUserId) {
+                return res.status(403).json({
+                    status: STATUS.FAILED,
+                    errors: [ERRORS.PROFILE_ACCESS_DENIED]
+                });
+            }
+            countryHint = profileDoc.country ?? 'TR';
         }
 
-        const authUserId = req.auth?.userId;
-        const linkedProfileForCountry = profileId ? await Profile.findById(profileId).select('country').lean() : null;
-        const countryHint = linkedProfileForCountry?.country ?? 'TR';
-
-        const userDoc = authUserId ? await getOrCreateUserKycDocument(authUserId) : null;
-        const { resolved } = buildEffectiveKycPlain({
-            userDoc,
+        const { effectivePlain, resolved } = buildEffectiveKycPlain({
+            kycConfigDoc,
             countryCodeOverride: countryHint,
             anonymousUserLabel: authUserId || 'system'
         });
         const verificationRules = resolved.verificationSteps;
 
+        const requiresIdAndSelfie = verificationRules.requireIdCard === true && verificationRules.requireSelfie === true;
+
+        if (requiresIdAndSelfie && !profileId) {
+            return res.status(400).json({
+                status: STATUS.FAILED,
+                errors: [ERRORS.PROFILE_ID_REQUIRED]
+            });
+        }
+
+        const allUrls = [idPhotoUrl, ...selfieUrls];
+        if (!allUrls.every(url => storageService.isValidImageUrl(url))) {
+            return res.status(400).json({ status: STATUS.FAILED, errors: [ERRORS.INVALID_IMAGE_URL] });
+        }
+
+        const storageCheck = await assertImagesReadyForLlm(allUrls);
+        if (!storageCheck.ok) {
+            return res.status(400).json({ status: STATUS.FAILED, errors: [storageCheck.error] });
+        }
+
         logger.info({ authUserId, profileId }, 'Starting selfie verification');
 
-        const result = await kycVerifySelfie(idPhotoUrl, selfieUrls, userDoc);
+        const result = await VerificationService.verifySelfie(effectivePlain, {
+            idPhotoUrl,
+            selfieUrls
+        });
 
         if (!result.success) {
             logger.error({ result }, 'Selfie verification failed internally');
-            return res.status(500).json({ status: result.status, errors: [result.error] });
+            const errPayload = result.error ?? (result.errors && result.errors[0]);
+            return res.status(500).json({
+                status: result.status,
+                errors: errPayload ? [errPayload] : [ERRORS.INTERNAL_ERROR]
+            });
         }
 
-        const rejectionReasons = result.errors.map(e => formatStructuredError(e.code, e.field, e.message));
+        const rejectionReasons = result.errors.map(e => formatStructuredError(e));
+
         let overallStatus = result.status;
 
-        if (profileId) {
+        if (profileId && result.success) {
             const idValidation = await IdCardValidation.findOne({ profileId });
             const idStatus = idValidation?.status || 'PENDING';
 
@@ -237,6 +284,14 @@ export const verifySelfie = async (req, res) => {
             } else {
                 logger.info({ profileId, status: overallStatus }, 'Selfie verification completed and profile updated');
             }
+        } else if (
+            result.success &&
+            !profileId &&
+            result.status === STATUS.APPROVED &&
+            verificationRules.requireSelfie &&
+            !verificationRules.requireIdCard
+        ) {
+            overallStatus = STATUS.APPROVED;
         }
 
         const confidenceScores = buildSelfieConfidenceRows(result.data || {}, resolved);
@@ -276,10 +331,10 @@ export const getUserStatus = async (req, res) => {
         ]);
 
         const authUserId = req.auth?.userId;
-        const userDoc = authUserId ? await getOrCreateUserKycDocument(authUserId) : null;
-        const resolved = userDoc
+        const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
+        const resolved = kycConfigDoc
             ? buildEffectiveKycPlain({
-                  userDoc,
+                  kycConfigDoc,
                   countryCodeOverride: profile.country || 'TR'
               }).resolved
             : resolveKycConfig(createDefaultConfig('guest', profile.country || 'TR'));
@@ -296,6 +351,7 @@ export const getUserStatus = async (req, res) => {
             (!verificationRules.requireIdCard || idApproved) &&
             (!verificationRules.requireSelfie || selfieApproved);
 
+        const idVitality = idValidation?.documentVitalityScore;
         const idData =
             idApproved && profile.idVerificationStatus === 'APPROVED'
                 ? {
@@ -309,7 +365,8 @@ export const getUserStatus = async (req, res) => {
                       nationality: profile.nationality,
                       serialNumber: profile.serialNumber,
                       address: profile.address,
-                      documentCondition: profile.documentCondition
+                      documentCondition: profile.documentCondition,
+                      ...(idVitality != null && Number.isFinite(idVitality) ? { documentVitalityScore: idVitality } : {})
                   }
                 : idValidation
                   ? {
@@ -323,7 +380,8 @@ export const getUserStatus = async (req, res) => {
                         nationality: idValidation.nationality,
                         serialNumber: idValidation.serialNumber,
                         address: idValidation.address,
-                        documentCondition: idValidation.documentCondition
+                        documentCondition: idValidation.documentCondition,
+                        ...(idVitality != null && Number.isFinite(idVitality) ? { documentVitalityScore: idVitality } : {})
                     }
                   : null;
 
@@ -360,7 +418,9 @@ export const getUserStatus = async (req, res) => {
                           identityNumber: idValidation.identityNumberConfidence,
                           dateOfBirth: idValidation.dateOfBirthConfidence,
                           expiryDate: idValidation.expiryDateConfidence,
-                          imageQuality: idValidation.imageQuality
+                          mrz: idValidation.mrzConfidence,
+                          imageQuality: idValidation.imageQuality,
+                          documentVitalityScore: idValidation.documentVitalityScore ?? null
                       },
                       confidenceScores: buildIdConfidenceRowsFromStoredRecord(
                           typeof idValidation.toObject === 'function' ? idValidation.toObject() : idValidation,
@@ -376,7 +436,16 @@ export const getUserStatus = async (req, res) => {
                       data: {
                           isMatch: selfieValidation.isMatch,
                           matchConfidence: selfieValidation.matchConfidence,
-                          spoofingRisk: selfieValidation.spoofingRisk
+                          spoofingRisk: selfieValidation.spoofingRisk,
+                          livenessConfidence: selfieValidation.livenessConfidence ?? null,
+                          livenessIndicators: selfieValidation.livenessIndicators || [],
+                          faceCount: selfieValidation.faceCount ?? null,
+                          faceDetectionConfidence: selfieValidation.faceDetectionConfidence ?? null,
+                          imageQuality: selfieValidation.imageQuality ?? null,
+                          lightingCondition: selfieValidation.lightingCondition ?? null,
+                          faceSize: selfieValidation.faceSize ?? null,
+                          faceCoverage: selfieValidation.faceCoverage ?? null,
+                          imageQualityIssues: selfieValidation.imageQualityIssues || []
                       },
                       confidenceScores: buildSelfieConfidenceRows(
                           typeof selfieValidation.toObject === 'function'

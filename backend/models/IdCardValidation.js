@@ -50,7 +50,9 @@ const idCardValidationSchema = new mongoose.Schema(
         identityNumberConfidence: Number,
         dateOfBirthConfidence: Number,
         expiryDateConfidence: Number,
+        mrzConfidence: Number,
         imageQuality: Number,
+        documentVitalityScore: Number,
 
         // Validation result
         status: {

@@ -26,6 +26,8 @@ const selfieValidationSchema = new mongoose.Schema(
         isMatch: Boolean,
         matchConfidence: Number, // 0-100
         spoofingRisk: Number, // 0-1
+        livenessConfidence: Number,
+        livenessIndicators: [String],
         faceCount: Number,
         imageQualityIssues: [String],
 

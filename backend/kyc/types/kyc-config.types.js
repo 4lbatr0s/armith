@@ -38,6 +38,7 @@ export const VERIFICATION_STATUS = ['approved', 'rejected', 'review', 'pending']
  * @property {number} maxTamperingRisk - Max tampering risk (0-1)
  * @property {number} minGenderConfidence - Min gender confidence (0-1)
  * @property {number} minSerialNumberConfidence - Min serial confidence (0-1)
+ * @property {number} minDocumentVitalityConfidence - Min document vitality score (0-1)
  * @property {string[]} acceptableDocumentConditions - Allowed conditions
  */
 

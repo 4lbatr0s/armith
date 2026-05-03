@@ -465,12 +465,34 @@ export const AdminPage = () => {
                     />
                     <ThresholdSlider
                       label={t('settings.th_image_quality')}
-                      value={settings.thresholds?.imageQuality ?? 0.7}
-                      onChange={(val) => updateThreshold('imageQuality', val)}
+                      value={settings.thresholds?.idMinImageQuality ?? settings.thresholds?.imageQuality ?? 0.7}
+                      onChange={(val) => {
+                        setSettings((prev) => {
+                            if (!prev) return prev;
+                            return {
+                                ...prev,
+                                thresholds: {
+                                    ...prev.thresholds,
+                                    idMinImageQuality: val,
+                                    imageQuality: val
+                                }
+                            };
+                        });
+                      }}
                       min={0}
                       max={1}
                       step={0.05}
-                      defaultValue={defaults?.thresholds?.imageQuality ?? 0.7}
+                      defaultValue={defaults?.thresholds?.idMinImageQuality ?? defaults?.thresholds?.imageQuality ?? 0.7}
+                      format="percent"
+                    />
+                    <ThresholdSlider
+                      label={t('settings.th_min_document_vitality')}
+                      value={settings.thresholds?.minDocumentVitalityConfidence ?? 0.45}
+                      onChange={(val) => updateThreshold('minDocumentVitalityConfidence', val)}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      defaultValue={defaults?.thresholds?.minDocumentVitalityConfidence ?? 0.45}
                       format="percent"
                     />
                   </div>
@@ -519,6 +541,26 @@ export const AdminPage = () => {
                       defaultValue={defaults?.thresholds?.spoofingRiskMax ?? 0.3}
                       format="percent"
                       inverse
+                    />
+                    <ThresholdSlider
+                      label={t('settings.th_min_liveness')}
+                      value={settings.thresholds?.minLivenessConfidence ?? 0.7}
+                      onChange={(val) => updateThreshold('minLivenessConfidence', val)}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      defaultValue={defaults?.thresholds?.minLivenessConfidence ?? 0.7}
+                      format="percent"
+                    />
+                    <ThresholdSlider
+                      label={t('settings.th_selfie_image_quality')}
+                      value={settings.thresholds?.selfieMinImageQuality ?? 0.6}
+                      onChange={(val) => updateThreshold('selfieMinImageQuality', val)}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      defaultValue={defaults?.thresholds?.selfieMinImageQuality ?? 0.6}
+                      format="percent"
                     />
                   </div>
                 </div>

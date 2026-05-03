@@ -20,6 +20,8 @@ export const DEFAULT_ID_CARD_THRESHOLDS = {
     maxTamperingRisk: 0.4,
     minGenderConfidence: 0.75,
     minSerialNumberConfidence: 0.8,
+    /** Minimum document vitality score (0–1) from authenticity.documentVitalityScore. */
+    minDocumentVitalityConfidence: 0.45,
     acceptableDocumentConditions: ['excellent', 'good', 'fair'] as string[]
 };
 
@@ -60,6 +62,7 @@ export const FLAT_LEGACY_THRESHOLDS = {
     dateOfBirthConfidence: DEFAULT_ID_CARD_THRESHOLDS.minDateOfBirthConfidence,
     expiryDateConfidence: DEFAULT_ID_CARD_THRESHOLDS.minExpiryDateConfidence,
     imageQuality: DEFAULT_ID_CARD_THRESHOLDS.minImageQuality,
+    minDocumentVitalityConfidence: DEFAULT_ID_CARD_THRESHOLDS.minDocumentVitalityConfidence,
     matchConfidence: DEFAULT_SELFIE_THRESHOLDS.minMatchConfidence,
     faceDetectionConfidence: DEFAULT_SELFIE_THRESHOLDS.minFacialFeatureConfidence,
     spoofingRiskMax: DEFAULT_SELFIE_THRESHOLDS.maxSpoofingRisk,
@@ -82,6 +85,7 @@ export const PRESETS = {
             minIdentityNumberConfidence: 0.95,
             minImageQuality: 0.75,
             maxTamperingRisk: 0.25,
+            minDocumentVitalityConfidence: 0.65,
             acceptableDocumentConditions: ['excellent', 'good']
         },
         selfieThresholds: {
@@ -125,6 +129,7 @@ export const PRESETS = {
             minIdentityNumberConfidence: 0.8,
             minImageQuality: 0.45,
             maxTamperingRisk: 0.6,
+            minDocumentVitalityConfidence: 0.35,
             acceptableDocumentConditions: ['excellent', 'good', 'fair', 'poor']
         },
         selfieThresholds: {

@@ -496,13 +496,17 @@ class StorageService {
   }
 
   /**
-   * Extract key from URL
+   * Extract S3/R2 object key from a URL.
+   * Path-style endpoints use `/{bucket}/{key}`; HeadObject expects `key` only (bucket is separate).
    */
   extractKeyFromUrl(url) {
     try {
       const urlObj = new URL(url);
-      const pathname = urlObj.pathname;
-      return pathname.startsWith('/') ? pathname.slice(1) : pathname;
+      let key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
+      if (this.bucketName && key.startsWith(`${this.bucketName}/`)) {
+        key = key.slice(this.bucketName.length + 1);
+      }
+      return key || null;
     } catch {
       return null;
     }

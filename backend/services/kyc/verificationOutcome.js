@@ -1,5 +1,9 @@
 import { STATUS } from '../../kyc/config.js';
 
+/**
+ * After ID passes (LLM + server thresholds): tenant needs only ID → full approval;
+ * tenant also needs selfie → stay pending until selfie step succeeds.
+ */
 export function deriveIdCheckpointStatus(llmApproved, verificationRules) {
     if (llmApproved === STATUS.APPROVED && verificationRules?.requireSelfie) {
         return STATUS.PENDING;

@@ -66,6 +66,21 @@ export function evaluateIdThresholdErrors(llmParsed: Record<string, any>, resolv
             `Tampering risk (${((tampering as number) * 100).toFixed(1)}%) exceeds maximum (${(t.maxTamperingRisk * 100).toFixed(1)}%).`
     );
 
+    const vitality = llmParsed.authenticity?.documentVitalityScore;
+    const minVit = t.minDocumentVitalityConfidence;
+    if (vitality !== undefined && vitality !== null && Number.isFinite(vitality) && minVit !== undefined && minVit !== null) {
+        if (vitality < minVit) {
+            errors.push(
+                new ValidationError(
+                    ERRORS.LOW_DOCUMENT_VITALITY.code,
+                    `Document vitality score (${(vitality * 100).toFixed(1)}%) is below minimum (${(minVit * 100).toFixed(1)}%).`,
+                    'documentVitalityScore',
+                    'critical'
+                )
+            );
+        }
+    }
+
     const condition = llmParsed.authenticity?.documentCondition?.toLowerCase?.() as string | undefined;
     const allowedList = (t.acceptableDocumentConditions || []).map((c: string) => c.toLowerCase());
     if (condition && allowedList.length > 0 && !allowedList.includes(condition)) {
@@ -102,6 +117,11 @@ export function evaluateSelfieRules(normalized: Record<string, any>, resolved: K
 
     if ((normalized.spoofingRisk ?? 0) > st.maxSpoofingRisk) {
         out.push(ERRORS.SPOOFING_DETECTED);
+    }
+
+    const lc = normalized.livenessConfidence;
+    if (lc !== undefined && lc !== null && Number.isFinite(lc) && lc < st.minLivenessConfidence) {
+        out.push(ERRORS.LOW_LIVENESS_CONFIDENCE);
     }
 
     const imgQ = normalized.imageQuality;

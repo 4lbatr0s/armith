@@ -40,6 +40,7 @@ const kycConfigurationSchema = new mongoose.Schema(
             maxTamperingRisk: { type: Number, default: 0.40 },
             minGenderConfidence: { type: Number, default: 0.75 },
             minSerialNumberConfidence: { type: Number, default: 0.80 },
+            minDocumentVitalityConfidence: { type: Number, default: 0.45 },
             acceptableDocumentConditions: { type: [String], default: ['excellent', 'good', 'fair'] },
         },
 

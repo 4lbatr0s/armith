@@ -14,16 +14,10 @@ import {
   validateDate,
   determineStatus
 } from './config.js';
-import { generateSelfiePrompt } from '../prompts/load-prompt.js';
-import {
-  ID_VERIFICATION_SCHEMA,
-  SELFIE_VERIFICATION_SCHEMA,
-  IdVerificationSchema,
-  SelfieVerificationSchema
-} from './schemas.js';
+import { generateIdCardPrompt } from '../prompts/load-prompt.js';
+import { ID_VERIFICATION_SCHEMA, IdVerificationSchema } from './schemas.js';
 import { createDefaultConfig } from './defaults.js';
-import { resolveKycConfig } from '../thresholds/resolve.js';
-import { evaluateSelfieRules } from '../thresholds/evaluate.js';
+import { VerificationService } from '../src/services/verification.service.js';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -220,132 +214,9 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
  * @returns {Promise<Object>} Verification result
  */
 export async function verifySelfie(idPhotoUrl, selfieUrls, config = null) {
-  try {
-    // Normalize selfie URLs to array
-    const selfies = Array.isArray(selfieUrls) ? selfieUrls : [selfieUrls];
-
-    // Build image content array
-    const imageContent = [
-      { type: 'image_url', image_url: { url: idPhotoUrl } },
-      ...selfies.map(url => ({ type: 'image_url', image_url: { url } }))
-    ];
-
-    // Use dynamic prompt (use defaults if config not provided)
-    const effectiveConfig = config || createDefaultConfig('system');
-    const prompt = generateSelfiePrompt(effectiveConfig);
-
-    // Call Groq API with structured output
-    const response = await groq.chat.completions.create({
-      model: MODEL,
-      temperature: TEMPERATURE,
-      max_tokens: MAX_TOKENS,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'selfie_verification_response',
-          strict: true,
-          schema: SELFIE_VERIFICATION_SCHEMA
-        }
-      },
-      messages: [
-        { role: 'system', content: prompt },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: `Compare the ID photo (first image) with the selfie${selfies.length > 1 ? 's' : ''} (${selfies.length} image${selfies.length > 1 ? 's' : ''}).` },
-            ...imageContent
-          ]
-        }
-      ]
-    });
-
-    // Parse JSON response (structured output guarantees valid JSON)
-    const rawData = parseJsonResponse(response.choices[0]?.message?.content);
-    if (!rawData) {
-      return {
-        success: false,
-        status: STATUS.FAILED,
-        error: ERRORS.INVALID_JSON_RESPONSE
-      };
-    }
-
-    // Validate with Zod schema
-    const validationResult = SelfieVerificationSchema.safeParse(rawData);
-    if (!validationResult.success) {
-      logger.warn({ errors: validationResult.error.errors }, 'Zod validation failed for selfie verification');
-      return {
-        success: false,
-        status: STATUS.FAILED,
-        error: ERRORS.INVALID_JSON_RESPONSE,
-        details: 'Response does not match expected schema'
-      };
-    }
-
-    const data = validationResult.data;
-
-    // Extract and normalize data from nested structure
-    const normalizedData = {
-      isMatch: data.biometricMatch.isMatch === true || data.biometricMatch.isMatch === 'true',
-      matchConfidence: parseFloat(data.biometricMatch.matchConfidence) || 0,
-      spoofingRisk: parseFloat(data.liveness.spoofingRisk) || 0,
-      faceCount: (() => {
-        const fc = data.faceDetection.selfie1FaceCount;
-        if (typeof fc === 'number' && Number.isFinite(fc)) return fc;
-        const parsed = parseInt(String(fc ?? '').trim(), 10);
-        return Number.isFinite(parsed) ? parsed : 0;
-      })(),
-      lightingCondition: data.imageQuality.lightingCondition || 'good',
-      faceSize: data.imageQuality.faceSize || 'adequate',
-      faceCoverage: data.imageQuality.faceCoverage || 'fully_visible',
-      faceDetectionConfidence: parseFloat(data.faceDetection.faceDetectionConfidence) || 0,
-      imageQuality: parseFloat(data.imageQuality.selfie1Quality) || 0,
-      imageQualityIssues: Array.isArray(data.imageQuality.qualityIssues) ? data.imageQuality.qualityIssues : []
-    };
-
-    const effectiveConfigPlain = config?.toObject
-      ? config.toObject()
-      : (config ?? createDefaultConfig('system'));
-
-    const resolved = resolveKycConfig(effectiveConfigPlain);
-    const errors = evaluateSelfieRules(normalizedData, resolved);
-
-    // Merge LLM-detected errors with validation errors
-    const allErrors = [...(data.validation?.errors || []), ...errors];
-    const uniqueErrors = deduplicateErrors(allErrors);
-
-    // Determine status
-    const status = determineStatus(uniqueErrors, {
-      isMatch: normalizedData.isMatch,
-      matchConfidence: normalizedData.matchConfidence
-    });
-
-    return {
-      success: true,
-      status,
-      data: {
-        isMatch: normalizedData.isMatch,
-        matchConfidence: normalizedData.matchConfidence,
-        spoofingRisk: normalizedData.spoofingRisk,
-        faceCount: normalizedData.faceCount,
-        lightingCondition: normalizedData.lightingCondition,
-        faceSize: normalizedData.faceSize,
-        faceCoverage: normalizedData.faceCoverage,
-        faceDetectionConfidence: normalizedData.faceDetectionConfidence,
-        imageQuality: normalizedData.imageQuality,
-        imageQualityIssues: normalizedData.imageQualityIssues
-      },
-      errors: uniqueErrors
-    };
-
-  } catch (error) {
-    console.error('Selfie verification error:', error);
-    return {
-      success: false,
-      status: STATUS.FAILED,
-      error: ERRORS.GROQ_API_ERROR,
-      details: error.message
-    };
-  }
+  const selfies = Array.isArray(selfieUrls) ? selfieUrls : [selfieUrls];
+  const plain = config?.toObject ? config.toObject() : (config ?? createDefaultConfig('system'));
+  return VerificationService.verifySelfie(plain, { idPhotoUrl, selfieUrls: selfies });
 }
 
 // ============================================================================

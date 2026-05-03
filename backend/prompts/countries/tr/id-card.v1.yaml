@@ -13,7 +13,7 @@ prompt: |
   # EXTRACTION REQUIREMENTS
   1. PERSONAL INFORMATION: Extract firstName (UPPERCASE Turkish alphabet), lastName (UPPERCASE Turkish alphabet), identityNumber (11 numeric digits, first digit non-zero), dateOfBirth (YYYY-MM-DD), gender (M/F), serialNumber, expiryDate (YYYY-MM-DD), nationality, address.
   2. MRZ: Extract 3-line zone (90 chars total). Return raw string and parsed fields.
-  3. AUTHENTICITY: Analyze hologramPresence, photoQuality, fontConsistency, edgeIntegrity, colorAccuracy, tamperingRisk.
+  3. AUTHENTICITY: Analyze hologramPresence, photoQuality, fontConsistency, edgeIntegrity, colorAccuracy, tamperingRisk, documentVitalityScore (0–1, higher if the card appears to be a live physical document rather than a photo-of-screen or flat print).
   4. QUALITY: imageQuality (0-1), documentCondition (excellent/good/fair/poor), readabilityIssues.
 
   # CLIENT-SPECIFIC THRESHOLDS
@@ -26,6 +26,7 @@ prompt: |
   - MRZ: >= {{idCardThresholds.minMrzConfidence}}
   - Image Quality: >= {{idCardThresholds.minImageQuality}}
   - Max Tampering Risk: <= {{idCardThresholds.maxTamperingRisk}}
+  - Min Document Vitality: >= {{idCardThresholds.minDocumentVitalityConfidence}}
   - Acceptable Conditions: {{#each idCardThresholds.acceptableDocumentConditions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
 
   {{#if hasCustomThresholds}}
@@ -83,7 +84,8 @@ prompt: |
       "fontConsistency": boolean,
       "edgeIntegrity": boolean,
       "colorAccuracy": boolean,
-      "tamperingRisk": number
+      "tamperingRisk": number,
+      "documentVitalityScore": number
     },
     "quality": {
       "imageQuality": number,

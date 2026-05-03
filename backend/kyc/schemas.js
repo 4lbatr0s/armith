@@ -63,7 +63,9 @@ const AuthenticitySchema = z.object({
   fontConsistency: BooleanCoerce.nullable().optional().default(true),
   edgeIntegrity: BooleanCoerce.nullable().optional().default(true),
   colorAccuracy: BooleanCoerce.nullable().optional().default(true),
-  tamperingRisk: z.coerce.number().min(0).max(1).default(0)
+  tamperingRisk: z.coerce.number().min(0).max(1).default(0),
+  /** 0–1: higher = more likely a live physical document (not screen/print replay). */
+  documentVitalityScore: z.coerce.number().min(0).max(1).default(0.85)
 });
 
 const QualitySchema = z.object({

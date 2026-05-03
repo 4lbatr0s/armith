@@ -13,6 +13,27 @@ import { ThresholdItem } from '../components/Result/ThresholdItem';
 import { ErrorSection } from '../components/Result/ErrorSection';
 import { maskIdentityNumber, formatDateOnly as formatDate, isExpired, formatMRZ } from '../lib/utils';
 
+function normThresholdLabel(s) {
+  return String(s ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/-/g, '_');
+}
+
+/** Compare stored enum (e.g. EXCELLENT) to config allowed list (e.g. excellent). */
+function observationMeetsAllowed(obs, allowedList) {
+  if (obs == null || obs === '') return false;
+  if (!allowedList || allowedList.length === 0) return true;
+  const o = normThresholdLabel(obs);
+  return allowedList.some((a) => normThresholdLabel(a) === o);
+}
+
+function formatCategoricalLabel(value) {
+  if (value == null || value === '') return '—';
+  return String(value).replace(/_/g, ' ');
+}
+
 export const ResultPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -344,12 +365,36 @@ export const ResultPage = () => {
                 <div className="p-4 space-y-2 text-sm">
                   <ThresholdItem label={t('result.th_name_confidence')} value={`≥ ${(thresholds.fullNameConfidence * 100).toFixed(0)}%`} />
                   <ThresholdItem label={t('result.th_id_confidence')} value={`≥ ${(thresholds.identityNumberConfidence * 100).toFixed(0)}%`} />
-                  <ThresholdItem label={t('result.th_image_quality')} value={`≥ ${(thresholds.imageQuality * 100).toFixed(0)}%`} />
+                  <ThresholdItem
+                    label={t('result.th_id_image_quality')}
+                    value={`≥ ${(((thresholds.idMinImageQuality ?? thresholds.imageQuality) || 0) * 100).toFixed(0)}%`}
+                  />
+                  <ThresholdItem
+                    label={t('result.th_min_document_vitality')}
+                    value={`≥ ${(((thresholds.minDocumentVitalityConfidence ?? 0.45) || 0) * 100).toFixed(0)}%`}
+                  />
+                  <ThresholdItem
+                    label={t('result.th_selfie_image_quality')}
+                    value={`≥ ${(((thresholds.selfieMinImageQuality ?? thresholds.imageQuality) || 0) * 100).toFixed(0)}%`}
+                  />
                   <ThresholdItem label={t('result.th_match_confidence')} value={`≥ ${thresholds.matchConfidence}%`} />
                   <ThresholdItem label={t('result.th_spoofing_max')} value={`≤ ${(thresholds.spoofingRiskMax * 100).toFixed(0)}%`} />
                   <ThresholdItem label={t('result.th_face_detection')} value={`≥ ${(thresholds.faceDetectionConfidence * 100).toFixed(0)}%`} />
-                  <ThresholdItem label={t('result.th_min_age')} value={`${thresholds.minAge} ${t('result.years')}`} />
-                  <ThresholdItem label={t('result.th_max_age')} value={`${thresholds.maxAge} ${t('result.years')}`} />
+                  <ThresholdItem
+                    label={t('result.th_min_liveness')}
+                    value={`≥ ${(((thresholds.minLivenessConfidence ?? 0.7) || 0) * 100).toFixed(0)}%`}
+                  />
+                  <ThresholdItem
+                    label={t('result.th_age_policy')}
+                    value={
+                      thresholds.enforceAgeCheck === false
+                        ? t('result.age_disabled')
+                        : `${thresholds.minAge}–${thresholds.maxAge} ${t('result.years')}`
+                    }
+                  />
+                  <ThresholdItem label={t('result.th_allowed_lighting')} value={(thresholds.allowedLightingConditions || []).join(', ') || '—'} />
+                  <ThresholdItem label={t('result.th_allowed_face_sizes')} value={(thresholds.allowedFaceSizes || []).join(', ') || '—'} />
+                  <ThresholdItem label={t('result.th_allowed_face_coverage')} value={(thresholds.allowedFaceCoverage || []).join(', ') || '—'} />
                 </div>
               </div>
             )}
@@ -507,7 +552,7 @@ export const ResultPage = () => {
                         <ConfidenceCircle
                           label={t('result.image_quality')}
                           value={idResult.confidence.imageQuality}
-                          threshold={thresholds.imageQuality || 0.7}
+                          threshold={thresholds.idMinImageQuality ?? thresholds.imageQuality ?? 0.7}
                         />
                         <ConfidenceCircle
                           label={t('result.name_confidence')}
@@ -529,6 +574,13 @@ export const ResultPage = () => {
                           value={idResult.confidence.expiryDate}
                           threshold={thresholds.expiryDateConfidence || 0.9}
                         />
+                        {idResult.confidence.documentVitalityScore != null && (
+                          <ConfidenceCircle
+                            label={t('result.document_vitality_confidence')}
+                            value={idResult.confidence.documentVitalityScore}
+                            threshold={thresholds.minDocumentVitalityConfidence ?? 0.45}
+                          />
+                        )}
                       </div>
                     </div>
                   )}
@@ -617,28 +669,41 @@ export const ResultPage = () => {
                         inverse
                       />
                       <AnalysisCard
+                        label={t('result.liveness_confidence')}
+                        value={
+                          selfieResult.data.livenessConfidence != null
+                            ? `${(selfieResult.data.livenessConfidence * 100).toFixed(0)}%`
+                            : '—'
+                        }
+                        icon="🫀"
+                        good={
+                          selfieResult.data.livenessConfidence == null ||
+                          selfieResult.data.livenessConfidence >= (thresholds.minLivenessConfidence ?? 0.7)
+                        }
+                      />
+                      <AnalysisCard
                         label={t('result.lighting')}
-                        value={selfieResult.data.lightingCondition || 'N/A'}
+                        value={formatCategoricalLabel(selfieResult.data.lightingCondition)}
                         icon="💡"
-                        good={selfieResult.data.lightingCondition === 'good'}
+                        good={observationMeetsAllowed(selfieResult.data.lightingCondition, thresholds.allowedLightingConditions)}
                       />
                       <AnalysisCard
                         label={t('result.face_size')}
-                        value={selfieResult.data.faceSize || 'N/A'}
+                        value={formatCategoricalLabel(selfieResult.data.faceSize)}
                         icon="📐"
-                        good={selfieResult.data.faceSize === 'adequate'}
+                        good={observationMeetsAllowed(selfieResult.data.faceSize, thresholds.allowedFaceSizes)}
                       />
                       <AnalysisCard
                         label={t('result.face_coverage')}
-                        value={selfieResult.data.faceCoverage || 'N/A'}
+                        value={formatCategoricalLabel(selfieResult.data.faceCoverage)}
                         icon="👁"
-                        good={selfieResult.data.faceCoverage === 'clear'}
+                        good={observationMeetsAllowed(selfieResult.data.faceCoverage, thresholds.allowedFaceCoverage)}
                       />
                       <AnalysisCard
                         label={t('result.image_quality')}
                         value={`${((selfieResult.data.imageQuality || 0) * 100).toFixed(0)}%`}
                         icon="🖼"
-                        good={(selfieResult.data.imageQuality || 0) >= (thresholds.imageQuality || 0.7)}
+                        good={(selfieResult.data.imageQuality || 0) >= (thresholds.selfieMinImageQuality ?? thresholds.imageQuality ?? 0.6)}
                       />
                     </div>
                   </div>
@@ -655,9 +720,14 @@ export const ResultPage = () => {
                         threshold={thresholds.faceDetectionConfidence || 0.8}
                       />
                       <ConfidenceBar
+                        label={t('result.liveness_confidence')}
+                        value={selfieResult.data.livenessConfidence}
+                        threshold={thresholds.minLivenessConfidence ?? 0.7}
+                      />
+                      <ConfidenceBar
                         label={t('result.image_quality')}
                         value={selfieResult.data.imageQuality}
-                        threshold={thresholds.imageQuality || 0.7}
+                        threshold={thresholds.selfieMinImageQuality ?? thresholds.imageQuality ?? 0.6}
                       />
                       <ConfidenceBar
                         label={t('result.match_score')}
