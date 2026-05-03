@@ -51,7 +51,8 @@ prompt: |
   Compare **only** the ID portrait region to the selfie face. **Do not** give a high match because both images are “clear faces” or same broad demographics.
 
   **Mandatory rules:**
-  - If the two faces are **clearly different individuals** (bone structure, inter-eye distance, nose shape, jaw, ear shape, age cohort incompatible with ID DOB when visible), set **`isMatch`: false** and **`matchConfidence` below 45** (not mid‑80s). List concrete differences in `explainability.mismatchReasons`.
+  - If the two faces are **clearly different individuals** (bone structure, inter-eye distance, nose shape, jaw, ear shape, age cohort incompatible with ID DOB when visible), set **`isMatch`: false** and **`matchConfidence` below 45** (not mid‑80s). You **must** populate `explainability.mismatchReasons` with at least 2 specific visual differences (not generic text).
+  - If the ID appears to be a **specimen / sample** (e.g. TEST names, obvious placeholder numbers, “sample” layout), set **`isMatch`: false**, high `spoofingRisk`, and explain under `spoofingIndicators` / `mismatchReasons`.
   - **`isMatch` true** only when you would confidently accept them as the **same person** in a court‑style ID check—not merely “similar hairstyle” or “both smiling”.
   - **Inflating `matchConfidence` is a security failure.** When uncertain, lower `matchConfidence` and set `isMatch` false.
 

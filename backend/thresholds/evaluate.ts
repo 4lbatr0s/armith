@@ -115,6 +115,21 @@ export function evaluateSelfieRules(normalized: Record<string, any>, resolved: K
         out.push(ERRORS.LOW_MATCH_CONFIDENCE);
     }
 
+    const mismatches = normalized.mismatchReasons as string[] | undefined;
+    if (Array.isArray(mismatches) && mismatches.length > 0) {
+        if (normalized.isMatch || normalized.matchConfidence >= st.minMatchConfidence) {
+            out.push(ERRORS.LOW_MATCH_CONFIDENCE);
+        }
+    }
+
+    const fs = normalized.facialScores as Record<string, number | undefined> | null | undefined;
+    if (normalized.isMatch && normalized.matchConfidence >= 75 && fs) {
+        const core = [fs.facialStructure, fs.eyes, fs.nose].filter((x): x is number => x !== undefined && Number.isFinite(x));
+        if (core.length >= 2 && Math.min(...core) < 0.66) {
+            out.push(ERRORS.LOW_MATCH_CONFIDENCE);
+        }
+    }
+
     if ((normalized.spoofingRisk ?? 0) > st.maxSpoofingRisk) {
         out.push(ERRORS.SPOOFING_DETECTED);
     }

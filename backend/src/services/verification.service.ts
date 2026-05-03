@@ -66,6 +66,19 @@ function normalizeSelfiePayload(data: Record<string, any>) {
     const lcRaw = data.liveness?.livenessConfidence;
     const lcParsed = lcRaw === null || lcRaw === undefined ? NaN : parseFloat(String(lcRaw));
     const livenessConfidence = Number.isFinite(lcParsed) ? lcParsed : undefined;
+    const mismatchReasons = Array.isArray(data.explainability?.mismatchReasons)
+        ? data.explainability.mismatchReasons.filter((x: unknown) => typeof x === 'string' && String(x).trim().length > 0)
+        : [];
+    const fs = data.biometricMatch?.facialFeatureScores;
+    const facialScores =
+        fs && typeof fs === 'object'
+            ? {
+                  facialStructure: parseOptionalScore(fs.facialStructure),
+                  eyes: parseOptionalScore(fs.eyes),
+                  nose: parseOptionalScore(fs.nose),
+                  mouthAndChin: parseOptionalScore(fs.mouthAndChin)
+              }
+            : null;
     return {
         isMatch:
             data.biometricMatch.isMatch === true || data.biometricMatch.isMatch === 'true',
@@ -73,6 +86,8 @@ function normalizeSelfiePayload(data: Record<string, any>) {
         spoofingRisk: parseFloat(data.liveness.spoofingRisk) || 0,
         livenessConfidence,
         livenessIndicators: Array.isArray(data.liveness?.livenessIndicators) ? data.liveness.livenessIndicators : [],
+        mismatchReasons,
+        facialScores,
         faceCount: parseSelfieFaceCount(data.faceDetection.selfie1FaceCount),
         lightingCondition: data.imageQuality.lightingCondition || 'good',
         faceSize: data.imageQuality.faceSize || 'adequate',
@@ -83,6 +98,12 @@ function normalizeSelfiePayload(data: Record<string, any>) {
             ? data.imageQuality.qualityIssues
             : []
     };
+}
+
+function parseOptionalScore(v: unknown): number | undefined {
+    if (v === null || v === undefined) return undefined;
+    const n = parseFloat(String(v));
+    return Number.isFinite(n) ? n : undefined;
 }
 
 function parseSelfieFaceCount(fc: unknown): number {
@@ -188,7 +209,7 @@ export class VerificationService {
                         content: [
                             {
                                 type: 'text',
-                                text: `Compare the ID photo (first image) with the selfie${selfies.length > 1 ? 's' : ''} (${selfies.length} image${selfies.length > 1 ? 's' : ''}).`
+                                text: `Compare the ID portrait in the first image with the live subject in the selfie image(s). They must be the same real person. If they look like different individuals (different age cohort, jaw/eyes/nose shape, facial hair pattern), set biometricMatch.isMatch to false and matchConfidence below 45, and list concrete differences in explainability.mismatchReasons. Do not output high match scores for clearly different people. Specimen or sample ID cards (e.g. names like TEST, sequential placeholder TC numbers) are not valid customer identity—treat as non-matching / high risk.`
                             },
                             ...(imageContent as any)
                         ] as any
