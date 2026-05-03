@@ -53,9 +53,18 @@ export async function persistIdVerification({
     if (profile) {
         profile.country = countryCodeUpper;
         profile.status = overallStatus.toUpperCase();
+        const prevIdVerificationStatus = profile.idVerificationStatus;
         profile.idVerificationStatus = result.status.toUpperCase();
 
-        if (result.status === STATUS.APPROVED) {
+        if (authUserId && !profile.userId) {
+            profile.userId = authUserId;
+        }
+
+        // Refresh extraction + images on approve, or while ID was never approved (retry same TCKN / same profile).
+        const shouldRefreshIdSnapshot =
+            result.status === STATUS.APPROVED || prevIdVerificationStatus !== 'APPROVED';
+
+        if (shouldRefreshIdSnapshot) {
             profile.fullName =
                 `${result.data?.firstName} ${result.data?.lastName}`.trim() || profile.fullName;
             profile.firstName = result.data?.firstName || profile.firstName;
@@ -83,7 +92,9 @@ export async function persistIdVerification({
 
         profile.verificationAttempts = (profile.verificationAttempts || 0) + 1;
         profile.lastVerificationAttempt = new Date();
-        if (rejectionReasons.length > 0) {
+        if (result.status === STATUS.APPROVED) {
+            profile.rejectionReasons = Array.isArray(rejectionReasons) ? rejectionReasons : [];
+        } else if (rejectionReasons.length > 0) {
             profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
         }
         await profile.save();

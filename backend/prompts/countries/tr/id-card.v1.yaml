@@ -13,8 +13,13 @@ prompt: |
   # EXTRACTION REQUIREMENTS
   1. PERSONAL INFORMATION: Extract firstName (UPPERCASE Turkish alphabet), lastName (UPPERCASE Turkish alphabet), identityNumber (11 numeric digits, first digit non-zero), dateOfBirth (YYYY-MM-DD), gender (M/F), serialNumber, expiryDate (YYYY-MM-DD), nationality, address.
   2. MRZ: Extract 3-line zone (90 chars total). Return raw string and parsed fields.
-  3. AUTHENTICITY: Analyze hologramPresence, photoQuality, fontConsistency, edgeIntegrity, colorAccuracy, tamperingRisk, documentVitalityScore (0–1, higher if the card appears to be a live physical document rather than a photo-of-screen or flat print).
+  3. AUTHENTICITY & FRAUD SIGNALS: Analyze hologramPresence, photoQuality, fontConsistency, edgeIntegrity, colorAccuracy, tamperingRisk, documentVitalityScore (0–1).
+     - **documentVitalityScore**: HIGH only for a **real card in hand** (natural specular highlights, depth, slight perspective, chip/relief cues if visible). LOW for **photo-of-screen** (moiré, straight bezel crop, uniform glare), **flat scan/print** (paper texture, cut edges, missing 3D), or **obvious template/forgery** (generic typography, inconsistent kerning, mismatched photo vs MRZ age cues when both visible).
+     - **tamperingRisk**: RAISE when fonts/photo edges look pasted, fields misaligned, or portrait looks composited vs background.
+     - **hologramPresence**: false or null is acceptable if angle hides it—then rely on other authenticity fields and vitality, not on guessing true.
   4. QUALITY: imageQuality (0-1), documentCondition (excellent/good/fair/poor), readabilityIssues.
+
+  **Bias**: Prefer **flagging suspicious documents** (lower vitality / higher tampering when cues exist) over giving the benefit of the doubt to a crisp image that may be a fake or a photo-of-photo.
 
   # CLIENT-SPECIFIC THRESHOLDS
   - Overall Confidence: >= {{idCardThresholds.minOverallConfidence}}

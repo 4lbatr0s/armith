@@ -260,7 +260,7 @@ export const verifySelfie = async (req, res) => {
         let overallStatus = result.status;
 
         if (profileId && result.success) {
-            const idValidation = await IdCardValidation.findOne({ profileId });
+            const idValidation = await IdCardValidation.findOne({ profileId }).sort({ createdAt: -1 });
             const idStatus = idValidation?.status || 'PENDING';
 
             overallStatus = computeProfileStatusAfterSelfie({
@@ -326,8 +326,8 @@ export const getUserStatus = async (req, res) => {
         }
 
         const [idValidation, selfieValidation] = await Promise.all([
-            IdCardValidation.findOne({ profileId }),
-            SelfieValidation.findOne({ profileId })
+            IdCardValidation.findOne({ profileId }).sort({ createdAt: -1 }),
+            SelfieValidation.findOne({ profileId }).sort({ createdAt: -1 })
         ]);
 
         const authUserId = req.auth?.userId;

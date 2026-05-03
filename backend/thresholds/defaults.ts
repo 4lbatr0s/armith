@@ -16,25 +16,26 @@ export const DEFAULT_ID_CARD_THRESHOLDS = {
     minDateOfBirthConfidence: 0.85,
     minExpiryDateConfidence: 0.85,
     minMrzConfidence: 0.8,
-    minImageQuality: 0.6,
-    maxTamperingRisk: 0.4,
+    minImageQuality: 0.62,
+    maxTamperingRisk: 0.35,
     minGenderConfidence: 0.75,
     minSerialNumberConfidence: 0.8,
     /** Minimum document vitality score (0–1) from authenticity.documentVitalityScore. */
-    minDocumentVitalityConfidence: 0.45,
+    minDocumentVitalityConfidence: 0.55,
     acceptableDocumentConditions: ['excellent', 'good', 'fair'] as string[]
 };
 
 export const DEFAULT_SELFIE_THRESHOLDS = {
-    minMatchConfidence: 85,
-    maxSpoofingRisk: 0.35,
-    minImageQuality: 0.6,
-    minLivenessConfidence: 0.7,
+    /** Same-person bar: 0–100; stricter default to reduce false matches across different people. */
+    minMatchConfidence: 92,
+    maxSpoofingRisk: 0.25,
+    minImageQuality: 0.62,
+    minLivenessConfidence: 0.78,
     requiredFaceCount: 1,
     allowedLightingConditions: ['excellent', 'good', 'acceptable'],
     allowedFaceSizes: ['optimal', 'adequate'],
     allowedFaceCoverage: ['fully_visible', 'partially_obscured'],
-    minFacialFeatureConfidence: 0.7,
+    minFacialFeatureConfidence: 0.78,
     requireMultipleAngles: false,
     minAngleDifference: 15
 };
@@ -90,8 +91,8 @@ export const PRESETS = {
         },
         selfieThresholds: {
             ...DEFAULT_SELFIE_THRESHOLDS,
-            minMatchConfidence: 92,
-            maxSpoofingRisk: 0.2,
+            minMatchConfidence: 94,
+            maxSpoofingRisk: 0.18,
             minImageQuality: 0.75,
             minLivenessConfidence: 0.85,
             allowedLightingConditions: ['excellent', 'good'],
