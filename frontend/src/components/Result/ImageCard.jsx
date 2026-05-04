@@ -1,28 +1,57 @@
 import React from 'react';
 
-export const ImageCard = ({ label, url, status, large }) => (
+export const ImageCard = ({ label, url, status, large, onPreview }) => {
+  const interactive = Boolean(url && onPreview);
+
+  return (
     <div className="relative group">
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-        <div className="relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-            <img
-                src={url}
-                alt={label}
-                className={`w-full object-cover ${large ? 'h-48' : 'h-28'} group-hover:scale-105 transition-transform duration-200`}
-            />
-            {status && (
-                <div className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center ${status === 'approved' ? 'bg-green-500' : status === 'rejected' ? 'bg-red-500' : 'bg-yellow-500'
-                    }`}>
-                    {status === 'approved' ? (
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    ) : (
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    )}
-                </div>
+      <p className="text-xs font-bold uppercase tracking-widest text-pm-muted mb-2">{label}</p>
+      <div
+        className={`relative overflow-hidden rounded-sm border-2 border-pm-ink/15 dark:border-white/15 bg-pm-wash/30 dark:bg-pm-void/50 ${
+          interactive ? 'cursor-brutal focus-within:ring-2 focus-within:ring-pm-accent' : ''
+        }`}
+        role={interactive ? 'button' : undefined}
+        tabIndex={interactive ? 0 : undefined}
+        onClick={() => interactive && onPreview()}
+        onKeyDown={(e) => {
+          if (!interactive) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onPreview();
+          }
+        }}
+      >
+        <img
+          src={url}
+          alt={label}
+          className={`w-full object-cover ${large ? 'h-48' : 'h-28'} ${interactive ? 'transition-transform duration-200 group-hover:scale-[1.02]' : ''}`}
+          draggable={false}
+        />
+        {status && (
+          <div
+            className={`absolute top-2 right-2 w-7 h-7 rounded-sm border-2 border-white/40 flex items-center justify-center ${
+              status === 'approved'
+                ? 'bg-pm-accent-alt'
+                : status === 'rejected'
+                  ? 'bg-red-600'
+                  : 'bg-amber-500'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            {status === 'approved' ? (
+              <svg className="h-4 w-4 text-pm-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             )}
-        </div>
+          </div>
+        )}
+      </div>
     </div>
-);
+  );
+};

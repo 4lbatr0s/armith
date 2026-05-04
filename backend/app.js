@@ -22,14 +22,7 @@ const PORT = process.env.PORT || 3001;
 // Security headers
 app.use(helmet());
 
-// Rate limiting
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, error: 'Too many requests, please try again later' }
-}));
-
-// CORS configuration - must be before Clerk middleware
+// CORS must run before rate limiting so preflight (OPTIONS) and 429 responses include ACAO etc.
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -68,8 +61,20 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
-// Handle preflight requests explicitly
+// Handle preflight requests explicitly (same options as above)
 app.options('*', cors());
+
+// Rate limiting — after CORS; do not count OPTIONS (preflight) toward the limit
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.RATE_LIMIT_MAX || 100),
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.method === 'OPTIONS',
+    message: { success: false, error: 'Too many requests, please try again later' }
+  })
+);
 
 // Cookie parser
 app.use(cookieParser());

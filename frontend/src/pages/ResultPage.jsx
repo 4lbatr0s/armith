@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
 import { StatusBadge } from '../components/Result/StatusBadge';
 import { ImageCard } from '../components/Result/ImageCard';
+import { ImageLightbox } from '../components/Result/ImageLightbox';
 import { DataField } from '../components/Result/DataField';
 import { ConfidenceCircle } from '../components/Result/ConfidenceCircle';
 import { ConfidenceBar } from '../components/Result/ConfidenceBar';
@@ -41,6 +42,7 @@ export const ResultPage = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -301,6 +303,9 @@ export const ResultPage = () => {
                     label={t('result.id_front')}
                     url={result.images.idFront}
                     status={idResult.status}
+                    onPreview={() =>
+                      setImagePreview({ url: result.images.idFront, title: t('result.id_front') })
+                    }
                   />
                 ) : (
                   <div className="h-32 bg-pm-wash/50 dark:bg-pm-void/80 border-2 border-dashed border-pm-ink/10 dark:border-white/10 rounded-sm flex items-center justify-center">
@@ -312,6 +317,9 @@ export const ResultPage = () => {
                     label={t('result.id_back')}
                     url={result.images.idBack}
                     status={idResult.status}
+                    onPreview={() =>
+                      setImagePreview({ url: result.images.idBack, title: t('result.id_back') })
+                    }
                   />
                 )}
               </div>
@@ -335,6 +343,9 @@ export const ResultPage = () => {
                     url={result.images.selfie}
                     status={selfieResult.status}
                     large
+                    onPreview={() =>
+                      setImagePreview({ url: result.images.selfie, title: t('result.selfie') })
+                    }
                   />
                 ) : (
                   <div className="h-48 bg-pm-wash/50 dark:bg-pm-void/80 border-2 border-dashed border-pm-ink/10 dark:border-white/10 rounded-sm flex flex-col items-center justify-center">
@@ -781,6 +792,13 @@ export const ResultPage = () => {
           </div>
         </div>
       </div>
+
+      <ImageLightbox
+        open={Boolean(imagePreview)}
+        url={imagePreview?.url}
+        title={imagePreview?.title}
+        onClose={() => setImagePreview(null)}
+      />
     </div>
   );
 };

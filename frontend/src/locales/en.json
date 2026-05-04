@@ -171,6 +171,8 @@
         "none": "None",
         "issues_found": "Issues Found",
         "return_home": "Start New Verification",
+        "image_lightbox_hint": "Click outside or press Esc to close",
+        "image_preview_a11y": "Verification image preview",
         "status_approved": "Approved",
         "status_rejected": "Rejected",
         "status_failed": "Failed",

@@ -119,6 +119,16 @@
   .pm-link-nav-active {
     @apply text-pm-ink dark:text-pm-ink-soft border-pm-accent;
   }
+
+  /**
+   * Neo-brutalist pointer (fallback: pointer). Hotspot ~ tip of arrow.
+   * Light: magenta fill + ink stroke. Dark mode: browser may still use light asset — pointer fallback suffices.
+   */
+  .cursor-brutal {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath fill='%23e4007a' stroke='%230c0c0c' stroke-width='2' stroke-linejoin='miter' d='M4 6 L4 22 L11 15 L15 24 L19 22 L14 13 L22 13 L22 9 L12 9 L12 4 Z'/%3E%3C/svg%3E")
+        4 6,
+      pointer;
+  }
 }
 
 /* Legacy aliases used on Home — map to new system */

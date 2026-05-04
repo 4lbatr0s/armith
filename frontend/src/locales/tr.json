@@ -171,6 +171,8 @@
         "none": "Yok",
         "issues_found": "Bulunan Sorunlar",
         "return_home": "Yeni Doğrulama Başlat",
+        "image_lightbox_hint": "Kapatmak için dışına tıklayın veya Esc",
+        "image_preview_a11y": "Doğrulama görseli önizlemesi",
         "status_approved": "Onaylandı",
         "status_rejected": "Reddedildi",
         "status_failed": "Başarısız",
