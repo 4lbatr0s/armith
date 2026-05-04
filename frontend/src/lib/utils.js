@@ -18,13 +18,13 @@ export function formatDate(date) {
 export function getStatusColor(status) {
   switch (status) {
     case 'approved':
-      return 'text-green-600 bg-green-50 border-green-200';
+      return 'text-pm-accent-alt bg-pm-accent-alt/10 border-pm-accent-alt/40';
     case 'rejected':
-      return 'text-red-600 bg-red-50 border-red-200';
+      return 'text-pm-accent bg-pm-accent/10 border-pm-accent/40';
     case 'pending':
-      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      return 'text-zinc-700 bg-zinc-400/15 border-zinc-400/60 dark:text-zinc-300';
     case 'failed':
-      return 'text-gray-600 bg-gray-50 border-gray-200';
+      return 'text-amber-800 bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-800';
     default:
       return 'text-gray-600 bg-gray-50 border-gray-200';
   }

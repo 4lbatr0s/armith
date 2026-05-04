@@ -127,23 +127,23 @@ export const ResultPage = () => {
   // Get header color based on status
   const getHeaderColor = () => {
     if (isApproved) return 'bg-pm-accent-alt';
-    if (isPending) return 'bg-pm-accent';
+    if (isPending) return 'bg-zinc-500';
     if (isFailed) return 'bg-amber-400';
-    return 'bg-red-600';
+    return 'bg-pm-accent';
   };
 
   const getHeaderBgColor = () => {
-    if (isApproved) return 'bg-pm-accent-alt/15 border-pm-accent-alt/40';
-    if (isPending) return 'bg-pm-accent/10 border-pm-accent/40';
+    if (isApproved) return 'bg-pm-accent-alt/15 border-pm-accent-alt/50';
+    if (isPending) return 'bg-zinc-500/15 border-zinc-500/40';
     if (isFailed) return 'bg-amber-400/15 border-amber-500/40';
-    return 'bg-red-600/10 border-red-600/40';
+    return 'bg-pm-accent/15 border-pm-accent/50';
   };
 
   const getIconColor = () => {
     if (isApproved) return 'text-pm-accent-alt';
-    if (isPending) return 'text-pm-accent';
+    if (isPending) return 'text-zinc-600 dark:text-zinc-300';
     if (isFailed) return 'text-amber-600 dark:text-amber-300';
-    return 'text-red-600 dark:text-red-400';
+    return 'text-pm-accent';
   };
 
   // Get status title
@@ -236,8 +236,8 @@ export const ResultPage = () => {
                 {/* Progress Steps */}
                 <div className="mt-4 flex items-center gap-4">
                   <div className="flex items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.idVerification?.approved ? 'bg-green-500' :
-                        progress.idVerification?.completed ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.idVerification?.approved ? 'bg-pm-accent-alt' :
+                        progress.idVerification?.completed ? 'bg-pm-accent' : 'bg-gray-300 dark:bg-gray-600'
                       }`}>
                       {progress.idVerification?.approved ? (
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,12 +254,12 @@ export const ResultPage = () => {
                     <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t('result.step_id')}</span>
                   </div>
 
-                  <div className={`flex-1 h-1 rounded ${progress.idVerification?.approved ? 'bg-green-300' : 'bg-gray-300 dark:bg-gray-600'
+                  <div className={`flex-1 h-1 rounded ${progress.idVerification?.approved ? 'bg-pm-accent-alt/70' : 'bg-gray-300 dark:bg-gray-600'
                     }`} />
 
                   <div className="flex items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.selfieVerification?.approved ? 'bg-green-500' :
-                        progress.selfieVerification?.completed ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.selfieVerification?.approved ? 'bg-pm-accent-alt' :
+                        progress.selfieVerification?.completed ? 'bg-pm-accent' : 'bg-gray-300 dark:bg-gray-600'
                       }`}>
                       {progress.selfieVerification?.approved ? (
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -427,7 +427,7 @@ export const ResultPage = () => {
                     {t('result.id_verification')}
                   </h3>
                   {idResult.status === 'APPROVED' && (
-                    <span className="ml-3 px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full flex items-center">
+                    <span className="ml-3 px-2 py-1 text-xs font-medium border-2 border-pm-ink/15 bg-pm-accent-alt/20 text-pm-ink dark:border-white/20 dark:bg-pm-accent-alt/15 dark:text-pm-accent-alt rounded-sm flex items-center">
                       <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
@@ -476,7 +476,7 @@ export const ResultPage = () => {
                         {t('result.mrz')}
                       </h4>
                       <div className="bg-gray-900 dark:bg-black rounded-lg p-4 overflow-x-auto mb-4">
-                        <code className="text-green-400 font-mono text-xs whitespace-pre">
+                        <code className="text-pm-accent-alt font-mono text-xs whitespace-pre">
                           {formatMRZ(idResult.data.mrz)}
                         </code>
                       </div>
@@ -500,7 +500,7 @@ export const ResultPage = () => {
                             {idResult.data.mrzInfo.valid !== undefined && (
                               <div>
                                 <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_valid')}:</span>
-                                <span className={`ml-2 font-semibold ${idResult.data.mrzInfo.valid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                <span className={`ml-2 font-semibold ${idResult.data.mrzInfo.valid ? 'text-pm-accent-alt dark:text-pm-accent-alt' : 'text-pm-accent dark:text-pm-accent'}`}>
                                   {idResult.data.mrzInfo.valid ? t('result.yes') : t('result.no')}
                                 </span>
                               </div>
@@ -636,14 +636,14 @@ export const ResultPage = () => {
                   <div className="mb-6 p-6 rounded-xl bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${selfieResult.data.isMatch ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 border-pm-ink/10 dark:border-white/15 ${selfieResult.data.isMatch ? 'bg-pm-accent-alt/25 dark:bg-pm-accent-alt/15' : 'bg-pm-accent/20 dark:bg-pm-accent/20'
                           }`}>
                           {selfieResult.data.isMatch ? (
-                            <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-8 h-8 text-pm-accent-alt" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           ) : (
-                            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-8 h-8 text-pm-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           )}

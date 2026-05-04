@@ -248,7 +248,7 @@ export const AdminPage = () => {
         </div>
 
         {error && (
-          <div className="mb-6 border-2 border-red-600/40 bg-red-500/10 text-red-800 dark:text-red-200 px-4 py-3 text-sm rounded-sm">
+          <div className="mb-6 rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-4 py-3 text-sm text-pm-ink dark:text-pm-ink-soft">
             {error}
           </div>
         )}
@@ -360,12 +360,12 @@ export const AdminPage = () => {
           <div className="space-y-6">
             {/* Messages */}
             {settingsError && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+              <div className="rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-4 py-3 text-pm-ink dark:text-pm-ink-soft">
                 {settingsError}
               </div>
             )}
             {settingsSuccess && (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-lg">
+              <div className="rounded-sm border-2 border-pm-accent-alt/40 bg-pm-accent-alt/10 px-4 py-3 text-pm-ink dark:text-pm-accent-alt">
                 {settingsSuccess}
               </div>
             )}
@@ -508,7 +508,7 @@ export const AdminPage = () => {
                 <div className="pm-panel overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                      <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 mr-2 text-pm-accent-alt" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       {t('settings.selfie_thresholds')}
@@ -690,8 +690,10 @@ const StatCard = ({ icon, label, value, color }) => {
 
 const StatusBadge = ({ status }) => {
   const config = {
-    approved: 'border-pm-accent-alt/60 text-pm-accent-alt bg-pm-accent-alt/10',
-    rejected: 'border-pm-accent/50 text-pm-accent bg-pm-accent/10',
+    approved:
+      'border-pm-ink/25 dark:border-white/20 text-pm-ink dark:text-pm-accent-alt bg-pm-accent-alt/25 dark:bg-pm-accent-alt/15',
+    rejected:
+      'border-pm-ink/25 dark:border-white/20 text-pm-ink dark:text-pm-ink-soft bg-pm-accent/20 dark:bg-pm-accent/25',
     pending: 'border-pm-ink/20 text-pm-muted dark:border-white/25',
     failed: 'border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10'
   };
@@ -747,7 +749,7 @@ const ThresholdSlider = ({ label, value, onChange, min, max, step, defaultValue,
     <div className="space-y-2">
       <div className="flex justify-between items-center">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-        <span className={`text-sm font-semibold ${isGood ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+        <span className={`text-sm font-semibold ${isGood ? 'text-pm-accent-alt dark:text-pm-accent-alt' : 'text-amber-600 dark:text-amber-400'}`}>
           {displayValue}
         </span>
       </div>
@@ -760,7 +762,7 @@ const ThresholdSlider = ({ label, value, onChange, min, max, step, defaultValue,
         onChange={(e) => onChange(parseFloat(e.target.value))}
         className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
         style={{
-          background: `linear-gradient(to right, ${isGood ? '#22c55e' : '#f97316'} 0%, ${isGood ? '#22c55e' : '#f97316'} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`
+          background: `linear-gradient(to right, ${isGood ? '#00c9b7' : '#f59e0b'} 0%, ${isGood ? '#00c9b7' : '#f59e0b'} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`
         }}
       />
       <p className="text-xs text-gray-500 dark:text-gray-400">

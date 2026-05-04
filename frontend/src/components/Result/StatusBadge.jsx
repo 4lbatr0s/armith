@@ -3,17 +3,20 @@ import React from 'react';
 export const StatusBadge = ({ status, t, large }) => {
   const config = {
     approved: {
-      border: 'border-pm-accent-alt/50 text-pm-accent-alt bg-pm-accent-alt/10',
+      border: 'border-pm-ink/30 dark:border-white/25 text-pm-ink dark:text-pm-accent-alt bg-pm-accent-alt/25 dark:bg-pm-accent-alt/15',
       dot: 'bg-pm-accent-alt'
     },
-    rejected: { border: 'border-red-600/50 text-red-700 dark:text-red-300 bg-red-600/10', dot: 'bg-red-600' },
+    rejected: {
+      border: 'border-pm-ink/30 dark:border-white/25 text-pm-ink dark:text-pm-ink-soft bg-pm-accent/20 dark:bg-pm-accent/25',
+      dot: 'bg-pm-accent'
+    },
     failed: {
       border: 'border-amber-500/50 text-amber-800 dark:text-amber-200 bg-amber-500/10',
       dot: 'bg-amber-500'
     },
     pending: {
-      border: 'border-pm-accent/50 text-pm-accent bg-pm-accent/10',
-      dot: 'bg-pm-accent animate-pulse'
+      border: 'border-zinc-400/60 text-zinc-700 dark:text-zinc-300 bg-zinc-400/15',
+      dot: 'bg-zinc-500 animate-pulse dark:bg-zinc-400'
     }
   }[status] || { border: 'border-pm-ink/20 text-pm-muted bg-pm-wash/40', dot: 'bg-pm-muted' };
 

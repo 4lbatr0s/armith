@@ -29,12 +29,12 @@ export const ImageCard = ({ label, url, status, large, onPreview }) => {
         />
         {status && (
           <div
-            className={`absolute top-2 right-2 w-7 h-7 rounded-sm border-2 border-white/40 flex items-center justify-center ${
+            className={`absolute top-2 right-2 w-7 h-7 rounded-sm border-2 border-pm-ink/20 dark:border-white/40 flex items-center justify-center ${
               status === 'approved'
-                ? 'bg-pm-accent-alt'
+                ? 'bg-pm-accent-alt text-pm-ink'
                 : status === 'rejected'
-                  ? 'bg-red-600'
-                  : 'bg-amber-500'
+                  ? 'bg-pm-accent text-white'
+                  : 'bg-amber-500 text-pm-ink'
             }`}
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
