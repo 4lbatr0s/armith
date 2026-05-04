@@ -185,16 +185,20 @@ export const AdminPage = () => {
 
         {activeTab === 'dashboard' && (
           <>
-            <div className="pm-panel mb-8 p-6 sm:p-8 bg-pm-ink text-pm-ink-soft dark:bg-pm-surface-dark border-pm-ink dark:border-white/20">
+            <div className="mb-8 rounded-sm border-2 border-pm-ink shadow-brutal bg-pm-ink p-6 sm:p-8 text-white dark:border-white/25 dark:bg-pm-surface-dark dark:text-pm-ink-soft dark:shadow-brutal">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                 <div>
-                  <h2 className="font-display text-2xl font-bold mb-2">{t('dashboard.welcome')}</h2>
-                  <p className="text-sm text-pm-ink-soft/80 max-w-xl">{t('dashboard.welcome_desc')}</p>
+                  <h2 className="font-display text-2xl font-bold tracking-tight text-white dark:text-pm-ink-soft">
+                    {t('dashboard.welcome')}
+                  </h2>
+                  <p className="mt-2 text-base leading-relaxed text-zinc-200 dark:text-zinc-300 max-w-xl">
+                    {t('dashboard.welcome_desc')}
+                  </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <Button
                     onClick={() => navigate('/upload-id')}
-                    className="bg-pm-accent text-white border-2 border-pm-ink-soft/20 hover:opacity-95 shadow-brutal"
+                    className="bg-pm-accent text-white border-2 border-white/30 hover:opacity-95 shadow-brutal dark:border-pm-ink/30"
                   >
                     <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -204,7 +208,7 @@ export const AdminPage = () => {
                   <Button
                     onClick={fetchData}
                     variant="outline"
-                    className="border-2 border-pm-ink-soft/40 text-pm-ink-soft hover:bg-white/10 bg-transparent"
+                    className="border-2 border-white/50 bg-white/10 text-white hover:bg-white/20 dark:border-white/25 dark:text-pm-ink-soft dark:hover:bg-white/10"
                   >
                     <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
