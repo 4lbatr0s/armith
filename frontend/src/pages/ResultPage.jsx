@@ -366,6 +366,10 @@ export const ResultPage = () => {
                   <ThresholdItem label={t('result.th_name_confidence')} value={`≥ ${(thresholds.fullNameConfidence * 100).toFixed(0)}%`} />
                   <ThresholdItem label={t('result.th_id_confidence')} value={`≥ ${(thresholds.identityNumberConfidence * 100).toFixed(0)}%`} />
                   <ThresholdItem
+                    label={t('result.th_mrz_confidence')}
+                    value={`≥ ${(((thresholds.minMrzConfidence ?? 0.8) || 0) * 100).toFixed(0)}%`}
+                  />
+                  <ThresholdItem
                     label={t('result.th_id_image_quality')}
                     value={`≥ ${(((thresholds.idMinImageQuality ?? thresholds.imageQuality) || 0) * 100).toFixed(0)}%`}
                   />
@@ -573,6 +577,11 @@ export const ResultPage = () => {
                           label={t('result.expiry_confidence')}
                           value={idResult.confidence.expiryDate}
                           threshold={thresholds.expiryDateConfidence || 0.9}
+                        />
+                        <ConfidenceCircle
+                          label={t('result.mrz_confidence')}
+                          value={idResult.confidence.mrzConfidence ?? idResult.confidence.mrz}
+                          threshold={thresholds.minMrzConfidence ?? 0.8}
                         />
                         {idResult.confidence.documentVitalityScore != null && (
                           <ConfidenceCircle

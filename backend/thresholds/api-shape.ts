@@ -9,6 +9,7 @@ export function flattenedThresholdPayload(resolved: KycConfigParsed) {
         identityNumberConfidence: resolved.idCardThresholds.minIdentityNumberConfidence,
         dateOfBirthConfidence: resolved.idCardThresholds.minDateOfBirthConfidence,
         expiryDateConfidence: resolved.idCardThresholds.minExpiryDateConfidence,
+        minMrzConfidence: resolved.idCardThresholds.minMrzConfidence,
         /** Minimum ID card image quality (0–1). */
         imageQuality: idMinQ,
         idMinImageQuality: idMinQ,
@@ -56,6 +57,9 @@ export function applyFlatThresholdPatches(
     }
     if (thresholds.expiryDateConfidence != null) {
         mongooseConfigDoc.idCardThresholds.minExpiryDateConfidence = thresholds.expiryDateConfidence;
+    }
+    if (thresholds.minMrzConfidence != null) {
+        mongooseConfigDoc.idCardThresholds.minMrzConfidence = thresholds.minMrzConfidence;
     }
     if (thresholds.matchConfidence != null) {
         mongooseConfigDoc.selfieThresholds.minMatchConfidence = thresholds.matchConfidence;

@@ -4,6 +4,7 @@ import { ExpiryValidator } from './base/expiry.validator.js';
 import { evaluateIdThresholdErrors } from '../../thresholds/evaluate.js';
 import { ValidationError, ValidationResult } from './country-validator.interface.js';
 import type { KycConfigParsed } from '../../thresholds/resolve.js';
+import { validateMrzAgainstExtraction } from './mrz-cross-validate.js';
 
 export class IdCardPostProcessor {
     static validate(data: any, config: KycConfigParsed): ValidationResult {
@@ -38,6 +39,10 @@ export class IdCardPostProcessor {
         }
 
         allErrors.push(...evaluateIdThresholdErrors(data, config));
+
+        if (config.validationRules.enforceMrzCrossValidation && data.mrz?.parsed) {
+            allErrors.push(...validateMrzAgainstExtraction(data.extraction ?? {}, data.mrz.parsed));
+        }
 
         // 5. Hologram
         if (config.validationRules.requireHologramDetection && !data.authenticity?.hologramPresence) {

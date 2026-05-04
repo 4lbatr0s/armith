@@ -421,6 +421,7 @@ export const getUserStatus = async (req, res) => {
                           dateOfBirth: idValidation.dateOfBirthConfidence,
                           expiryDate: idValidation.expiryDateConfidence,
                           mrz: idValidation.mrzConfidence,
+                          mrzConfidence: idValidation.mrzConfidence,
                           imageQuality: idValidation.imageQuality,
                           documentVitalityScore: idValidation.documentVitalityScore ?? null
                       },

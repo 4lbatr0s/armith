@@ -2,7 +2,9 @@ import { ERRORS } from '../kyc/config.js';
 import { ValidationError } from '../src/validation/country-validator.interface.js';
 import {
     equalsDenylistToken,
+    isDenylistDocumentNumber,
     isDenylistIdentityNumber,
+    isPlaceholderDate,
     mergeFieldDenylist,
     normToken,
     tokenInDenylist
@@ -86,14 +88,60 @@ export function applyFakeDataPenalties(parsed: IdParsed, config: KycConfigParsed
         mark('gender', 'Gender value matches known test or placeholder entry.');
     }
 
-    const fakeDates = new Set(['1111-11-11', '0001-01-01', '1900-01-01', '2099-12-31']);
-    if (dob && fakeDates.has(dob)) {
+    if (dob && isPlaceholderDate(dob, lists)) {
         c.dateOfBirthConfidence = 0;
         mark('dateOfBirth', 'Date of birth matches known placeholder date.');
     }
-    if (exp && fakeDates.has(exp)) {
+    if (exp && isPlaceholderDate(exp, lists)) {
         c.expiryDateConfidence = 0;
         mark('expiryDate', 'Expiry date matches known placeholder date.');
+    }
+
+    const mrzParsed = working.mrz?.parsed;
+    if (mrzParsed && typeof mrzParsed === 'object') {
+        const mp = mrzParsed as Record<string, unknown>;
+        const mrzDoc = mp.documentNumber != null ? String(mp.documentNumber) : '';
+        const mrzSurname = mp.surname != null ? String(mp.surname) : '';
+        const mrzGiven = mp.givenNames != null ? String(mp.givenNames) : '';
+        const mrzDob = mp.dateOfBirth != null ? String(mp.dateOfBirth) : '';
+        const mrzExp = mp.expiryDate != null ? String(mp.expiryDate) : '';
+        const mrzNat = mp.nationality != null ? String(mp.nationality) : '';
+        const mrzSex = mp.sex != null ? String(mp.sex) : '';
+
+        if (isDenylistDocumentNumber(mrzDoc, lists.identityNumberExact)) {
+            c.mrzConfidence = 0;
+            c.identityNumberConfidence = 0;
+            mark('mrz', 'MRZ document number matches known test or placeholder pattern.');
+        }
+        if (tokenInDenylist(mrzSurname, lists.lastName)) {
+            c.mrzConfidence = 0;
+            c.lastNameConfidence = 0;
+            mark('mrz', 'MRZ surname matches known test or placeholder value.');
+        }
+        const givenParts = mrzGiven.split(/\s+/).filter(Boolean);
+        if (givenParts.some((p) => tokenInDenylist(p, lists.firstName)) || tokenInDenylist(mrzGiven, lists.firstName)) {
+            c.mrzConfidence = 0;
+            c.firstNameConfidence = 0;
+            mark('mrz', 'MRZ given names match known test or placeholder value.');
+        }
+        if (mrzDob && isPlaceholderDate(mrzDob, lists)) {
+            c.mrzConfidence = 0;
+            c.dateOfBirthConfidence = 0;
+            mark('mrz', 'MRZ date of birth matches known placeholder date.');
+        }
+        if (mrzExp && isPlaceholderDate(mrzExp, lists)) {
+            c.mrzConfidence = 0;
+            c.expiryDateConfidence = 0;
+            mark('mrz', 'MRZ expiry date matches known placeholder date.');
+        }
+        if (equalsDenylistToken(mrzNat, lists.nationality)) {
+            c.mrzConfidence = 0;
+            mark('mrz', 'MRZ nationality matches known test or placeholder value.');
+        }
+        if (mrzSex && equalsDenylistToken(mrzSex, lists.gender)) {
+            c.mrzConfidence = 0;
+            mark('mrz', 'MRZ sex field matches known test or placeholder entry.');
+        }
     }
 
     if (errors.length > 0 && typeof c.overallConfidence === 'number') {

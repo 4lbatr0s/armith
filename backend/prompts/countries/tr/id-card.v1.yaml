@@ -12,7 +12,7 @@ prompt: |
 
   # EXTRACTION REQUIREMENTS
   1. PERSONAL INFORMATION: Extract firstName (UPPERCASE Turkish alphabet), lastName (UPPERCASE Turkish alphabet), identityNumber (11 numeric digits, first digit non-zero), dateOfBirth (YYYY-MM-DD), gender (M/F), serialNumber, expiryDate (YYYY-MM-DD), nationality, address.
-  2. MRZ: Extract 3-line zone (90 chars total). Return raw string and parsed fields.
+  2. MRZ: Extract 3-line zone (90 chars total). Return raw string and parsed fields; `mrz.parsed` must match `extraction` (same TC in document number, DOB, expiry, names, sex)—when MRZ Cross-Validation is on, the server rejects mismatches.
   3. AUTHENTICITY & FRAUD SIGNALS: Analyze hologramPresence, photoQuality, fontConsistency, edgeIntegrity, colorAccuracy, tamperingRisk, documentVitalityScore (0–1).
      - **documentVitalityScore**: HIGH only for a **real card in hand** (natural specular highlights, depth, slight perspective, chip/relief cues if visible). LOW for **photo-of-screen** (moiré, straight bezel crop, uniform glare), **flat scan/print** (paper texture, cut edges, missing 3D), or **obvious template/forgery** (generic typography, inconsistent kerning, mismatched photo vs MRZ age cues when both visible).
      - **tamperingRisk**: RAISE when fonts/photo edges look pasted, fields misaligned, or portrait looks composited vs background.

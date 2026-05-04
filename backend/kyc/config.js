@@ -74,6 +74,11 @@ export const ERRORS = {
     textCode: 'LOW_DOCUMENT_VITALITY',
     message: 'Document vitality score is below the required threshold (possible screen or copy capture).'
   },
+  MRZ_CROSS_VALIDATION_FAILED: {
+    code: 3008,
+    textCode: 'MRZ_CROSS_VALIDATION_FAILED',
+    message: 'MRZ fields do not match the visually extracted identity data (TC, dates, names, or sex).'
+  },
 
   // Selfie Verification (4XXX)
   LOW_MATCH_CONFIDENCE: { code: 4001, textCode: 'LOW_MATCH_CONFIDENCE', message: 'Face match confidence is below acceptable threshold.' },
@@ -356,7 +361,7 @@ export function determineStatus(errors, options = {}) {
   }
 
   // Critical errors = rejected
-  const criticalErrorCodes = [1001, 1008, 1002, 2001, 2005, 2009, 3007, 4001, 4005, 4002, 4009];
+  const criticalErrorCodes = [1001, 1008, 1002, 2001, 2005, 2009, 3007, 3008, 4001, 4005, 4002, 4009];
 
   if (errors.some(e => criticalErrorCodes.includes(e.code) || criticalErrorCodes.includes(e.numericCode))) {
     return STATUS.REJECTED;

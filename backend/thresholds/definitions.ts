@@ -37,6 +37,11 @@ export function buildIdConfidenceRowsFromVerification(
             confidenceValueName: 'documentVitalityScore',
             confidenceScore: vitality ?? undefined,
             threshold: t.minDocumentVitalityConfidence
+        },
+        {
+            confidenceValueName: 'mrzConfidence',
+            confidenceScore: c.mrzConfidence,
+            threshold: t.minMrzConfidence
         }
     ];
 }
@@ -78,6 +83,11 @@ export function buildIdConfidenceRowsFromStoredRecord(idRow: Record<string, numb
             confidenceValueName: 'documentVitalityScore',
             confidenceScore: idRow.documentVitalityScore,
             threshold: t.minDocumentVitalityConfidence
+        },
+        {
+            confidenceValueName: 'mrzConfidence',
+            confidenceScore: idRow.mrzConfidence,
+            threshold: t.minMrzConfidence
         }
     ];
 }
