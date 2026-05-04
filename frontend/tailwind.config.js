@@ -9,7 +9,23 @@ const config = {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        display: ['"Syne"', 'system-ui', 'sans-serif'],
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+      },
       colors: {
+        pm: {
+          void: '#09090b',
+          paper: '#f0ebe3',
+          wash: '#e4ddd4',
+          surface: '#faf8f5',
+          'surface-dark': '#121214',
+          ink: '#0c0c0c',
+          'ink-soft': '#f5f2eb',
+          muted: '#5e5952',
+          accent: '#e4007a',
+          'accent-alt': '#00c9b7',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

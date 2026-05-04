@@ -72,10 +72,10 @@ export const ResultPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="flex-1 flex items-center justify-center min-h-[40vh]">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">{t('common.loading')}</p>
+          <div className="w-10 h-10 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm uppercase tracking-widest text-pm-muted">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -83,16 +83,16 @@ export const ResultPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-        <div className="text-center max-w-md">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
-            <svg className="h-8 w-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="flex-1 flex items-center justify-center px-4 py-16">
+        <div className="text-center max-w-md pm-panel p-8">
+          <div className="mx-auto flex items-center justify-center h-14 w-14 border-2 border-pm-accent mb-4 rounded-sm">
+            <svg className="h-7 w-7 text-pm-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">{t('common.error')}</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-          <Button onClick={() => navigate('/')} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <h3 className="font-display text-lg font-bold mb-2">{t('common.error')}</h3>
+          <p className="text-sm text-pm-muted mb-6">{error}</p>
+          <Button onClick={() => navigate('/')} className="shadow-brutal border-2 border-pm-ink dark:border-white/20">
             {t('result.return_home')}
           </Button>
         </div>
@@ -124,25 +124,23 @@ export const ResultPage = () => {
 
   // Get header color based on status
   const getHeaderColor = () => {
-    if (isApproved) return 'bg-green-500';
-    if (isPending) return 'bg-blue-500';
-    if (isFailed) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (isApproved) return 'bg-pm-accent-alt';
+    if (isPending) return 'bg-pm-accent';
+    if (isFailed) return 'bg-amber-400';
+    return 'bg-red-600';
   };
 
-  // Get header background color
   const getHeaderBgColor = () => {
-    if (isApproved) return 'bg-green-100 dark:bg-green-900/30';
-    if (isPending) return 'bg-blue-100 dark:bg-blue-900/30';
-    if (isFailed) return 'bg-yellow-100 dark:bg-yellow-900/30';
-    return 'bg-red-100 dark:bg-red-900/30';
+    if (isApproved) return 'bg-pm-accent-alt/15 border-pm-accent-alt/40';
+    if (isPending) return 'bg-pm-accent/10 border-pm-accent/40';
+    if (isFailed) return 'bg-amber-400/15 border-amber-500/40';
+    return 'bg-red-600/10 border-red-600/40';
   };
 
-  // Get header icon color
   const getIconColor = () => {
-    if (isApproved) return 'text-green-600 dark:text-green-400';
-    if (isPending) return 'text-blue-600 dark:text-blue-400';
-    if (isFailed) return 'text-yellow-600 dark:text-yellow-400';
+    if (isApproved) return 'text-pm-accent-alt';
+    if (isPending) return 'text-pm-accent';
+    if (isFailed) return 'text-amber-600 dark:text-amber-300';
     return 'text-red-600 dark:text-red-400';
   };
 
@@ -155,16 +153,16 @@ export const ResultPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 py-6 px-4 sm:px-6 lg:px-8">
+    <div className="flex-1 w-full py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-
-        {/* Header Card */}
-        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-2xl mb-6 overflow-hidden">
-          <div className={`h-2 ${getHeaderColor()}`} />
-          <div className="p-6">
+        <div className="pm-panel mb-8 overflow-hidden">
+          <div className={`h-1.5 ${getHeaderColor()}`} />
+          <div className="p-6 sm:p-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-center">
-                <div className={`flex-shrink-0 flex items-center justify-center h-16 w-16 rounded-full mr-4 ${getHeaderBgColor()}`}>
+                <div
+                  className={`flex-shrink-0 flex items-center justify-center h-16 w-16 rounded-sm mr-4 border-2 ${getHeaderBgColor()}`}
+                >
                   {isApproved ? (
                     <svg className={`h-8 w-8 ${getIconColor()}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
@@ -184,17 +182,15 @@ export const ResultPage = () => {
                   )}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {getStatusTitle()}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">{getStatusTitle()}</h1>
+                  <div className="flex flex-wrap items-center gap-2 mt-2 text-xs font-semibold uppercase tracking-widest text-pm-muted">
                     {result.createdAt && (
                       <span>{new Date(result.createdAt).toLocaleString()}</span>
                     )}
                     {result.id && (
                       <>
                         <span>•</span>
-                        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                        <span className="font-mono text-[10px] border border-pm-ink/15 dark:border-white/15 px-2 py-0.5 rounded-sm">
                           {result.id}
                         </span>
                       </>
@@ -211,11 +207,11 @@ export const ResultPage = () => {
               <div className="flex items-center gap-3">
                 <StatusBadge status={result.status} t={t} large />
                 {isPending && !selfieResult.status ? (
-                  <Button onClick={handleContinueSelfie} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Button onClick={handleContinueSelfie} className="shadow-brutal border-2 border-pm-ink dark:border-white/20">
                     {t('result.continue_selfie')}
                   </Button>
                 ) : (
-                  <Button onClick={handleStartNew} variant="outline" className="border-gray-300 dark:border-gray-600">
+                  <Button onClick={handleStartNew} variant="outline" className="border-2 border-pm-ink/25 dark:border-white/25">
                     {t('result.return_home')}
                   </Button>
                 )}
@@ -226,7 +222,7 @@ export const ResultPage = () => {
 
         {/* Verification Progress Card - Show for pending */}
         {isPending && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl mb-6 p-4">
+          <div className="border-2 border-pm-accent/30 bg-pm-accent/5 dark:bg-pm-accent/10 rounded-sm mb-6 p-4">
             <div className="flex items-start">
               <svg className="w-6 h-6 text-blue-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -290,7 +286,7 @@ export const ResultPage = () => {
           <div className="xl:col-span-1 space-y-6">
 
             {/* ID Card Images */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+            <div className="pm-panel overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="font-semibold text-gray-900 dark:text-white flex items-center">
                   <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -307,8 +303,8 @@ export const ResultPage = () => {
                     status={idResult.status}
                   />
                 ) : (
-                  <div className="h-32 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-400 text-sm">{t('result.no_image')}</span>
+                  <div className="h-32 bg-pm-wash/50 dark:bg-pm-void/80 border-2 border-dashed border-pm-ink/10 dark:border-white/10 rounded-sm flex items-center justify-center">
+                    <span className="text-pm-muted text-xs font-bold uppercase tracking-widest">{t('result.no_image')}</span>
                   </div>
                 )}
                 {result.images?.idBack && (
@@ -322,7 +318,7 @@ export const ResultPage = () => {
             </div>
 
             {/* Selfie Image */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+            <div className="pm-panel overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="font-semibold text-gray-900 dark:text-white flex items-center">
                   <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,11 +337,11 @@ export const ResultPage = () => {
                     large
                   />
                 ) : (
-                  <div className="h-48 bg-gray-100 dark:bg-gray-700 rounded-lg flex flex-col items-center justify-center">
-                    <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="h-48 bg-pm-wash/50 dark:bg-pm-void/80 border-2 border-dashed border-pm-ink/10 dark:border-white/10 rounded-sm flex flex-col items-center justify-center">
+                    <svg className="w-12 h-12 text-pm-muted mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    <span className="text-gray-400 text-sm">{t('result.selfie_not_uploaded')}</span>
+                    <span className="text-pm-muted text-xs font-bold uppercase tracking-widest">{t('result.selfie_not_uploaded')}</span>
                   </div>
                 )}
               </div>
@@ -353,7 +349,7 @@ export const ResultPage = () => {
 
             {/* Thresholds */}
             {Object.keys(thresholds).length > 0 && (
-              <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+              <div className="pm-panel overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="font-semibold text-gray-900 dark:text-white flex items-center">
                     <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,7 +404,7 @@ export const ResultPage = () => {
           <div className="xl:col-span-3 space-y-6">
 
             {/* ID Verification Card */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+            <div className="pm-panel overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div className="flex items-center">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
@@ -610,7 +606,7 @@ export const ResultPage = () => {
             </div>
 
             {/* Selfie Verification Card */}
-            <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+            <div className="pm-panel overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                   <span className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-3">

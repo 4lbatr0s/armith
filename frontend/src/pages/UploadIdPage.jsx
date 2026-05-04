@@ -92,32 +92,29 @@ export const UploadIdPage = () => {
     }
   };
 
+  const inputBase =
+    'w-full px-3 py-2.5 border-2 border-pm-ink/15 dark:border-white/20 bg-pm-surface dark:bg-pm-surface-dark rounded-sm focus:outline-none focus:ring-2 focus:ring-pm-accent focus:border-pm-accent text-pm-ink dark:text-pm-ink-soft';
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
-      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transition-colors duration-200">
-        <div className="px-6 py-8">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('upload_id.title')}</h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">{t('upload_id.subtitle')}</p>
+    <div className="flex-1 w-full py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md mx-auto pm-panel overflow-hidden">
+        <div className="px-6 py-8 sm:px-8">
+          <div className="mb-8">
+            <span className="pm-kicker mb-3 inline-block text-[10px]">{t('layout.verify_identity')}</span>
+            <h2 className="font-display text-2xl font-bold tracking-tight">{t('upload_id.title')}</h2>
+            <p className="mt-2 text-sm text-pm-muted">{t('upload_id.subtitle')}</p>
           </div>
 
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+            <div className="mb-6 border-2 border-red-600/40 bg-red-500/10 text-red-800 dark:text-red-200 px-4 py-3 text-sm rounded-sm">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('upload_id.select_country')}
-              </label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                required
-              >
+              <label className="block text-xs font-bold uppercase tracking-widest text-pm-muted mb-2">{t('upload_id.select_country')}</label>
+              <select value={country} onChange={(e) => setCountry(e.target.value)} className={inputBase} required>
                 <option value="">{t('upload_id.select_country')}</option>
                 <option value="us">United States</option>
                 <option value="uk">United Kingdom</option>
@@ -132,46 +129,42 @@ export const UploadIdPage = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('upload_id.front_id')}
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
+              <label className="block text-xs font-bold uppercase tracking-widest text-pm-muted mb-2">{t('upload_id.front_id')}</label>
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-pm-ink/20 dark:border-white/20 rounded-sm hover:border-pm-accent/60 transition-colors bg-pm-wash/30 dark:bg-pm-void/50">
                 <div className="space-y-1 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                  <svg className="mx-auto h-12 w-12 text-pm-muted" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
                     <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <div className="flex text-sm text-gray-600 dark:text-gray-400">
-                    <label htmlFor="front-file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                  <div className="flex text-sm text-pm-muted justify-center">
+                    <label htmlFor="front-file-upload" className="relative cursor-pointer font-semibold text-pm-accent hover:underline">
                       <span>{t('upload_id.upload_file')}</span>
                       <input id="front-file-upload" name="front-file-upload" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'front')} required />
                     </label>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{frontFile ? frontFile.name : t('upload_id.file_types')}</p>
+                  <p className="text-xs text-pm-muted">{frontFile ? frontFile.name : t('upload_id.file_types')}</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('upload_id.back_id')}
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
+              <label className="block text-xs font-bold uppercase tracking-widest text-pm-muted mb-2">{t('upload_id.back_id')}</label>
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-pm-ink/20 dark:border-white/20 rounded-sm hover:border-pm-accent-alt/60 transition-colors bg-pm-wash/30 dark:bg-pm-void/50">
                 <div className="space-y-1 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                  <svg className="mx-auto h-12 w-12 text-pm-muted" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
                     <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <div className="flex text-sm text-gray-600 dark:text-gray-400">
-                    <label htmlFor="back-file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                  <div className="flex text-sm text-pm-muted justify-center">
+                    <label htmlFor="back-file-upload" className="relative cursor-pointer font-semibold text-pm-accent hover:underline">
                       <span>{t('upload_id.upload_file')}</span>
                       <input id="back-file-upload" name="back-file-upload" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'back')} />
                     </label>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{backFile ? backFile.name : t('upload_id.file_types')}</p>
+                  <p className="text-xs text-pm-muted">{backFile ? backFile.name : t('upload_id.file_types')}</p>
                 </div>
               </div>
             </div>
 
-            <Button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50" disabled={isUploading}>
+            <Button type="submit" className="w-full py-3 shadow-brutal border-2 border-pm-ink dark:border-white/20" disabled={isUploading}>
               {isUploading ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -137,61 +137,64 @@ export const AdminPage = () => {
 
   if (isLoading && !stats) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center min-h-[40vh]">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading')}</p>
+          <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm uppercase tracking-widest text-pm-muted">{t('common.loading')}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
+    <div className="flex-1 w-full py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header with Tabs */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('dashboard.title')}</h1>
-          
-          {/* Tabs */}
-          <div className="flex bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4 border-b-2 border-pm-ink/10 dark:border-white/10 pb-6">
+          <div>
+            <span className="pm-kicker mb-2 inline-block text-[10px]">{t('layout.dashboard')}</span>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-pm-ink dark:text-pm-ink-soft">
+              {t('dashboard.title')}
+            </h1>
+          </div>
+
+          <div className="flex border-2 border-pm-ink dark:border-white/20 rounded-sm overflow-hidden shadow-brutal">
             <button
+              type="button"
               onClick={() => setActiveTab('dashboard')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${
                 activeTab === 'dashboard'
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-pm-accent text-white'
+                  : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
               }`}
             >
               {t('dashboard.overview')}
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('settings')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest border-l-2 border-pm-ink dark:border-white/20 transition-colors ${
                 activeTab === 'settings'
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-pm-accent text-white'
+                  : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
               }`}
             >
               {t('settings.title')}
             </button>
           </div>
-                </div>
+        </div>
 
-        {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Welcome Section with Quick Actions */}
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 rounded-xl shadow-lg mb-6 p-6 text-white">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="pm-panel mb-8 p-6 sm:p-8 bg-pm-ink text-pm-ink-soft dark:bg-pm-surface-dark border-pm-ink dark:border-white/20">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">{t('dashboard.welcome')}</h2>
-                  <p className="text-blue-100 dark:text-blue-200">{t('dashboard.welcome_desc')}</p>
+                  <h2 className="font-display text-2xl font-bold mb-2">{t('dashboard.welcome')}</h2>
+                  <p className="text-sm text-pm-ink-soft/80 max-w-xl">{t('dashboard.welcome_desc')}</p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <Button
                     onClick={() => navigate('/upload-id')}
-                    className="bg-white text-blue-600 hover:bg-blue-50 font-semibold shadow-md"
+                    className="bg-pm-accent text-white border-2 border-pm-ink-soft/20 hover:opacity-95 shadow-brutal"
                   >
                     <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -201,7 +204,7 @@ export const AdminPage = () => {
                   <Button
                     onClick={fetchData}
                     variant="outline"
-                    className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                    className="border-2 border-pm-ink-soft/40 text-pm-ink-soft hover:bg-white/10 bg-transparent"
                   >
                     <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -241,64 +244,63 @@ export const AdminPage = () => {
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+          <div className="mb-6 border-2 border-red-600/40 bg-red-500/10 text-red-800 dark:text-red-200 px-4 py-3 text-sm rounded-sm">
             {error}
           </div>
         )}
 
-        {/* Recent Verifications Table */}
-        <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg transition-colors duration-200">
-          <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">{t('dashboard.recent_verifications')}</h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{t('dashboard.recent_verifications_desc')}</p>
+        <div className="pm-panel overflow-hidden sm:rounded-sm transition-colors duration-200">
+          <div className="px-4 py-5 sm:px-6 border-b-2 border-pm-ink/10 dark:border-white/10">
+            <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">{t('dashboard.recent_verifications')}</h3>
+            <p className="mt-1 max-w-2xl text-xs font-semibold uppercase tracking-widest text-pm-muted">{t('dashboard.recent_verifications_desc')}</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+            <table className="min-w-full divide-y divide-pm-ink/10 dark:divide-white/10">
+              <thead className="bg-pm-wash/50 dark:bg-pm-void/80">
                 <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.name')}</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.tckn')}</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.id_status')}</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.selfie_status')}</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.overall_status')}</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('dashboard.date')}</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('common.view')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.name')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.tckn')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.id_status')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.selfie_status')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.overall_status')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.date')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('common.view')}</th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-pm-surface dark:bg-pm-surface-dark divide-y divide-pm-ink/10 dark:divide-white/10">
                 {verifications.length > 0 ? (
                   verifications.map((verification) => (
-                    <tr key={verification.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                    <tr key={verification.id} className="hover:bg-pm-wash/40 dark:hover:bg-white/5 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-pm-ink dark:text-pm-ink-soft">
                         {verification.fullName || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-pm-muted font-mono">
                         {verification.identityNumber ? `${verification.identityNumber.substring(0, 3)}***${verification.identityNumber.substring(verification.identityNumber.length - 2)}` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {verification.idVerification?.completed ? (
                           <StatusBadge status={verification.idVerification.status} />
                         ) : (
-                          <span className="text-xs text-gray-400 dark:text-gray-500">{t('dashboard.not_started')}</span>
+                          <span className="text-xs text-pm-muted">{t('dashboard.not_started')}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {verification.selfieVerification?.completed ? (
                           <StatusBadge status={verification.selfieVerification.status} />
                         ) : (
-                          <span className="text-xs text-gray-400 dark:text-gray-500">{t('dashboard.not_started')}</span>
+                          <span className="text-xs text-pm-muted">{t('dashboard.not_started')}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={verification.status} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-pm-muted">
                         {new Date(verification.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-pm-muted">
                         <Button
                           variant="link"
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 p-0 h-auto font-medium"
+                          className="text-pm-accent p-0 h-auto font-bold uppercase tracking-wide"
                               onClick={() => navigate(`/result/${verification.id}`)}
                         >
                           {t('common.view')}
@@ -308,7 +310,7 @@ export const AdminPage = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan="7" className="px-6 py-10 text-center text-pm-muted text-sm uppercase tracking-widest">
                           {t('dashboard.no_verifications')}
                     </td>
                   </tr>
@@ -319,7 +321,7 @@ export const AdminPage = () => {
         </div>
 
         {/* Pagination */}
-        <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4 rounded-lg shadow transition-colors duration-200">
+        <div className="pm-panel px-4 py-3 flex items-center justify-between sm:px-6 mt-4 transition-colors duration-200">
           <div className="flex-1 flex justify-between sm:hidden">
                 <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} variant="outline" className="dark:bg-gray-700 dark:text-white dark:border-gray-600">
               {t('dashboard.previous')}
@@ -366,12 +368,12 @@ export const AdminPage = () => {
 
             {settingsLoading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin" />
               </div>
             ) : settings && (
               <>
                 {/* Verification Rules */}
-                <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+                <div className="pm-panel overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                       <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -412,7 +414,7 @@ export const AdminPage = () => {
                 </div>
 
                 {/* Thresholds - ID Verification */}
-                <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+                <div className="pm-panel overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                       <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -499,7 +501,7 @@ export const AdminPage = () => {
                 </div>
 
                 {/* Thresholds - Selfie Verification */}
-                <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+                <div className="pm-panel overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                       <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -566,7 +568,7 @@ export const AdminPage = () => {
                 </div>
 
                 {/* Thresholds - Age */}
-                <div className="bg-white dark:bg-gray-800 shadow rounded-xl overflow-hidden">
+                <div className="pm-panel overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                       <svg className="w-5 h-5 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -624,7 +626,7 @@ export const AdminPage = () => {
                     <Button
                       onClick={handleSaveSettings}
                       disabled={settingsSaving}
-                      className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]"
+                      className="min-w-[120px] shadow-brutal border-2 border-pm-ink dark:border-white/20"
                     >
                       {settingsSaving ? (
                         <div className="flex items-center">
@@ -659,23 +661,21 @@ export const AdminPage = () => {
 
 const StatCard = ({ icon, label, value, color }) => {
   const colorClasses = {
-    gray: 'text-gray-400',
-    green: 'text-green-400',
-    yellow: 'text-yellow-400',
-    red: 'text-red-400'
+    gray: 'text-pm-muted',
+    green: 'text-pm-accent-alt',
+    yellow: 'text-amber-500',
+    red: 'text-pm-accent'
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-colors duration-200">
+    <div className="pm-panel overflow-hidden transition-colors duration-200">
       <div className="p-5">
-        <div className="flex items-center">
-          <div className={`flex-shrink-0 ${colorClasses[color]}`}>
-            {icon}
-          </div>
-          <div className="ml-5 w-0 flex-1">
+        <div className="flex items-center gap-4">
+          <div className={`flex-shrink-0 ${colorClasses[color]}`}>{icon}</div>
+          <div className="min-w-0 flex-1">
             <dl>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{label}</dt>
-              <dd className="text-lg font-medium text-gray-900 dark:text-white">{value}</dd>
+              <dt className="text-[10px] font-bold uppercase tracking-[0.15em] text-pm-muted truncate">{label}</dt>
+              <dd className="font-display text-2xl font-bold text-pm-ink dark:text-pm-ink-soft">{value}</dd>
             </dl>
           </div>
         </div>
@@ -686,33 +686,41 @@ const StatCard = ({ icon, label, value, color }) => {
 
 const StatusBadge = ({ status }) => {
   const config = {
-    approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    pending: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    failed: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+    approved: 'border-pm-accent-alt/60 text-pm-accent-alt bg-pm-accent-alt/10',
+    rejected: 'border-pm-accent/50 text-pm-accent bg-pm-accent/10',
+    pending: 'border-pm-ink/20 text-pm-muted dark:border-white/25',
+    failed: 'border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10'
   };
 
   return (
-    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${config[status] || config.pending}`}>
+    <span
+      className={`px-2 py-0.5 inline-flex text-[10px] uppercase tracking-widest font-bold border-2 rounded-sm ${
+        config[status] || config.pending
+      }`}
+    >
       {status}
     </span>
   );
 };
 
 const ToggleSwitch = ({ label, description, checked, onChange, disabled }) => (
-  <div className={`flex items-center justify-between p-4 rounded-lg border ${disabled ? 'opacity-50' : ''} ${
-    checked ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-700'
-  }`}>
-    <div className="flex-1">
-      <p className="font-medium text-gray-900 dark:text-white">{label}</p>
-      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+  <div
+    className={`flex items-center justify-between p-4 rounded-sm border-2 ${disabled ? 'opacity-50' : ''} ${
+      checked
+        ? 'bg-pm-accent/10 border-pm-accent/40'
+        : 'bg-pm-wash/40 dark:bg-pm-void/80 border-pm-ink/10 dark:border-white/10'
+    }`}
+  >
+    <div className="flex-1 pr-4">
+      <p className="font-display font-semibold text-pm-ink dark:text-pm-ink-soft">{label}</p>
+      <p className="text-sm text-pm-muted mt-0.5">{description}</p>
     </div>
     <button
       type="button"
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-        checked ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-pm-ink/20 dark:border-white/20 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-pm-accent focus:ring-offset-2 ${
+        checked ? 'bg-pm-accent' : 'bg-pm-muted/30'
       } ${disabled ? 'cursor-not-allowed' : ''}`}
     >
       <span

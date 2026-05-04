@@ -6,14 +6,14 @@ import { useState } from 'react';
 export const AuthPage = () => {
   const { isSignedIn, isLoaded } = useUser();
   const location = useLocation();
-  const [mode, setMode] = useState('sign-in'); // 'sign-in' or 'sign-up'
+  const [mode, setMode] = useState('sign-in');
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center min-h-[40vh]">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm uppercase tracking-widest text-pm-muted">Loading…</p>
         </div>
       </div>
     );
@@ -25,64 +25,47 @@ export const AuthPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="flex-1 w-full flex items-center justify-center py-12 px-4 sm:px-6">
       <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-            {mode === 'sign-in' ? 'Sign in to your account' : 'Create your account'}
+        <div className="text-center space-y-2">
+          <span className="pm-kicker">Armith</span>
+          <h2 className="font-display text-3xl font-bold tracking-tight">
+            {mode === 'sign-in' ? 'Sign in' : 'Create account'}
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Access your KYC verification dashboard
-          </p>
+          <p className="text-sm text-pm-muted uppercase tracking-wider">KYC verification workspace</p>
         </div>
-        
-        {/* Mode Toggle */}
-        <div className="flex justify-center space-x-4 mb-6">
-            <button
+
+        <div className="flex border-2 border-pm-ink dark:border-white/15 rounded-sm overflow-hidden shadow-brutal">
+          <button
+            type="button"
             onClick={() => setMode('sign-in')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-colors ${
               mode === 'sign-in'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300'
+                ? 'bg-pm-accent text-white'
+                : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
             }`}
-            >
+          >
             Sign In
-            </button>
-            <button
+          </button>
+          <button
+            type="button"
             onClick={() => setMode('sign-up')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-colors border-l-2 border-pm-ink dark:border-white/15 ${
               mode === 'sign-up'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300'
+                ? 'bg-pm-accent text-white'
+                : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
             }`}
-            >
+          >
             Sign Up
-            </button>
-          </div>
-
-        {/* Clerk Components */}
-        <div className="flex justify-center">
-          {mode === 'sign-in' ? (
-            <SignIn 
-              routing="path" 
-              path="/auth"
-              signUpUrl="/auth"
-              afterSignInUrl="/upload-id"
-            />
-          ) : (
-            <SignUp 
-              routing="path" 
-              path="/auth"
-              signInUrl="/auth"
-              afterSignUpUrl="/upload-id"
-            />
-          )}
+          </button>
         </div>
 
-          <div className="text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-              By signing in, you agree to our Terms of Service and Privacy Policy
-            </p>
+        <div className="pm-panel p-4 sm:p-6 flex justify-center [&_.cl-card]:shadow-none [&_.cl-card]:border-0">
+          {mode === 'sign-in' ? (
+            <SignIn routing="path" path="/auth" signUpUrl="/auth" afterSignInUrl="/upload-id" />
+          ) : (
+            <SignUp routing="path" path="/auth" signInUrl="/auth" afterSignUpUrl="/upload-id" />
+          )}
         </div>
       </div>
     </div>

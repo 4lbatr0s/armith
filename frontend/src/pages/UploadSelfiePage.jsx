@@ -137,17 +137,18 @@ export const UploadSelfiePage = () => {
   }, [stopCamera]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
+    <div className="flex-1 w-full py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('upload_selfie.title')}</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">{t('upload_selfie.subtitle')}</p>
+        <div className="mb-10">
+          <span className="pm-kicker mb-3 inline-block text-[10px]">{t('layout.verify_identity')}</span>
+          <h1 className="font-display text-3xl font-bold tracking-tight">{t('upload_selfie.title')}</h1>
+          <p className="mt-2 text-sm text-pm-muted max-w-lg">{t('upload_selfie.subtitle')}</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl overflow-hidden transition-colors duration-200">
-          <div className="p-8">
+        <div className="pm-panel overflow-hidden transition-colors duration-200">
+          <div className="p-6 sm:p-8">
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <div className="mb-6 border-2 border-red-600/40 bg-red-500/10 text-red-800 dark:text-red-200 px-4 py-3 text-sm rounded-sm" role="alert">
                 <span className="block sm:inline">{error}</span>
               </div>
             )}
@@ -164,7 +165,7 @@ export const UploadSelfiePage = () => {
                         onClick={capturePhoto}
                         className="bg-white rounded-full p-4 shadow-lg hover:bg-gray-100 transition-colors"
                       >
-                        <div className="w-8 h-8 rounded-full border-4 border-blue-600"></div>
+                        <div className="w-8 h-8 rounded-full border-4 border-pm-accent"></div>
                       </button>
                       <button
                         onClick={() => { stopCamera(); setMode('select'); }}
@@ -185,16 +186,16 @@ export const UploadSelfiePage = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="h-96 w-full bg-gray-100 dark:bg-gray-700 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
-                    <svg className="h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="h-96 w-full bg-pm-wash/40 dark:bg-pm-void/80 rounded-sm flex flex-col items-center justify-center border-2 border-dashed border-pm-ink/15 dark:border-white/15">
+                    <svg className="h-24 w-24 text-pm-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                     <div className="space-x-4">
-                      <Button onClick={startCamera} className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Button onClick={startCamera} className="shadow-brutal border-2 border-pm-ink dark:border-white/20">
                         {t('upload_selfie.use_camera')}
                       </Button>
-                      <span className="text-gray-500 dark:text-gray-400">{t('common.or')}</span>
-                      <label className="cursor-pointer bg-white dark:bg-gray-800 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 inline-flex items-center">
+                      <span className="text-pm-muted text-xs font-bold uppercase tracking-widest">{t('common.or')}</span>
+                      <label className="cursor-pointer py-2 px-4 border-2 border-pm-ink/20 dark:border-white/20 rounded-sm text-xs font-bold uppercase tracking-wider text-pm-ink dark:text-pm-ink-soft hover:bg-pm-wash/60 dark:hover:bg-white/10 inline-flex items-center">
                         {t('upload_selfie.upload_photo')}
                         <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                       </label>
@@ -207,7 +208,7 @@ export const UploadSelfiePage = () => {
               <div className="pt-6">
                 <Button
                   onClick={handleSubmit}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex justify-center py-3 shadow-brutal border-2 border-pm-ink dark:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isLoading || !selfieFile}
                 >
                   {isLoading ? (

@@ -1,0 +1,56 @@
+---
+description: Armith frontend UI/UX — postmodern design system, tokens, and consistency rules
+globs: frontend/**/*.{jsx,tsx,css,js}
+alwaysApply: false
+---
+
+# Armith frontend UI / UX
+
+When creating or editing UI in `frontend/`, follow this system so landing, dashboard, flows, and results stay visually coherent.
+
+## Design direction (postmodern / neo-system)
+
+- **Tone**: Confident, editorial, slightly brutalist — not generic “SaaS blue”. Prefer **high contrast**, **hard edges** (small radius), **offset hard shadows**, and **one loud accent** (`pm-accent`) plus a **secondary accent** (`pm-accent-alt`) for highlights only.
+- **Typography**: Headlines use **`font-display`** (Syne). Body and UI use **`font-sans`** (IBM Plex Sans). **Uppercase + wide tracking** (`tracking-[0.2em] text-xs`) for meta labels, nav groups, and table headers — never for long paragraphs.
+- **Surfaces**: Pages sit on **`bg-pm-paper` / `dark:bg-pm-void`**. Cards and panels use **`bg-pm-surface` / `dark:bg-pm-surface-dark`** with **`border-2 border-pm-ink dark:border-white/15`** and **`shadow-brutal`** (see `index.css`). Avoid mixing unrelated motifs (e.g. heavy glassmorphism on one page and flat gray cards on another).
+- **Layout**: Use **`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`** for primary content; **`flex-1 w-full`** for route bodies inside `Layout` (do not stack a second full viewport background that fights the shell).
+- **Motion**: Subtle only (`transition-colors`, short transforms). No busy parallax unless explicitly requested.
+
+## Tokens (Tailwind + CSS)
+
+Prefer semantic **`pm-*`** classes from `tailwind.config.js` / `index.css`:
+
+| Role        | Light                          | Dark                                      |
+|------------|--------------------------------|-------------------------------------------|
+| Page base  | `bg-pm-paper text-pm-ink`      | `bg-pm-void text-pm-ink-soft`             |
+| Panel/card | `bg-pm-surface border-pm-ink`  | `bg-pm-surface-dark border-white/15`      |
+| Muted copy | `text-pm-muted`                | same                                      |
+| Primary CTA| `bg-pm-accent text-white`      | same                                      |
+| Links / 2° | `text-pm-accent` hover underline | `text-pm-accent-alt` where contrast needs it |
+
+Shadcn **`primary`** in `:root` is aligned to the accent — use `<Button>` defaults for primary actions.
+
+## Components
+
+- **Buttons**: Use `components/ui/button.jsx` with `variant` / `size`; override with **`pm-*`** utilities only when necessary (e.g. ghost on dark header).
+- **Forms**: Inputs: `border-2 border-pm-ink/20 dark:border-white/20 bg-pm-surface dark:bg-pm-surface-dark rounded-sm focus:ring-2 focus:ring-pm-accent`.
+- **Alerts**: Keep semantic colors (red/green/yellow) but use **`border-2`** and **`rounded-sm`** to match panels.
+- **Tables**: Header row `font-display text-xs uppercase tracking-widest text-pm-muted`; rows `hover:bg-pm-wash/50 dark:hover:bg-white/5`.
+
+## Do / don’t
+
+- **Do** reuse `Layout.jsx` chrome; keep **one** footer and **one** header language.
+- **Do** add new marketing or dashboard sections as **`pm-panel`**-style blocks, not new one-off gradients.
+- **Don’t** introduce a third font family or rainbow gradients per page.
+- **Don’t** use `rounded-2xl` + soft shadow on one screen and `rounded-lg` + flat gray on another for the same hierarchy level.
+
+## i18n
+
+All user-visible strings go through **`react-i18next`** (`t('...')`); add keys to `en.json` and `tr.json`.
+
+## Checklist before merging UI work
+
+1. Light + dark both readable (contrast on `pm-accent` on white/black).
+2. Route uses **`flex-1 w-full`** when inside `Layout` (no double `min-h-screen` backgrounds).
+3. Headings use **`font-display`**; labels use **uppercase + tracking** sparingly.
+4. Cards use **`border-2`** + **`shadow-brutal`** (or documented exception in the PR).
