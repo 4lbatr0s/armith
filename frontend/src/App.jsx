@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
@@ -14,12 +14,12 @@ import './index.css';
 import { ThemeProvider } from './components/ThemeContext';
 
 const CLERK_PUBLISHABLE_KEY = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
-const CLERK_SIGN_IN_URL = process.env.REACT_APP_CLERK_SIGN_IN_URL || '/#/auth/sign-in';
-const CLERK_SIGN_UP_URL = process.env.REACT_APP_CLERK_SIGN_UP_URL || '/#/auth/sign-up';
+const CLERK_SIGN_IN_URL = process.env.REACT_APP_CLERK_SIGN_IN_URL || '/auth/sign-in';
+const CLERK_SIGN_UP_URL = process.env.REACT_APP_CLERK_SIGN_UP_URL || '/auth/sign-up';
 const CLERK_SIGN_IN_FALLBACK_REDIRECT_URL =
-  process.env.REACT_APP_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/#/admin';
+  process.env.REACT_APP_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/admin';
 const CLERK_SIGN_UP_FALLBACK_REDIRECT_URL =
-  process.env.REACT_APP_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/#/admin';
+  process.env.REACT_APP_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/admin';
 
 if (!CLERK_PUBLISHABLE_KEY) {
   console.error('Missing REACT_APP_CLERK_PUBLISHABLE_KEY');
