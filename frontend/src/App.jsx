@@ -14,6 +14,12 @@ import './index.css';
 import { ThemeProvider } from './components/ThemeContext';
 
 const CLERK_PUBLISHABLE_KEY = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
+const CLERK_SIGN_IN_URL = process.env.REACT_APP_CLERK_SIGN_IN_URL || '/auth/sign-in';
+const CLERK_SIGN_UP_URL = process.env.REACT_APP_CLERK_SIGN_UP_URL || '/auth/sign-up';
+const CLERK_SIGN_IN_FALLBACK_REDIRECT_URL =
+  process.env.REACT_APP_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/admin';
+const CLERK_SIGN_UP_FALLBACK_REDIRECT_URL =
+  process.env.REACT_APP_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/admin';
 
 if (!CLERK_PUBLISHABLE_KEY) {
   console.error('Missing REACT_APP_CLERK_PUBLISHABLE_KEY');
@@ -57,7 +63,13 @@ const PublicPricingRoute = ({ children }) => {
 
 export const App = () => {
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <ClerkProvider
+      publishableKey={CLERK_PUBLISHABLE_KEY}
+      signInUrl={CLERK_SIGN_IN_URL}
+      signUpUrl={CLERK_SIGN_UP_URL}
+      signInFallbackRedirectUrl={CLERK_SIGN_IN_FALLBACK_REDIRECT_URL}
+      signUpFallbackRedirectUrl={CLERK_SIGN_UP_FALLBACK_REDIRECT_URL}
+    >
       <ApiTokenProvider>
         <ThemeProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
