@@ -1,5 +1,5 @@
-# Production static site: https://armith.onrender.com (Render name: armith-frontend).
-# If this file is not linked as a Blueprint, SPA rewrites must be set in the Dashboard (see README).
+# Frontend: Prefer a Node Web Service + `serve -s build` so /admin deep links work without CDN rewrites.
+# If you keep a Static Site instead, add Dashboard rewrite /* → /index.html (README).
 services:
   # Backend Service
   - type: web
@@ -17,17 +17,21 @@ services:
         value: https://armith.onrender.com
     healthCheckPath: /health
 
-  # Frontend Service (same output as Dashboard rootDir ./frontend → publish ./build → repo path frontend/build)
+  # Frontend — Node + serve SPA fallback (Clerk redirects to /admin?__clerk_handshake=… need index.html).
+  # Match Render Dashboard: Root Directory ./frontend → buildCommand/startCommand run inside frontend/.
+  # To migrate from Static Site: create this Web Service (or Blueprint sync), then remove the old static site.
   - type: web
     name: kyc-frontend
-    env: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/build
-    # SPA: Clerk completes sign-in with a full navigation to /admin?__clerk_handshake=… — CDN must serve index.html
-    routes:
-      - type: rewrite
-        source: "/*"
-        destination: "/index.html"
+    env: node
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run serve
     envVars:
+      - key: NODE_ENV
+        value: production
+      - key: IGNORE_DOCS_BUILD
+        value: "1"
       - key: REACT_APP_API_URL
         value: https://armith-backend-live.onrender.com
