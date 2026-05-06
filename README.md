@@ -15,27 +15,27 @@ KYC Flow is a frontend + backend identity verification project.
 - Render frontend (dev): `https://armith.onrender.com`
 - Render backend (dev): `https://armith-backend-live.onrender.com`
 
-### Render frontend: Clerk + `/admin` and 404 after login
+### Render static frontend (React Router / Clerk)
 
-Clerk often **full-page redirects** to something like `/admin?__clerk_handshake=…`. The host must respond with **`index.html`** (and your JS bundle) for that path. If Render serves the app as a **Static Site** without an SPA rewrite, `/admin` is “not a file” and the CDN returns **404** — the React app never runs, so it is not a Clerk bug.
+Signing in with Clerk can **full-page navigate** to something like `/admin?__clerk_handshake=…`. The **CDN** must answer that URL with **`index.html`** so the React bundle and Clerk SDK run; otherwise Render returns plain **404** (this is unrelated to Clerk “not finding” a route — the React app never loads).
 
-Verify:
+Verify (before fix expect `404`, after rewrite expect `200`):
 
 ```bash
 curl -sI https://armith.onrender.com/admin | head -1
 ```
 
-### Fix A — Recommended: Node Web Service + `serve -s build` (in `render.yaml`)
+**Fix (Dashboard):**
 
-`frontend/package.json` includes the `serve` dependency and `"serve"` script (`serve -s build -l $PORT`). The repo Blueprint deploys the frontend as a **`web` service** (not static): build CRA, then `npm run serve` so **every path** falls back to `index.html`.
+1. Open the static site `[armith-frontend settings](https://dashboard.render.com/static/srv-d37rd16r433s73f08up0/settings)`.
+2. Go to **Redirects / Rewrites** (or equivalent for static sites).
+3. Add rule: **Source** `/*` → **Destination** `/index.html` → **Rewrite** (not redirect).
 
-On Render you may need to **replace** the old **Static Site** with this Web Service (same repo, Root Directory `./frontend`), copy env vars (`REACT_APP_*`, Clerk keys), set `IGNORE_DOCS_BUILD=1`, then point your custom hostname / traffic to the web service.
+Blueprint: `render.yaml` includes this `routes` block; it only applies if this repo’s Blueprint is **connected** and the service definitions match Render. Until then, rely on the Dashboard rule above.
 
-### Fix B — Keep Static Site: CDN rewrite rule
+**React Router (production SPA):** the server must fallback to `index.html` for non-file URLs so in-app navigation works after reload or external redirects ([Create React App — CS routing](https://create-react-app.dev/docs/deployment#serving-apps-with-client-side-routing)).
 
-Dashboard example (static site `armith-frontend`): https://dashboard.render.com/static/srv-d37rd16r433s73f08up0/settings — **Redirects / Rewrites**: **Source** `/*` → **Destination** `/index.html` → **Action** **Rewrite**.
-
-**Background:** client-side routing and Clerk handshakes assume the SPA shell loads ([CRA deployment notes](https://create-react-app.dev/docs/deployment#serving-apps-with-client-side-routing)).
+**Clerk:** The `__clerk_handshake` query string is used while [propagating the session](https://clerk.com/docs/how-clerk-works/overview) in the browser; the SPA must actually load (`index.html` + JS) so Clerk can consume it — a CDN **404 on `/admin`** blocks that entirely.
 
 ## Required Environment Variables
 

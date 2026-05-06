@@ -13,7 +13,6 @@
     "react-dom": "^18.2.0",
     "react-i18next": "^16.3.5",
     "react-router-dom": "^6.20.1",
-    "serve": "^14.2.4",
     "tailwind-merge": "^2.0.0",
     "tailwindcss-animate": "^1.0.7",
     "web-vitals": "^2.1.4"
@@ -34,7 +33,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "dev": "npm run docs:build && react-scripts start",
-    "serve": "serve -s build -l ${PORT:-3000}"
+    "serve": "npx serve -s build -l ${PORT:-3000}"
   },
   "eslintConfig": {
     "extends": [
