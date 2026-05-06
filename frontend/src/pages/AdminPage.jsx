@@ -215,7 +215,7 @@ export const AdminPage = () => {
                     {t('dashboard.refresh')}
                   </Button>
                   <Button
-                    onClick={() => navigate('/profile')}
+                    onClick={() => navigate('/profile?tab=security')}
                     variant="outline"
                     className="border-2 border-white/50 bg-white/10 text-white hover:bg-white/20 dark:border-white/25 dark:text-pm-ink-soft dark:hover:bg-white/10"
                   >

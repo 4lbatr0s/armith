@@ -14,11 +14,19 @@ import { flattenedThresholdPayload, applyFlatThresholdPatches } from '../thresho
  */
 export const getVerifications = async (req, res) => {
   try {
+    const ownerId = req.auth?.userId;
+    if (!ownerId) {
+      return res.status(401).json({
+        status: STATUS.FAILED,
+        errors: [{ textCode: 'UNAUTHORIZED', message: 'Unauthorized' }]
+      });
+    }
+
     const { page = 1, limit = 10, status } = req.query;
-    
+
     const skip = (page - 1) * limit;
 
-    const filter = status ? { status } : {};
+    const filter = { userId: ownerId, ...(status ? { status } : {}) };
 
     const [profiles, total] = await Promise.all([
       Profile.find(filter).skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 }),
@@ -89,11 +97,20 @@ export const getVerifications = async (req, res) => {
  */
 export const getStats = async (req, res) => {
   try {
+    const ownerId = req.auth?.userId;
+    if (!ownerId) {
+      return res.status(401).json({
+        status: STATUS.FAILED,
+        errors: [{ textCode: 'UNAUTHORIZED', message: 'Unauthorized' }]
+      });
+    }
+
+    const base = { userId: ownerId };
     const [total, approved, rejected, pending] = await Promise.all([
-      Profile.countDocuments(),
-      Profile.countDocuments({ status: 'APPROVED' }),
-      Profile.countDocuments({ status: 'REJECTED' }),
-      Profile.countDocuments({ status: 'PENDING' })
+      Profile.countDocuments(base),
+      Profile.countDocuments({ ...base, status: 'APPROVED' }),
+      Profile.countDocuments({ ...base, status: 'REJECTED' }),
+      Profile.countDocuments({ ...base, status: 'PENDING' })
     ]);
 
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;

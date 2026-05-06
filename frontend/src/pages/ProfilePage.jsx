@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { Button } from '../components/ui/button';
 import { apiService } from '../services/api';
@@ -7,7 +8,10 @@ import { useTranslation } from 'react-i18next';
 export const ProfilePage = () => {
   const { user } = useUser();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('account');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() =>
+    searchParams.get('tab') === 'security' ? 'security' : 'account'
+  );
   const [apiKeys, setApiKeys] = useState([]);
   const [usage, setUsage] = useState(null);
   const [apiKeysLoading, setApiKeysLoading] = useState(false);
@@ -16,6 +20,10 @@ export const ProfilePage = () => {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'security') setActiveTab('security');
+  }, [searchParams]);
 
   const loadApiKeys = useCallback(async () => {
     try {
