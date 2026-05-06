@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
@@ -21,6 +21,8 @@ const ID_PROMPTS = {
 export const UploadIdPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isDemoMode = searchParams.get('mode') === 'demo';
   const { user } = useUser();
   const [country, setCountry] = useState('');
   const [frontFile, setFrontFile] = useState(null);
@@ -86,7 +88,10 @@ export const UploadIdPage = () => {
       navigate('/upload-selfie');
     } catch (err) {
       console.error('Upload failed:', err);
-      setError(err.response?.data?.error || err.message || t('common.error'));
+      const limitError = err?.code === 'PLAN_LIMIT_REACHED'
+        ? t('upload_id.plan_limit_reached')
+        : null;
+      setError(limitError || err.response?.data?.error || err.message || t('common.error'));
     } finally {
       setIsUploading(false);
     }
@@ -103,11 +108,23 @@ export const UploadIdPage = () => {
             <span className="pm-kicker mb-3 inline-block text-[10px]">{t('layout.verify_identity')}</span>
             <h2 className="font-display text-2xl font-bold tracking-tight">{t('upload_id.title')}</h2>
             <p className="mt-2 text-sm text-pm-muted">{t('upload_id.subtitle')}</p>
+            {isDemoMode && (
+              <div className="mt-3 rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-3 py-2 text-xs">
+                {t('upload_id.demo_mode_notice')}
+              </div>
+            )}
           </div>
 
           {error && (
             <div className="mb-6 border-2 border-red-600/40 bg-red-500/10 text-red-800 dark:text-red-200 px-4 py-3 text-sm rounded-sm">
               {error}
+              {error === t('upload_id.plan_limit_reached') && (
+                <div className="mt-3">
+                  <Link to="/pricing" className="underline font-semibold">
+                    {t('upload_id.upgrade_cta')}
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 

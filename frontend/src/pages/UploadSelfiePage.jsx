@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { apiService } from '../services/api';
 import { Button } from '../components/ui/button';
@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 export const UploadSelfiePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isDemoMode = searchParams.get('mode') === 'demo';
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -123,7 +125,10 @@ export const UploadSelfiePage = () => {
 
     } catch (err) {
       console.error('Verification failed:', err);
-      setError(err.message || t('common.error'));
+      const limitError = err?.code === 'PLAN_LIMIT_REACHED'
+        ? t('upload_id.plan_limit_reached')
+        : null;
+      setError(limitError || err.message || t('common.error'));
     } finally {
       setIsLoading(false);
     }
@@ -143,6 +148,11 @@ export const UploadSelfiePage = () => {
           <span className="pm-kicker mb-3 inline-block text-[10px]">{t('layout.verify_identity')}</span>
           <h1 className="font-display text-3xl font-bold tracking-tight">{t('upload_selfie.title')}</h1>
           <p className="mt-2 text-sm text-pm-muted max-w-lg">{t('upload_selfie.subtitle')}</p>
+          {isDemoMode && (
+            <div className="mt-3 rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-3 py-2 text-xs max-w-lg">
+              {t('upload_id.demo_mode_notice')}
+            </div>
+          )}
         </div>
 
         <div className="pm-panel overflow-hidden transition-colors duration-200">
@@ -150,6 +160,13 @@ export const UploadSelfiePage = () => {
             {error && (
               <div className="mb-6 border-2 border-red-600/40 bg-red-500/10 text-red-800 dark:text-red-200 px-4 py-3 text-sm rounded-sm" role="alert">
                 <span className="block sm:inline">{error}</span>
+                {error === t('upload_id.plan_limit_reached') && (
+                  <div className="mt-3">
+                    <Link to="/pricing" className="underline font-semibold">
+                      {t('upload_id.upgrade_cta')}
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 

@@ -56,7 +56,10 @@ const request = async (url, options = {}) => {
 
   if (!response.ok) {
     console.error('API Error:', data);
-    throw new Error(data.error || data.message || 'Request failed');
+    const firstError = Array.isArray(data?.errors) ? data.errors[0] : null;
+    const error = new Error(firstError?.message || data.error || data.message || 'Request failed');
+    if (firstError?.code) error.code = firstError.code;
+    throw error;
   }
 
   return data;

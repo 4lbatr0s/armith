@@ -82,7 +82,10 @@
         "verifying": "Verifying ID...",
         "next_step": "Next Step",
         "error_file_size": "File size must be less than 10MB",
-        "error_missing_fields": "Please select a country and upload the front of your ID"
+        "error_missing_fields": "Please select a country and upload the front of your ID",
+        "demo_mode_notice": "Demo mode is active. This flow follows your current plan limits and guardrails.",
+        "plan_limit_reached": "Your monthly verification limit has been reached.",
+        "upgrade_cta": "Upgrade plan"
     },
     "upload_selfie": {
         "title": "Selfie Verification",

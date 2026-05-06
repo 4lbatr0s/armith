@@ -82,7 +82,10 @@
         "verifying": "Kimlik Doğrulanıyor...",
         "next_step": "Sonraki Adım",
         "error_file_size": "Dosya boyutu 10MB'dan küçük olmalıdır",
-        "error_missing_fields": "Lütfen ülke seçin ve kimliğinizin ön yüzünü yükleyin"
+        "error_missing_fields": "Lütfen ülke seçin ve kimliğinizin ön yüzünü yükleyin",
+        "demo_mode_notice": "Demo modu aktif. Bu akış mevcut plan limitleriniz ve güvenlik kurallarıyla çalışır.",
+        "plan_limit_reached": "Aylık doğrulama limitinize ulaştınız.",
+        "upgrade_cta": "Planı Yükselt"
     },
     "upload_selfie": {
         "title": "Özçekim Doğrulama",

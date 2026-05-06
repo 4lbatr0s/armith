@@ -69,7 +69,7 @@ router.post('/webhook', async (req, res) => {
             imageUrl: clerkUser.image_url
           }
         },
-        { upsert: true, new: true }
+        { upsert: true, new: true, setDefaultsOnInsert: true }
       );
       console.log(`User ${type}:`, clerkUser.id);
     }

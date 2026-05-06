@@ -7,6 +7,8 @@ export const AuthPage = () => {
   const { isSignedIn, isLoaded } = useUser();
   const location = useLocation();
   const [mode, setMode] = useState('sign-in');
+  const nextParam = new URLSearchParams(location.search).get('next');
+  const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : '/upload-id';
 
   if (!isLoaded) {
     return (
@@ -20,7 +22,7 @@ export const AuthPage = () => {
   }
 
   if (isSignedIn) {
-    const from = location.state?.from?.pathname || '/upload-id';
+    const from = safeNext || location.state?.from?.pathname || '/upload-id';
     return <Navigate to={from} replace />;
   }
 
@@ -62,9 +64,9 @@ export const AuthPage = () => {
 
         <div className="pm-panel p-4 sm:p-6 flex justify-center [&_.cl-card]:shadow-none [&_.cl-card]:border-0">
           {mode === 'sign-in' ? (
-            <SignIn routing="path" path="/auth" signUpUrl="/auth" afterSignInUrl="/upload-id" />
+            <SignIn routing="path" path="/auth" signUpUrl="/auth" afterSignInUrl={safeNext} />
           ) : (
-            <SignUp routing="path" path="/auth" signInUrl="/auth" afterSignUpUrl="/upload-id" />
+            <SignUp routing="path" path="/auth" signInUrl="/auth" afterSignUpUrl={safeNext} />
           )}
         </div>
       </div>

@@ -12,6 +12,7 @@ import { VerificationService } from '../src/services/verification.service.js';
 import { getOrCreateUserKycConfig, buildEffectiveKycPlain } from '../services/kyc/runtimeConfig.js';
 import { deriveIdCheckpointStatus, computeProfileStatusAfterSelfie } from '../services/kyc/verificationOutcome.js';
 import { persistIdVerification, persistSelfieVerification } from '../services/kyc/persistence.js';
+import { checkUserVerificationQuota, incrementUserVerificationUsage } from '../services/quotaService.js';
 import { assertImagesReadyForLlm } from '../services/kyc/verificationPrecheck.js';
 import {
     buildIdConfidenceRowsFromVerification,
@@ -110,6 +111,27 @@ export const verifyId = async (req, res) => {
         
         const authUserId = req.authContext?.userId || req.auth?.userId;
 
+        if (authUserId) {
+            const quota = await checkUserVerificationQuota(authUserId);
+            if (!quota.allowed) {
+                return res.status(429).json({
+                    status: STATUS.FAILED,
+                    errors: [
+                        {
+                            code: 'PLAN_LIMIT_REACHED',
+                            message: 'Monthly verification limit reached for your plan.',
+                            details: {
+                                tier: quota.planTier,
+                                used: quota.used,
+                                limit: quota.limit,
+                                upgradeHint: 'Upgrade your plan to continue verifications.'
+                            }
+                        }
+                    ]
+                });
+            }
+        }
+
         const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
 
         const { effectivePlain, resolved } = buildEffectiveKycPlain({
@@ -150,6 +172,10 @@ export const verifyId = async (req, res) => {
         });
 
         logger.info({ profileId: profile._id, status: overallStatus }, 'ID verification completed');
+
+        if (authUserId) {
+            await incrementUserVerificationUsage(authUserId);
+        }
 
         const confidenceScores = buildIdConfidenceRowsFromVerification(result, resolved);
 

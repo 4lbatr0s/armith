@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import { useTranslation } from 'react-i18next';
 
 export const HomePage = () => {
   const { t } = useTranslation();
+  const { isSignedIn } = useUser();
 
   return (
     <div className="flex-1 w-full flex flex-col">
@@ -27,7 +29,7 @@ export const HomePage = () => {
             <Link to="/auth" className="btn-primary text-center justify-center">
               {t('home.get_started')}
             </Link>
-            <Link to="/pricing" className="btn-secondary text-center justify-center">
+            <Link to={isSignedIn ? '/upload-id?mode=demo' : '/auth?next=%2Fupload-id%3Fmode%3Ddemo'} className="btn-secondary text-center justify-center">
               {t('home.live_demo')}
             </Link>
           </div>
