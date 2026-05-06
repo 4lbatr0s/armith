@@ -29,8 +29,7 @@ export const Layout = ({ children }) => {
   const navClass = (path) =>
     `pm-link-nav ${isActive(path) ? 'pm-link-nav-active' : ''}`;
 
-  const publicUrl = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
-  const docsHref = `${publicUrl}/docs/`.replace(/\/\/+/g, '/');
+  const docsHref = process.env.REACT_APP_DOCUMENTATION_URL || '/docs';
 
   return (
     <div className="min-h-screen flex flex-col bg-pm-paper dark:bg-pm-void text-pm-ink dark:text-pm-ink-soft pm-grid-bg transition-colors duration-200">

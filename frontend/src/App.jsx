@@ -25,6 +25,7 @@ const CLERK_SIGN_IN_FALLBACK_REDIRECT_URL =
   process.env.REACT_APP_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/';
 const CLERK_SIGN_UP_FALLBACK_REDIRECT_URL =
   process.env.REACT_APP_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/';
+const DOCUMENTATION_URL = process.env.REACT_APP_DOCUMENTATION_URL;
 
 if (!CLERK_PUBLISHABLE_KEY) {
   console.error('Missing REACT_APP_CLERK_PUBLISHABLE_KEY');
@@ -66,6 +67,14 @@ const PublicPricingRoute = ({ children }) => {
   );
 };
 
+const DocsRedirectRoute = () => {
+  if (typeof window !== 'undefined') {
+    const fallbackDocsUrl = `${window.location.origin}/docs/`;
+    window.location.replace(DOCUMENTATION_URL || fallbackDocsUrl);
+  }
+  return null;
+};
+
 export const App = () => {
   return (
     <ClerkProvider
@@ -93,6 +102,7 @@ export const App = () => {
                   <PricingPage />
                 </PublicPricingRoute>
               } />
+              <Route path="/docs" element={<DocsRedirectRoute />} />
 
               <Route path="/upload-id" element={
                 <ProtectedRoute>
