@@ -16,10 +16,14 @@ import { ThemeProvider } from './components/ThemeContext';
 const CLERK_PUBLISHABLE_KEY = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
 const CLERK_SIGN_IN_URL = process.env.REACT_APP_CLERK_SIGN_IN_URL || '/auth/sign-in';
 const CLERK_SIGN_UP_URL = process.env.REACT_APP_CLERK_SIGN_UP_URL || '/auth/sign-up';
+const CLERK_SIGN_IN_FORCE_REDIRECT_URL =
+  process.env.REACT_APP_CLERK_SIGN_IN_FORCE_REDIRECT_URL || '/';
+const CLERK_SIGN_UP_FORCE_REDIRECT_URL =
+  process.env.REACT_APP_CLERK_SIGN_UP_FORCE_REDIRECT_URL || '/';
 const CLERK_SIGN_IN_FALLBACK_REDIRECT_URL =
-  process.env.REACT_APP_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/admin';
+  process.env.REACT_APP_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/';
 const CLERK_SIGN_UP_FALLBACK_REDIRECT_URL =
-  process.env.REACT_APP_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/admin';
+  process.env.REACT_APP_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/';
 
 if (!CLERK_PUBLISHABLE_KEY) {
   console.error('Missing REACT_APP_CLERK_PUBLISHABLE_KEY');
@@ -67,6 +71,8 @@ export const App = () => {
       publishableKey={CLERK_PUBLISHABLE_KEY}
       signInUrl={CLERK_SIGN_IN_URL}
       signUpUrl={CLERK_SIGN_UP_URL}
+      signInForceRedirectUrl={CLERK_SIGN_IN_FORCE_REDIRECT_URL}
+      signUpForceRedirectUrl={CLERK_SIGN_UP_FORCE_REDIRECT_URL}
       signInFallbackRedirectUrl={CLERK_SIGN_IN_FALLBACK_REDIRECT_URL}
       signUpFallbackRedirectUrl={CLERK_SIGN_UP_FALLBACK_REDIRECT_URL}
     >
