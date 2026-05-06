@@ -1,3 +1,5 @@
+# Production static site: https://armith.onrender.com (Render name: armith-frontend).
+# If this file is not linked as a Blueprint, SPA rewrites must be set in the Dashboard (see README).
 services:
   # Backend Service
   - type: web
@@ -12,20 +14,20 @@ services:
       - key: PORT
         value: 3001
       - key: FRONTEND_URL
-        value: https://kyc-frontend.onrender.com
+        value: https://armith.onrender.com
     healthCheckPath: /health
 
-  # Frontend Service
+  # Frontend Service (same output as Dashboard rootDir ./frontend → publish ./build → repo path frontend/build)
   - type: web
     name: kyc-frontend
     env: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/build
-    # SPA fallback: direct hits (e.g. Clerk redirect to /admin?__clerk_handshake=…) must serve index.html
+    # SPA: Clerk completes sign-in with a full navigation to /admin?__clerk_handshake=… — CDN must serve index.html
     routes:
       - type: rewrite
         source: "/*"
         destination: "/index.html"
     envVars:
       - key: REACT_APP_API_URL
-        value: https://kyc-backend.onrender.com
+        value: https://armith-backend-live.onrender.com

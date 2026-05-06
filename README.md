@@ -17,7 +17,25 @@ KYC Flow is a frontend + backend identity verification project.
 
 ### Render static frontend (React Router / Clerk)
 
-If the frontend is a **Render Static Site**, you must rewrite unknown paths to `index.html`; otherwise URLs like `/admin?__clerk_handshake=…` return **404**. `render.yaml` includes this rewrite. If you created the static site manually in the Dashboard, open **Redirects / Rewrites**, add **Source** `/*`, **Destination** `/index.html`, **Action** Rewrite.
+Signing in with Clerk can **full-page navigate** to something like `/admin?__clerk_handshake=…`. The **CDN** must answer that URL with **`index.html`** so the React bundle and Clerk SDK run; otherwise Render returns plain **404** (this is unrelated to Clerk “not finding” a route — the React app never loads).
+
+Verify (before fix expect `404`, after rewrite expect `200`):
+
+```bash
+curl -sI https://armith.onrender.com/admin | head -1
+```
+
+**Fix (Dashboard):**
+
+1. Open the static site `[armith-frontend settings](https://dashboard.render.com/static/srv-d37rd16r433s73f08up0/settings)`.
+2. Go to **Redirects / Rewrites** (or equivalent for static sites).
+3. Add rule: **Source** `/*` → **Destination** `/index.html` → **Rewrite** (not redirect).
+
+Blueprint: `render.yaml` already includes this `routes` block; it only applies if this repo’s Blueprint is **connected** and the service definitions match Render. Until then, rely on the Dashboard rule above.
+
+**React Router (production SPA):** the server must fallback to `index.html` for non-file URLs so in-app navigation works after reload or external redirects ([Create React App — CS routing](https://create-react-app.dev/docs/deployment#serving-apps-with-client-side-routing)).
+
+**Clerk:** The `__clerk_handshake` query string is used while [propagating the session](https://clerk.com/docs/how-clerk-works/overview) in the browser; the SPA must actually load (`index.html` + JS) so Clerk can consume it — a CDN **404 on `/admin`** blocks that entirely.
 
 ## Required Environment Variables
 
