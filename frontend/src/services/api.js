@@ -1,4 +1,11 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const isProductionBuild = process.env.NODE_ENV === 'production';
+const configuredApiBaseUrl = process.env.REACT_APP_API_URL;
+
+if (isProductionBuild && !configuredApiBaseUrl) {
+  throw new Error('REACT_APP_API_URL is required for production builds.');
+}
+
+const API_BASE_URL = configuredApiBaseUrl || 'http://localhost:3001';
 
 // Helper to get Clerk token - will be set by ClerkProvider context
 let getToken = null;

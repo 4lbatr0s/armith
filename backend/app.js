@@ -27,23 +27,23 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+    const isDevelopment = process.env.NODE_ENV !== 'production';
 
     const configuredOrigins = [
       process.env.FRONTEND_URL,
       ...(process.env.FRONTEND_URLS || '').split(',').map((item) => item.trim())
     ].filter(Boolean);
 
-    const allowedOrigins = [
-      ...configuredOrigins,
-      'http://localhost:3000',
-      'http://127.0.0.1:3000'
-    ];
+    const localOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    const allowedOrigins = isDevelopment
+      ? [...configuredOrigins, ...localOrigins]
+      : configuredOrigins;
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       // In development, allow all origins
-      if (process.env.NODE_ENV === 'development') {
+      if (isDevelopment) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
