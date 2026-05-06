@@ -64,9 +64,21 @@ export const AuthPage = () => {
 
         <div className="pm-panel p-4 sm:p-6 flex justify-center [&_.cl-card]:shadow-none [&_.cl-card]:border-0">
           {mode === 'sign-in' ? (
-            <SignIn routing="path" path="/auth" signUpUrl="/auth" afterSignInUrl={safeNext} />
+            <SignIn
+              routing="path"
+              path="/auth"
+              signUpUrl="/auth"
+              forceRedirectUrl={safeNext}
+              fallbackRedirectUrl={safeNext}
+            />
           ) : (
-            <SignUp routing="path" path="/auth" signInUrl="/auth" afterSignUpUrl={safeNext} />
+            <SignUp
+              routing="path"
+              path="/auth"
+              signInUrl="/auth"
+              forceRedirectUrl={safeNext}
+              fallbackRedirectUrl={safeNext}
+            />
           )}
         </div>
       </div>

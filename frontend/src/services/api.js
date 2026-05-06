@@ -66,6 +66,8 @@ const request = async (url, options = {}) => {
 };
 
 export const apiService = {
+  getProfile: () => request('/auth/profile'),
+
   healthCheck: () => request('/health'),
 
   getSupportedCountries: () => request('/kyc/countries'),

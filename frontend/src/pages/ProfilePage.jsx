@@ -9,6 +9,7 @@ export const ProfilePage = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('account');
   const [apiKeys, setApiKeys] = useState([]);
+  const [usage, setUsage] = useState(null);
   const [apiKeysLoading, setApiKeysLoading] = useState(false);
   const [apiKeyName, setApiKeyName] = useState('');
   const [apiKeyToken, setApiKeyToken] = useState(null);
@@ -19,8 +20,29 @@ export const ProfilePage = () => {
   const loadApiKeys = useCallback(async () => {
     try {
       setApiKeysLoading(true);
-      const data = await apiService.getApiKeys();
-      setApiKeys(data.apiKeys || []);
+      const [keysData, profileData] = await Promise.all([
+        apiService.getApiKeys(),
+        apiService.getProfile()
+      ]);
+      setApiKeys(keysData.apiKeys || []);
+      const profileUser = profileData?.data?.user;
+      if (profileUser) {
+        const limit = profileUser?.limitsOverride?.monthlyVerificationLimit ?? (
+          profileUser?.planTier === 'growth'
+            ? 5000
+            : profileUser?.planTier === 'enterprise'
+              ? null
+              : 100
+        );
+        const used = profileUser?.verificationUsage?.currentPeriodCount || 0;
+        const remaining = limit == null ? null : Math.max(limit - used, 0);
+        setUsage({
+          planTier: profileUser.planTier || 'free',
+          used,
+          limit,
+          remaining
+        });
+      }
     } catch (err) {
       setError(err.message || t('profile.security.load_error'));
     } finally {
@@ -132,6 +154,22 @@ export const ProfilePage = () => {
           <div className="pm-panel p-6 space-y-5">
             <h2 className="font-display text-xl font-bold">{t('profile.security.title')}</h2>
             <p className="text-sm text-pm-muted">{t('profile.security.description')}</p>
+            {usage && (
+              <div className="rounded-sm border-2 border-pm-ink/15 dark:border-white/20 bg-pm-wash/40 dark:bg-pm-void/60 px-4 py-3 text-sm">
+                <p className="font-semibold">
+                  {t('profile.security.usage_plan')}: {usage.planTier}
+                </p>
+                <p>
+                  {t('profile.security.usage_used')}: {usage.used}
+                </p>
+                <p>
+                  {t('profile.security.usage_limit')}: {usage.limit == null ? t('profile.security.unlimited') : usage.limit}
+                </p>
+                <p>
+                  {t('profile.security.usage_remaining')}: {usage.remaining == null ? t('profile.security.unlimited') : usage.remaining}
+                </p>
+              </div>
+            )}
 
             {apiKeyToken && (
               <div className="rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 p-4">
