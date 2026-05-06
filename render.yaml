@@ -21,6 +21,11 @@ services:
     env: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/build
+    # SPA fallback: direct hits (e.g. Clerk redirect to /admin?__clerk_handshake=…) must serve index.html
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
     envVars:
       - key: REACT_APP_API_URL
         value: https://kyc-backend.onrender.com

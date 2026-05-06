@@ -15,6 +15,10 @@ KYC Flow is a frontend + backend identity verification project.
 - Render frontend (dev): `https://armith.onrender.com`
 - Render backend (dev): `https://armith-backend-live.onrender.com`
 
+### Render static frontend (React Router / Clerk)
+
+If the frontend is a **Render Static Site**, you must rewrite unknown paths to `index.html`; otherwise URLs like `/admin?__clerk_handshake=…` return **404**. `render.yaml` includes this rewrite. If you created the static site manually in the Dashboard, open **Redirects / Rewrites**, add **Source** `/*`, **Destination** `/index.html`, **Action** Rewrite.
+
 ## Required Environment Variables
 
 ### Frontend
