@@ -25,11 +25,14 @@
     "tailwindcss": "^3.3.6"
   },
   "scripts": {
+    "docs:build": "cd docs && npm run docs:build",
+    "prestart": "npm run docs:build",
+    "prebuild": "if [ \"$IGNORE_DOCS_BUILD\" = \"1\" ]; then echo \"Skipping docs build\"; else npm run docs:build; fi",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "react-scripts start",
+    "dev": "npm run docs:build && react-scripts start",
     "serve": "npx serve -s build -l ${PORT:-3000}"
   },
   "eslintConfig": {

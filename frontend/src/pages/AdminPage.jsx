@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { Button } from '../components/ui/button';
@@ -12,7 +12,6 @@ export const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   
   // Settings state
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' or 'settings'
@@ -23,7 +22,7 @@ export const AdminPage = () => {
   const [settingsError, setSettingsError] = useState(null);
   const [settingsSuccess, setSettingsSuccess] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [statsData, verificationsData] = await Promise.all([
@@ -33,16 +32,15 @@ export const AdminPage = () => {
 
       setStats(statsData);
       setVerifications(verificationsData.users);
-      setTotalPages(verificationsData.pagination.totalPages);
     } catch (err) {
       console.error('Failed to load admin data:', err);
       setError(t('common.error'));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, t]);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       setSettingsLoading(true);
       const data = await apiService.getSettings();
@@ -54,17 +52,17 @@ export const AdminPage = () => {
     } finally {
       setSettingsLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     fetchData();
-  }, [page]);
+  }, [fetchData]);
 
   useEffect(() => {
     if (activeTab === 'settings' && !settings) {
       fetchSettings();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchSettings, settings]);
 
   const handleSaveSettings = async () => {
     if (!settings) return;

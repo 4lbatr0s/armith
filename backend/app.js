@@ -28,8 +28,13 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
+    const configuredOrigins = [
+      process.env.FRONTEND_URL,
+      ...(process.env.FRONTEND_URLS || '').split(',').map((item) => item.trim())
+    ].filter(Boolean);
+
     const allowedOrigins = [
-      process.env.FRONTEND_URL || 'http://localhost:3000',
+      ...configuredOrigins,
       'http://localhost:3000',
       'http://127.0.0.1:3000'
     ];

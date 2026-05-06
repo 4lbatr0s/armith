@@ -1,0 +1,128 @@
+import { ValidationError } from '../src/validation/country-validator.interface.js';
+import { ERRORS } from '../kyc/config.js';
+function severityForMinimum(score, threshold) {
+    return score < threshold - 0.2 ? 'critical' : 'warning';
+}
+function pushMinimumConfidence(errors, field, score, threshold, thresholdLabel = 'threshold') {
+    if (score === undefined || threshold === undefined)
+        return;
+    if (score < threshold) {
+        errors.push(new ValidationError(ERRORS.LOW_CONFIDENCE.code, `Confidence score for ${field} (${(score * 100).toFixed(1)}%) is below ${thresholdLabel} (${(threshold * 100).toFixed(1)}%).`, field, severityForMinimum(score, threshold)));
+    }
+}
+function pushMaximumScore(errors, field, score, ceiling, messageBuilder) {
+    if (score === undefined || ceiling === undefined)
+        return;
+    if (score > ceiling) {
+        errors.push(new ValidationError(ERRORS.LOW_CONFIDENCE.code, messageBuilder(), field, 'critical'));
+    }
+}
+export function evaluateIdThresholdErrors(llmParsed, resolved) {
+    const errors = [];
+    const scores = llmParsed.confidence ?? {};
+    const t = resolved.idCardThresholds;
+    pushMinimumConfidence(errors, 'firstName', scores.firstNameConfidence, t.minFullNameConfidence);
+    pushMinimumConfidence(errors, 'lastName', scores.lastNameConfidence, t.minFullNameConfidence);
+    pushMinimumConfidence(errors, 'identityNumber', scores.identityNumberConfidence, t.minIdentityNumberConfidence);
+    pushMinimumConfidence(errors, 'dateOfBirth', scores.dateOfBirthConfidence, t.minDateOfBirthConfidence);
+    pushMinimumConfidence(errors, 'expiryDate', scores.expiryDateConfidence, t.minExpiryDateConfidence);
+    pushMinimumConfidence(errors, 'overallConfidence', scores.overallConfidence, t.minOverallConfidence);
+    pushMinimumConfidence(errors, 'mrzConfidence', scores.mrzConfidence, t.minMrzConfidence);
+    const imageQuality = scores.imageQuality ?? llmParsed.quality?.imageQuality ?? llmParsed.extraction?.quality?.imageQuality;
+    pushMinimumConfidence(errors, 'imageQuality', imageQuality, t.minImageQuality);
+    const tampering = llmParsed.authenticity?.tamperingRisk;
+    pushMaximumScore(errors, 'tamperingRisk', tampering, t.maxTamperingRisk, () => `Tampering risk (${(tampering * 100).toFixed(1)}%) exceeds maximum (${(t.maxTamperingRisk * 100).toFixed(1)}%).`);
+    const vitality = llmParsed.authenticity?.documentVitalityScore;
+    const minVit = t.minDocumentVitalityConfidence;
+    if (vitality !== undefined && vitality !== null && Number.isFinite(vitality) && minVit !== undefined && minVit !== null) {
+        if (vitality < minVit) {
+            errors.push(new ValidationError(ERRORS.LOW_DOCUMENT_VITALITY.code, `Document vitality score (${(vitality * 100).toFixed(1)}%) is below minimum (${(minVit * 100).toFixed(1)}%).`, 'documentVitalityScore', 'critical'));
+        }
+    }
+    const condition = llmParsed.authenticity?.documentCondition?.toLowerCase?.();
+    const allowedList = (t.acceptableDocumentConditions || []).map((c) => c.toLowerCase());
+    if (condition && allowedList.length > 0 && !allowedList.includes(condition)) {
+        errors.push(new ValidationError('POOR_DOCUMENT_CONDITION', `Document condition '${condition}' is not acceptable.`, 'documentCondition', 'critical'));
+    }
+    return errors;
+}
+function norm(s) {
+    return (s || '').trim().toLowerCase();
+}
+export function evaluateSelfieRules(normalized, resolved) {
+    const out = [];
+    const st = resolved.selfieThresholds;
+    if (normalized.faceCount === 0) {
+        out.push(ERRORS.NO_FACE_DETECTED);
+    }
+    else if (normalized.faceCount > 1) {
+        out.push(ERRORS.MULTIPLE_FACES);
+    }
+    if (!normalized.isMatch || normalized.matchConfidence < st.minMatchConfidence) {
+        out.push(ERRORS.LOW_MATCH_CONFIDENCE);
+    }
+    const mismatches = normalized.mismatchReasons;
+    if (Array.isArray(mismatches) && mismatches.length > 0) {
+        if (normalized.isMatch || normalized.matchConfidence >= st.minMatchConfidence) {
+            out.push(ERRORS.LOW_MATCH_CONFIDENCE);
+        }
+    }
+    const fs = normalized.facialScores;
+    if (normalized.isMatch && normalized.matchConfidence >= 75 && fs) {
+        const core = [fs.facialStructure, fs.eyes, fs.nose].filter((x) => x !== undefined && Number.isFinite(x));
+        if (core.length >= 2 && Math.min(...core) < 0.66) {
+            out.push(ERRORS.LOW_MATCH_CONFIDENCE);
+        }
+    }
+    if ((normalized.spoofingRisk ?? 0) > st.maxSpoofingRisk) {
+        out.push(ERRORS.SPOOFING_DETECTED);
+    }
+    const lc = normalized.livenessConfidence;
+    if (lc !== undefined && lc !== null && Number.isFinite(lc) && lc < st.minLivenessConfidence) {
+        out.push(ERRORS.LOW_LIVENESS_CONFIDENCE);
+    }
+    const imgQ = normalized.imageQuality;
+    if (imgQ !== undefined && imgQ < st.minImageQuality) {
+        out.push(ERRORS.POOR_IMAGE_QUALITY);
+    }
+    const faceConf = normalized.faceDetectionConfidence;
+    if (faceConf !== undefined && faceConf < st.minFacialFeatureConfidence) {
+        out.push(ERRORS.NO_FACE_DETECTED);
+    }
+    const lighting = norm(normalized.lightingCondition);
+    if (lighting === 'insufficient') {
+        out.push(ERRORS.INSUFFICIENT_LIGHTING);
+    }
+    else if (lighting && st.allowedLightingConditions.length > 0) {
+        const allowed = st.allowedLightingConditions.map(norm);
+        if (!allowed.some((x) => x === lighting)) {
+            out.push(ERRORS.INSUFFICIENT_LIGHTING);
+        }
+    }
+    const faceSize = norm(normalized.faceSize);
+    if (faceSize === 'too_small') {
+        out.push(ERRORS.FACE_TOO_SMALL);
+    }
+    else if (faceSize && st.allowedFaceSizes.length > 0) {
+        const allowed = st.allowedFaceSizes.map(norm);
+        if (!allowed.some((x) => x === faceSize && x !== '')) {
+            out.push(ERRORS.FACE_TOO_SMALL);
+        }
+    }
+    let coverage = norm(normalized.faceCoverage).replace(/\s+/g, '_');
+    if (coverage === 'clear')
+        coverage = 'fully_visible';
+    const allowedCov = st.allowedFaceCoverage.map((c) => norm(c.replace(/\s+/g, '_')));
+    if (coverage &&
+        allowedCov.length > 0 &&
+        !allowedCov.includes(coverage)) {
+        out.push(ERRORS.FACE_PARTIALLY_COVERED);
+    }
+    const seen = new Set();
+    return out.filter((e) => {
+        if (!e?.code || seen.has(e.code))
+            return false;
+        seen.add(e.code);
+        return true;
+    });
+}

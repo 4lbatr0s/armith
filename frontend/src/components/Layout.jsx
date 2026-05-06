@@ -29,6 +29,9 @@ export const Layout = ({ children }) => {
   const navClass = (path) =>
     `pm-link-nav ${isActive(path) ? 'pm-link-nav-active' : ''}`;
 
+  const publicUrl = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
+  const docsHref = `${publicUrl}/docs/`.replace(/\/\/+/g, '/');
+
   return (
     <div className="min-h-screen flex flex-col bg-pm-paper dark:bg-pm-void text-pm-ink dark:text-pm-ink-soft pm-grid-bg transition-colors duration-200">
       <header className="sticky top-0 z-50 border-b-2 border-pm-ink dark:border-white/15 bg-pm-surface/95 dark:bg-pm-surface-dark/95 backdrop-blur-sm">
@@ -46,6 +49,13 @@ export const Layout = ({ children }) => {
 
             <div className="flex items-center gap-2 sm:gap-6 min-w-0">
               <nav className="hidden sm:flex items-center gap-5">
+                <a
+                  href={docsHref}
+                  className="pm-link-nav"
+                  rel="noopener noreferrer"
+                >
+                  {t('layout.documentation')}
+                </a>
                 {!isSignedIn && (
                   <>
                     <Link to="/" className={navClass('/')}>
@@ -127,6 +137,9 @@ export const Layout = ({ children }) => {
             </div>
           </div>
           <div className="sm:hidden flex gap-4 pb-3 overflow-x-auto border-t border-pm-ink/10 dark:border-white/10 pt-2">
+            <a href={docsHref} className="pm-link-nav whitespace-nowrap" rel="noopener noreferrer">
+              {t('layout.documentation')}
+            </a>
             {!isSignedIn && (
               <>
                 <Link to="/" className={navClass('/')}>

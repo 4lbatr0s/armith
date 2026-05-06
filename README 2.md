@@ -145,7 +145,7 @@ kyc-flow/
 │   │   ├── pages/          # Page components
 │   │   └── lib/            # Utilities
 │   └── public/
-└── docs/                   # Additional documentation
+└── frontend/docs/          # VitePress product & API documentation
 ```
 
 ## 🔧 Status Codes

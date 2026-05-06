@@ -2,6 +2,21 @@
 
 Armith is a production-ready, open-source KYC (Know Your Customer) API system that verifies identity documents and selfies using **Groq's Llama 4 Scout (17Bx16E)** Vision Language Model. Built with Express.js backend and React frontend with ShadCN UI.
 
+## Documentation
+
+Product guides (flows, architecture, operations) and an **interactive OpenAPI** reference (Scalar) live in the VitePress site under [`frontend/docs/`](frontend/docs/).
+
+```bash
+cd frontend/docs && npm install   # first time, or use npm run install-all from repo root
+npm run docs:dev                  # local dev server (default http://localhost:5173)
+npm run docs:build                # static output in frontend/docs/.vitepress/dist
+npm run docs:preview              # preview production build
+```
+
+From the repo root you can also run `npm run docs:dev` / `npm run docs:build` / `npm run docs:preview`.
+
+After `npm run docs:build` (or when you start the frontend with `npm start` / root `npm run dev`, which runs `prestart`), the docs are emitted to **`frontend/public/docs`** and are available in the browser at **`http://localhost:3000/docs/`** alongside the SPA. Use the **Documentation** link in the app header.
+
 ![Armith](https://img.shields.io/badge/Status-Production%20Ready-green)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)
