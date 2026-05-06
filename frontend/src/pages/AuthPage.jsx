@@ -8,7 +8,7 @@ export const AuthPage = () => {
   const location = useLocation();
   const [mode, setMode] = useState('sign-in');
   const nextParam = new URLSearchParams(location.search).get('next');
-  const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : '/upload-id';
+  const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : '/admin';
 
   if (!isLoaded) {
     return (
@@ -22,7 +22,7 @@ export const AuthPage = () => {
   }
 
   if (isSignedIn) {
-    const from = safeNext || location.state?.from?.pathname || '/upload-id';
+    const from = safeNext || location.state?.from?.pathname || '/admin';
     return <Navigate to={from} replace />;
   }
 
