@@ -83,9 +83,9 @@ out
 .nuxt
 dist
 
-# Gatsby files
+# Gatsby files (repo root only — do not ignore frontend/public or docs/public)
 .cache/
-public
+/public
 
 # Vuepress build output
 .vuepress/dist
@@ -259,6 +259,14 @@ secrets/
 *.pem
 *.key
 *.crt
+
+# MCP and local credential configs (prevent accidental key commits)
+.cursor/mcp.json
+.cursor/mcp.local.json
+.cursor/**/mcp.json
+.cursor/**/mcp.local.json
+.cursor/**/mcps/**
+.cursor/**/secrets/**
 
 # Backup files
 *.bak
