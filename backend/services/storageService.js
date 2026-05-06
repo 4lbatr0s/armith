@@ -47,6 +47,9 @@ class StorageService {
           secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
         },
         forcePathStyle: true, // Required for R2
+        // Avoid default CRC query params on presigned PUTs (browser fetch + R2 / CORS)
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
       });
 
       console.log('✅ Storage service initialized with R2');
@@ -113,11 +116,7 @@ class StorageService {
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: fileName,
-        ContentType: contentType,
-        Metadata: {
-          'upload-timestamp': new Date().toISOString(),
-          'upload-source': 'kyc-flow'
-        }
+        ContentType: contentType
       });
 
       // Generate presigned URL for upload

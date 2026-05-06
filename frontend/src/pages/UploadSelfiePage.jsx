@@ -96,7 +96,7 @@ export const UploadSelfiePage = () => {
       
       // 1. Upload Selfie
       const uploadData = await apiService.generateUploadUrl(selfieFile.type, userId, 'selfie');
-      await apiService.uploadFile(selfieFile, uploadData.uploadUrl);
+      await apiService.uploadFile(selfieFile, uploadData.uploadUrl, uploadData.contentType);
 
       // 2. Get ID photo URL and verification ID from previous step
       const idPhotoUrl = localStorage.getItem('idPhotoUrl');

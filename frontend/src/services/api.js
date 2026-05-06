@@ -77,11 +77,14 @@ export const apiService = {
     body: JSON.stringify({ fileType, userId, documentType })
   }),
 
-  uploadFile: async (file, uploadUrl) => {
+  uploadFile: async (file, uploadUrl, contentType) => {
+    const ct = contentType || file.type;
+    const headers = {};
+    if (ct) headers['Content-Type'] = ct;
     const response = await fetch(uploadUrl, {
       method: 'PUT',
       body: file,
-      headers: { 'Content-Type': file.type }
+      headers
     });
 
     if (!response.ok) throw new Error('Upload failed');
@@ -134,7 +137,7 @@ export const apiService = {
 
 export const uploadFileHelper = async (file) => {
     const uploadData = await apiService.generateUploadUrl(file.type);
-    await apiService.uploadFile(file, uploadData.uploadUrl);
+    await apiService.uploadFile(file, uploadData.uploadUrl, uploadData.contentType);
     return uploadData.downloadUrl;
 };
 

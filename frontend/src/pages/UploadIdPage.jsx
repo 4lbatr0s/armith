@@ -58,13 +58,13 @@ export const UploadIdPage = () => {
 
       // 1. Upload Front Image
       const frontUploadData = await apiService.generateUploadUrl(frontFile.type, userId, 'id-front');
-      await apiService.uploadFile(frontFile, frontUploadData.uploadUrl);
+      await apiService.uploadFile(frontFile, frontUploadData.uploadUrl, frontUploadData.contentType);
 
       // 2. Upload Back Image (if exists)
       let backDownloadUrl = null;
       if (backFile) {
         const backUploadData = await apiService.generateUploadUrl(backFile.type, userId, 'id-back');
-        await apiService.uploadFile(backFile, backUploadData.uploadUrl);
+        await apiService.uploadFile(backFile, backUploadData.uploadUrl, backUploadData.contentType);
         backDownloadUrl = backUploadData.downloadUrl;
       }
 
