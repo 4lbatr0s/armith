@@ -55,6 +55,7 @@ app.use(cors({
   allowedHeaders: [
     'Content-Type',
     'Authorization',
+    'x-api-key',
     'X-Requested-With',
     'Accept',
     'Origin',
