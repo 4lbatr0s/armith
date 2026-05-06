@@ -103,6 +103,17 @@ export const apiService = {
 
   getStats: () => request('/admin/stats'),
 
+  getApiKeys: () => request('/admin/api-keys'),
+
+  createApiKey: (name) => request('/admin/api-keys', {
+    method: 'POST',
+    body: JSON.stringify({ name })
+  }),
+
+  revokeApiKey: (id) => request(`/admin/api-keys/${id}`, {
+    method: 'DELETE'
+  }),
+
   // Settings
   getSettings: () => request('/admin/settings'),
   

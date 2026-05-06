@@ -4,6 +4,7 @@
  */
 
 export { User } from './User.js';
+export { ApiKey } from './ApiKey.js';
 export { Profile } from './Profile.js';
 export { IdCardValidation } from './IdCardValidation.js';
 export { SelfieValidation } from './SelfieValidation.js';

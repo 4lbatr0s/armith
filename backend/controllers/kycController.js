@@ -108,7 +108,7 @@ export const verifyId = async (req, res) => {
 
         const countryCodeUpper = countryCode.toUpperCase();
         
-        const authUserId = req.auth?.userId;
+        const authUserId = req.authContext?.userId || req.auth?.userId;
 
         const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
 
@@ -192,7 +192,7 @@ export const verifySelfie = async (req, res) => {
         const { idPhotoUrl, selfieUrls, profileId: profileIdFromBody, verificationId } = validation.data;
         const profileId = profileIdFromBody || verificationId;
 
-        const authUserId = req.auth?.userId;
+        const authUserId = req.authContext?.userId || req.auth?.userId;
         const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
 
         let countryHint = 'TR';
@@ -330,7 +330,13 @@ export const getUserStatus = async (req, res) => {
             SelfieValidation.findOne({ profileId }).sort({ createdAt: -1 })
         ]);
 
-        const authUserId = req.auth?.userId;
+        const authUserId = req.authContext?.userId || req.auth?.userId;
+        if (profile.userId && authUserId && profile.userId !== authUserId) {
+            return res.status(403).json({
+                status: STATUS.FAILED,
+                errors: [ERRORS.PROFILE_ACCESS_DENIED]
+            });
+        }
         const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
         const resolved = kycConfigDoc
             ? buildEffectiveKycPlain({

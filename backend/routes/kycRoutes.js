@@ -1,5 +1,4 @@
 import express from 'express';
-import { requireAuth } from '@clerk/express';
 import { 
   getSupportedCountries,
   generateUploadUrl,
@@ -9,6 +8,7 @@ import {
   getUserStatus,
   getLLMStatus
 } from '../controllers/kycController.js';
+import { authenticateApiKeyOrUser } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -17,10 +17,10 @@ router.get('/countries', getSupportedCountries);
 router.get('/llm-status', getLLMStatus);
 
 // Protected routes
-router.post('/upload-url', requireAuth(), generateUploadUrl);
-router.post('/secure-download-url', requireAuth(), generateSecureDownloadUrlEndpoint);
-router.post('/id-check', requireAuth(), verifyId);
-router.post('/selfie-check', requireAuth(), verifySelfie);
-router.get('/status/:profileId', requireAuth(), getUserStatus);
+router.post('/upload-url', authenticateApiKeyOrUser, generateUploadUrl);
+router.post('/secure-download-url', authenticateApiKeyOrUser, generateSecureDownloadUrlEndpoint);
+router.post('/id-check', authenticateApiKeyOrUser, verifyId);
+router.post('/selfie-check', authenticateApiKeyOrUser, verifySelfie);
+router.get('/status/:profileId', authenticateApiKeyOrUser, getUserStatus);
 
 export default router; 

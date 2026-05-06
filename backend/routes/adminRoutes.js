@@ -7,6 +7,11 @@ import {
   updateSettings, 
   resetSettings 
 } from '../controllers/adminController.js';
+import {
+  getApiKeys,
+  createApiKeyHandler,
+  revokeApiKeyHandler
+} from '../controllers/apiKeyController.js';
 
 const router = express.Router();
 
@@ -23,5 +28,10 @@ router.get('/stats', getStats);
 router.get('/settings', getSettings);
 router.put('/settings', updateSettings);
 router.post('/settings/reset', resetSettings);
+
+// API key management
+router.get('/api-keys', getApiKeys);
+router.post('/api-keys', createApiKeyHandler);
+router.delete('/api-keys/:id', revokeApiKeyHandler);
 
 export default router; 
