@@ -26,7 +26,7 @@
   },
   "scripts": {
     "docs:build": "cd docs && npm run docs:build",
-    "prestart": "npm run docs:build",
+    "prestart": "if [ \"$IGNORE_DOCS_BUILD\" = \"1\" ] || [ ! -d \"docs\" ]; then echo \"Skipping docs build\"; else npm run docs:build; fi",
     "prebuild": "if [ \"$IGNORE_DOCS_BUILD\" = \"1\" ]; then echo \"Skipping docs build\"; else npm run docs:build; fi",
     "start": "react-scripts start",
     "build": "react-scripts build",

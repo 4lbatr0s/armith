@@ -71,6 +71,9 @@ export const Layout = ({ children }) => {
                     <Link to="/admin" className={navClass('/admin')}>
                       {t('layout.dashboard')}
                     </Link>
+                    <Link to="/profile" className={navClass('/profile')}>
+                      {t('layout.profile')}
+                    </Link>
                     <Link
                       to="/upload-id"
                       className={`pm-link-nav ${
@@ -117,6 +120,16 @@ export const Layout = ({ children }) => {
                         {user?.firstName || user?.emailAddresses?.[0]?.emailAddress}
                       </p>
                     </div>
+                    <Link
+                      to="/profile"
+                      className={`text-xs font-bold uppercase tracking-wider px-3 py-2 border-2 rounded-sm ${
+                        isActive('/profile')
+                          ? 'bg-pm-accent text-white border-pm-accent'
+                          : 'border-pm-ink/20 dark:border-white/20 hover:bg-pm-wash dark:hover:bg-white/10'
+                      }`}
+                    >
+                      {t('layout.profile')}
+                    </Link>
                     <button
                       type="button"
                       onClick={handleSignOut}
@@ -154,6 +167,9 @@ export const Layout = ({ children }) => {
               <>
                 <Link to="/admin" className={navClass('/admin')}>
                   {t('layout.dashboard')}
+                </Link>
+                <Link to="/profile" className={navClass('/profile')}>
+                  {t('layout.profile')}
                 </Link>
                 <Link
                   to="/upload-id"

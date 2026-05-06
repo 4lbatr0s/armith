@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
 import { PricingPage } from './pages/PricingPage';
@@ -8,6 +8,7 @@ import { UploadIdPage } from './pages/UploadIdPage';
 import { UploadSelfiePage } from './pages/UploadSelfiePage';
 import { ResultPage } from './pages/ResultPage';
 import { AdminPage } from './pages/AdminPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { Layout } from './components/Layout';
 import { ApiTokenProvider } from './components/ApiTokenProvider';
 import './index.css';
@@ -35,7 +36,7 @@ const ProtectedRoute = ({ children }) => {
     <>
       <SignedIn>{children}</SignedIn>
       <SignedOut>
-        <RedirectToSignIn />
+        <Navigate to="/auth" replace />
       </SignedOut>
     </>
   );
@@ -112,6 +113,11 @@ export const App = () => {
               <Route path="/admin" element={
                 <ProtectedRoute>
                   <AdminPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <ProfilePage />
                 </ProtectedRoute>
               } />
 

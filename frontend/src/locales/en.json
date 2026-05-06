@@ -20,6 +20,7 @@
         "pricing": "Pricing",
         "verify_identity": "Verify Identity",
         "dashboard": "Dashboard",
+        "profile": "Profile",
         "sign_out": "Sign Out",
         "sign_in": "Sign In",
         "documentation": "Documentation",
@@ -204,6 +205,7 @@
     "dashboard": {
         "title": "Dashboard",
         "overview": "Overview",
+        "manage_api_keys": "Manage API Keys",
         "welcome": "Welcome to Dashboard",
         "welcome_desc": "Manage verifications, view statistics, and configure settings.",
         "start_verification": "Start New Verification",
@@ -289,5 +291,39 @@
         "save_changes": "Save Changes",
         "saving": "Saving...",
         "last_updated": "Last updated"
+    },
+    "profile": {
+        "title": "Profile",
+        "account": {
+            "title": "Account",
+            "description": "View your account identity used for dashboard access.",
+            "name": "Name",
+            "email": "Email"
+        },
+        "security": {
+            "title": "Security",
+            "description": "Manage API keys used by your backend to call Armith APIs.",
+            "load_error": "Failed to load API keys",
+            "name_required": "API key name is required",
+            "create_success": "API key created successfully",
+            "create_error": "Failed to create API key",
+            "revoke_confirm": "Are you sure you want to revoke this API key?",
+            "revoke_success": "API key revoked successfully",
+            "revoke_error": "Failed to revoke API key",
+            "one_time": "Copy this API key now. It will not be shown again.",
+            "copy": "Copy API Key",
+            "name_placeholder": "Key name (example: Production backend)",
+            "create": "Create API Key",
+            "key_name": "Name",
+            "key_prefix": "Prefix",
+            "created": "Created",
+            "last_used": "Last used",
+            "status": "Status",
+            "actions": "Actions",
+            "empty": "No API keys yet.",
+            "active": "Active",
+            "revoked": "Revoked",
+            "revoke": "Revoke"
+        }
     }
 }

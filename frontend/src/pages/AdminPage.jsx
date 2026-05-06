@@ -21,10 +21,6 @@ export const AdminPage = () => {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState(null);
   const [settingsSuccess, setSettingsSuccess] = useState(null);
-  const [apiKeys, setApiKeys] = useState([]);
-  const [apiKeysLoading, setApiKeysLoading] = useState(false);
-  const [apiKeyName, setApiKeyName] = useState('');
-  const [apiKeyToken, setApiKeyToken] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -47,20 +43,14 @@ export const AdminPage = () => {
   const fetchSettings = useCallback(async () => {
     try {
       setSettingsLoading(true);
-      setApiKeysLoading(true);
-      const [settingsData, apiKeysData] = await Promise.all([
-        apiService.getSettings(),
-        apiService.getApiKeys()
-      ]);
+      const settingsData = await apiService.getSettings();
       setSettings(settingsData.settings);
       setDefaults(settingsData.defaults);
-      setApiKeys(apiKeysData.apiKeys || []);
     } catch (err) {
       console.error('Failed to load settings:', err);
       setSettingsError(t('settings.load_error'));
     } finally {
       setSettingsLoading(false);
-      setApiKeysLoading(false);
     }
   }, [t]);
 
@@ -143,48 +133,6 @@ export const AdminPage = () => {
     });
   };
 
-  const handleCreateApiKey = async () => {
-    const trimmedName = apiKeyName.trim();
-    if (!trimmedName) {
-      setSettingsError(t('settings.api_key_name_required'));
-      return;
-    }
-
-    try {
-      setSettingsSaving(true);
-      setSettingsError(null);
-      const data = await apiService.createApiKey(trimmedName);
-      setApiKeyName('');
-      setApiKeyToken(data.token);
-      const listData = await apiService.getApiKeys();
-      setApiKeys(listData.apiKeys || []);
-      setSettingsSuccess(t('settings.api_key_create_success'));
-      setTimeout(() => setSettingsSuccess(null), 3000);
-    } catch (err) {
-      console.error('Failed to create API key:', err);
-      setSettingsError(err.message || t('settings.api_key_create_error'));
-    } finally {
-      setSettingsSaving(false);
-    }
-  };
-
-  const handleRevokeApiKey = async (id) => {
-    if (!window.confirm(t('settings.api_key_revoke_confirm'))) return;
-
-    try {
-      setSettingsSaving(true);
-      setSettingsError(null);
-      await apiService.revokeApiKey(id);
-      setApiKeys((prev) => prev.map((item) => (item.id === id ? { ...item, revokedAt: new Date().toISOString() } : item)));
-      setSettingsSuccess(t('settings.api_key_revoke_success'));
-      setTimeout(() => setSettingsSuccess(null), 3000);
-    } catch (err) {
-      console.error('Failed to revoke API key:', err);
-      setSettingsError(err.message || t('settings.api_key_revoke_error'));
-    } finally {
-      setSettingsSaving(false);
-    }
-  };
 
   if (isLoading && !stats) {
     return (
@@ -265,6 +213,13 @@ export const AdminPage = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                     {t('dashboard.refresh')}
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/profile')}
+                    variant="outline"
+                    className="border-2 border-white/50 bg-white/10 text-white hover:bg-white/20 dark:border-white/25 dark:text-pm-ink-soft dark:hover:bg-white/10"
+                  >
+                    {t('dashboard.manage_api_keys')}
                   </Button>
                 </div>
               </div>
@@ -427,96 +382,6 @@ export const AdminPage = () => {
               </div>
             ) : settings && (
               <>
-                <div className="pm-panel overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings.api_keys_title')}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('settings.api_keys_desc')}</p>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    {apiKeyToken && (
-                      <div className="rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 p-4">
-                        <p className="text-xs uppercase tracking-widest text-pm-muted mb-2">{t('settings.api_key_one_time')}</p>
-                        <code className="block w-full overflow-x-auto text-sm">{apiKeyToken}</code>
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => navigator.clipboard.writeText(apiKeyToken)}
-                          >
-                            {t('settings.api_key_copy')}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <input
-                        type="text"
-                        value={apiKeyName}
-                        onChange={(e) => setApiKeyName(e.target.value)}
-                        placeholder={t('settings.api_key_name_placeholder')}
-                        className="flex-1 px-3 py-2 border rounded-sm bg-white dark:bg-gray-900 dark:text-white"
-                        maxLength={100}
-                      />
-                      <Button onClick={handleCreateApiKey} disabled={settingsSaving}>
-                        {t('settings.api_key_create')}
-                      </Button>
-                    </div>
-                    {apiKeysLoading ? (
-                      <p className="text-sm text-pm-muted">{t('common.loading')}</p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-pm-ink/10 dark:divide-white/10">
-                          <thead>
-                            <tr>
-                              <th className="px-3 py-2 text-left text-xs uppercase tracking-widest text-pm-muted">{t('settings.api_key_name')}</th>
-                              <th className="px-3 py-2 text-left text-xs uppercase tracking-widest text-pm-muted">{t('settings.api_key_prefix')}</th>
-                              <th className="px-3 py-2 text-left text-xs uppercase tracking-widest text-pm-muted">{t('settings.api_key_created')}</th>
-                              <th className="px-3 py-2 text-left text-xs uppercase tracking-widest text-pm-muted">{t('settings.api_key_last_used')}</th>
-                              <th className="px-3 py-2 text-left text-xs uppercase tracking-widest text-pm-muted">{t('settings.api_key_status')}</th>
-                              <th className="px-3 py-2 text-left text-xs uppercase tracking-widest text-pm-muted">{t('settings.api_key_actions')}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-pm-ink/10 dark:divide-white/10">
-                            {apiKeys.length === 0 ? (
-                              <tr>
-                                <td colSpan="6" className="px-3 py-4 text-sm text-pm-muted">
-                                  {t('settings.api_key_empty')}
-                                </td>
-                              </tr>
-                            ) : (
-                              apiKeys.map((item) => (
-                                <tr key={item.id}>
-                                  <td className="px-3 py-3 text-sm text-pm-ink dark:text-pm-ink-soft">{item.name}</td>
-                                  <td className="px-3 py-3 text-sm font-mono text-pm-muted">{item.prefix}</td>
-                                  <td className="px-3 py-3 text-sm text-pm-muted">{new Date(item.createdAt).toLocaleString()}</td>
-                                  <td className="px-3 py-3 text-sm text-pm-muted">
-                                    {item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString() : '-'}
-                                  </td>
-                                  <td className="px-3 py-3 text-sm text-pm-muted">
-                                    {item.revokedAt ? t('settings.api_key_status_revoked') : t('settings.api_key_status_active')}
-                                  </td>
-                                  <td className="px-3 py-3">
-                                    {!item.revokedAt && (
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => handleRevokeApiKey(item.id)}
-                                        disabled={settingsSaving}
-                                      >
-                                        {t('settings.api_key_revoke')}
-                                      </Button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
                 {/* Verification Rules */}
                 <div className="pm-panel overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">

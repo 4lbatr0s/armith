@@ -20,6 +20,7 @@
         "pricing": "Fiyatlandırma",
         "verify_identity": "Kimlik Doğrulama",
         "dashboard": "Panel",
+        "profile": "Profil",
         "sign_out": "Çıkış Yap",
         "sign_in": "Giriş Yap",
         "documentation": "Dokümantasyon",
@@ -204,6 +205,7 @@
     "dashboard": {
         "title": "Panel",
         "overview": "Genel Bakış",
+        "manage_api_keys": "API Anahtarlarını Yönet",
         "welcome": "Panele Hoş Geldiniz",
         "welcome_desc": "Doğrulamaları yönetin, istatistikleri görüntüleyin ve ayarları yapılandırın.",
         "start_verification": "Yeni Doğrulama Başlat",
@@ -267,5 +269,39 @@
         "save_changes": "Değişiklikleri Kaydet",
         "saving": "Kaydediliyor...",
         "last_updated": "Son güncelleme"
+    },
+    "profile": {
+        "title": "Profil",
+        "account": {
+            "title": "Hesap",
+            "description": "Dashboard erişiminde kullanılan hesap bilgilerini görüntüleyin.",
+            "name": "Ad Soyad",
+            "email": "E-posta"
+        },
+        "security": {
+            "title": "Güvenlik",
+            "description": "Armith API çağrıları için API anahtarlarınızı yönetin.",
+            "load_error": "API anahtarları yüklenemedi",
+            "name_required": "API anahtar adı zorunludur",
+            "create_success": "API anahtarı başarıyla oluşturuldu",
+            "create_error": "API anahtarı oluşturulamadı",
+            "revoke_confirm": "Bu API anahtarını iptal etmek istediğinize emin misiniz?",
+            "revoke_success": "API anahtarı başarıyla iptal edildi",
+            "revoke_error": "API anahtarı iptal edilemedi",
+            "one_time": "Bu anahtarı şimdi kopyalayın. Tekrar gösterilmeyecek.",
+            "copy": "API Anahtarını Kopyala",
+            "name_placeholder": "Anahtar adı (örnek: Production backend)",
+            "create": "API Anahtarı Oluştur",
+            "key_name": "Ad",
+            "key_prefix": "Ön Ek",
+            "created": "Oluşturulma",
+            "last_used": "Son kullanım",
+            "status": "Durum",
+            "actions": "İşlemler",
+            "empty": "Henüz API anahtarı yok.",
+            "active": "Aktif",
+            "revoked": "İptal",
+            "revoke": "İptal Et"
+        }
     }
 }
