@@ -1,6 +1,20 @@
 import { Profile, IdCardValidation, SelfieValidation } from '../../models/index.js';
 import { STATUS, formatStructuredError } from '../../kyc/config.js';
 
+/** Thrown when (country + identityNumber) exists on another userId than the authenticated user. */
+export class IdentityNumberConflictError extends Error {
+    constructor(message = 'This identity number is already linked to another account.') {
+        super(message);
+        this.name = 'IdentityNumberConflictError';
+    }
+}
+
+function normalizeIdentityNumber(value) {
+    if (value == null || value === '') return null;
+    const s = String(value).trim();
+    return s.length ? s : null;
+}
+
 function omitNullProps(obj) {
     if (!obj || typeof obj !== 'object') return undefined;
     const out = Object.fromEntries(Object.entries(obj).filter(([, v]) => v != null));
@@ -42,12 +56,26 @@ export async function persistIdVerification({
     rejectionReasons,
     overallStatus
 }) {
-    let profile = await Profile.findOne({ userId: authUserId });
-    if (!profile && result.data?.identityNumber) {
-        profile = await Profile.findOne({
+    const idNum = normalizeIdentityNumber(result.data?.identityNumber);
+    let profile = null;
+
+    // Logged-in: one profile row per (userId + identityNumber). Do not reuse "any" profile for this user.
+    if (authUserId && idNum) {
+        profile = await Profile.findOne({ userId: authUserId, identityNumber: idNum });
+    }
+
+    // Match by national id + country when no user-scoped row yet (guest flow or first link).
+    if (!profile && idNum) {
+        const existing = await Profile.findOne({
             country: countryCodeUpper,
-            identityNumber: result.data.identityNumber
+            identityNumber: idNum,
         });
+        if (existing) {
+            if (authUserId && existing.userId && existing.userId !== authUserId) {
+                throw new IdentityNumberConflictError();
+            }
+            profile = existing;
+        }
     }
 
     if (profile) {

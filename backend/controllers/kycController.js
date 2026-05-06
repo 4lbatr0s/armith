@@ -11,7 +11,11 @@ import logger from '../lib/logger.js';
 import { VerificationService } from '../src/services/verification.service.js';
 import { getOrCreateUserKycConfig, buildEffectiveKycPlain } from '../services/kyc/runtimeConfig.js';
 import { deriveIdCheckpointStatus, computeProfileStatusAfterSelfie } from '../services/kyc/verificationOutcome.js';
-import { persistIdVerification, persistSelfieVerification } from '../services/kyc/persistence.js';
+import {
+    persistIdVerification,
+    persistSelfieVerification,
+    IdentityNumberConflictError
+} from '../services/kyc/persistence.js';
 import { checkUserVerificationQuota, incrementUserVerificationUsage } from '../services/quotaService.js';
 import { assertImagesReadyForLlm } from '../services/kyc/verificationPrecheck.js';
 import {
@@ -161,15 +165,33 @@ export const verifyId = async (req, res) => {
         const rejectionReasons = result.errors.map(e => formatStructuredError(e));
         const overallStatus = deriveIdCheckpointStatus(result.status, resolved.verificationSteps);
 
-        const profile = await persistIdVerification({
-            authUserId,
-            countryCodeUpper,
-            result,
-            frontImageUrl,
-            backImageUrl,
-            rejectionReasons,
-            overallStatus
-        });
+        let profile;
+        try {
+            profile = await persistIdVerification({
+                authUserId,
+                countryCodeUpper,
+                result,
+                frontImageUrl,
+                backImageUrl,
+                rejectionReasons,
+                overallStatus
+            });
+        } catch (err) {
+            if (err instanceof IdentityNumberConflictError) {
+                logger.warn({ authUserId, msg: err.message }, 'Identity number belongs to another user');
+                return res.status(409).json({
+                    status: STATUS.FAILED,
+                    errors: [
+                        {
+                            code: 'IDENTITY_ALREADY_LINKED',
+                            message: err.message,
+                            textCode: 'IDENTITY_ALREADY_LINKED'
+                        }
+                    ]
+                });
+            }
+            throw err;
+        }
 
         logger.info({ profileId: profile._id, status: overallStatus }, 'ID verification completed');
 
