@@ -1,6 +1,7 @@
 import crypto from 'crypto';
-import { ApiKey } from '../models/index.js';
+import { ApiKey, User } from '../models/index.js';
 import { normalizeAllowedCidrs } from '../lib/ipAllowlist.js';
+import { canUsePerKeyIpAllowlist } from '../lib/planFeatures.js';
 
 const API_KEY_PREFIX = 'ak_live_';
 const TOKEN_BYTES = 24;
@@ -38,6 +39,14 @@ export const listApiKeysByUserId = async (userId) =>
   ApiKey.find({ userId }).sort({ createdAt: -1 });
 
 export const updateApiKeyAllowlist = async ({ userId, apiKeyId, allowedCidrs }) => {
+  const user = await User.findOne({ clerkId: userId }).lean();
+  if (!canUsePerKeyIpAllowlist(user)) {
+    const err = new Error('Per-API-key IP allowlists are available on Growth and Enterprise plans.');
+    err.statusCode = 403;
+    err.code = 'PLAN_LIMIT_IP_PER_KEY';
+    throw err;
+  }
+
   const norm = normalizeAllowedCidrs(allowedCidrs);
   if (!norm.ok) {
     const err = new Error(norm.error || 'Invalid allowlist');

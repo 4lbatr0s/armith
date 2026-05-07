@@ -2,6 +2,8 @@ import { requireAuth, getAuth } from '@clerk/express';
 import { authenticateApiKeyToken } from '../services/apiKeyService.js';
 import { getClientIp } from '../lib/clientIp.js';
 import { ipAllowedByRules } from '../lib/ipAllowlist.js';
+import { canUsePerKeyIpAllowlist } from '../lib/planFeatures.js';
+import { User } from '../models/User.js';
 import { verifyCaptureSessionToken } from '../lib/captureSessionToken.js';
 
 /**
@@ -80,10 +82,21 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
         return res.status(401).json({ error: 'Invalid API key' });
       }
 
-      const rules = Array.isArray(apiKey.allowedCidrs) ? apiKey.allowedCidrs : [];
-      if (rules.length > 0) {
-        const ip = getClientIp(req);
-        if (!ipAllowedByRules(ip, rules)) {
+      const ip = getClientIp(req);
+      const tenant = await User.findOne({ clerkId: apiKey.userId }).lean();
+      const accountRules = Array.isArray(tenant?.apiAllowedCidrs) ? tenant.apiAllowedCidrs : [];
+      if (accountRules.length > 0) {
+        if (!ipAllowedByRules(ip, accountRules)) {
+          return res.status(403).json({
+            error: 'IP address not allowed for this account',
+            code: 'ACCOUNT_IP_FORBIDDEN'
+          });
+        }
+      }
+
+      const keyRules = Array.isArray(apiKey.allowedCidrs) ? apiKey.allowedCidrs : [];
+      if (keyRules.length > 0 && canUsePerKeyIpAllowlist(tenant)) {
+        if (!ipAllowedByRules(ip, keyRules)) {
           return res.status(403).json({
             error: 'IP address not allowed for this API key',
             code: 'API_KEY_IP_FORBIDDEN'

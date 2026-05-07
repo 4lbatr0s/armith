@@ -173,6 +173,9 @@ export const Layout = ({ children }) => {
                 <Link to="/admin" className={navClass('/admin')}>
                   {t('layout.dashboard')}
                 </Link>
+                <Link to="/integrations" className={navClass('/integrations')}>
+                  {t('layout.integrations')}
+                </Link>
                 <Link to="/profile" className={navClass('/profile')}>
                   {t('layout.profile')}
                 </Link>

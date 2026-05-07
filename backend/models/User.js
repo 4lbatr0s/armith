@@ -50,6 +50,11 @@ const userSchema = new mongoose.Schema(
                 default: null,
             },
         },
+        /** Applies to all API keys for this tenant when non-empty (Clerk user / dashboard account). */
+        apiAllowedCidrs: {
+            type: [String],
+            default: [],
+        },
     },
     {
         timestamps: true,

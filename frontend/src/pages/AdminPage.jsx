@@ -470,7 +470,7 @@ export const AdminPage = () => {
                   </Button>
                   <Button
                     type="button"
-                    onClick={() => navigate('/profile?tab=security')}
+                    onClick={() => navigate('/integrations?tab=api-keys')}
                     variant="outline"
                     className="border-2 border-white/50 bg-white/10 text-white hover:bg-white/20 dark:border-white/25 dark:text-pm-ink-soft dark:hover:bg-white/10"
                   >
@@ -1094,7 +1094,7 @@ export const AdminPage = () => {
                     <Button type="button" className="border-2 border-pm-ink/20 dark:border-white/25" onClick={() => navigate('/integrations')}>
                       {t('settings.integration_moved_webhook_cta')}
                     </Button>
-                    <Button type="button" variant="outline" className="border-2" onClick={() => navigate('/profile?tab=security')}>
+                    <Button type="button" variant="outline" className="border-2" onClick={() => navigate('/integrations?tab=api-keys')}>
                       {t('settings.integration_moved_keys_cta')}
                     </Button>
                   </div>

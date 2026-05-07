@@ -19,7 +19,8 @@ import {
   getApiKeys,
   createApiKeyHandler,
   patchApiKeyAllowlistHandler,
-  revokeApiKeyHandler
+  revokeApiKeyHandler,
+  putAccountApiIpAllowlist
 } from '../controllers/apiKeyController.js';
 
 const router = express.Router();
@@ -54,6 +55,7 @@ router.post('/settings/reset', resetSettings);
 // API key management
 router.get('/api-keys', getApiKeys);
 router.post('/api-keys', createApiKeyHandler);
+router.put('/account-api-ip-allowlist', putAccountApiIpAllowlist);
 router.patch('/api-keys/:id', patchApiKeyAllowlistHandler);
 router.delete('/api-keys/:id', revokeApiKeyHandler);
 

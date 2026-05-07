@@ -169,6 +169,12 @@ export const apiService = {
       body: JSON.stringify({ allowedCidrs })
     }),
 
+  updateAccountApiIpAllowlist: (allowedCidrs) =>
+    request('/admin/account-api-ip-allowlist', {
+      method: 'PUT',
+      body: JSON.stringify({ allowedCidrs })
+    }),
+
   // Settings
   getSettings: () => request('/admin/settings'),
   

@@ -4,6 +4,9 @@ import {
   revokeApiKeyById,
   updateApiKeyAllowlist
 } from '../services/apiKeyService.js';
+import { User } from '../models/index.js';
+import { normalizeAllowedCidrs } from '../lib/ipAllowlist.js';
+import { canUsePerKeyIpAllowlist } from '../lib/planFeatures.js';
 
 const mapApiKey = (apiKey) => ({
   id: apiKey._id,
@@ -18,11 +21,37 @@ const mapApiKey = (apiKey) => ({
 export const getApiKeys = async (req, res) => {
   try {
     const userId = req.auth?.userId;
-    const apiKeys = await listApiKeysByUserId(userId);
-    res.json({ apiKeys: apiKeys.map(mapApiKey) });
+    const [apiKeys, user] = await Promise.all([
+      listApiKeysByUserId(userId),
+      User.findOne({ clerkId: userId }).lean()
+    ]);
+    res.json({
+      apiKeys: apiKeys.map(mapApiKey),
+      features: { perKeyIpAllowlist: canUsePerKeyIpAllowlist(user) }
+    });
   } catch (error) {
     console.error('Get API keys error:', error);
     res.status(500).json({ error: 'Failed to fetch API keys' });
+  }
+};
+
+export const putAccountApiIpAllowlist = async (req, res) => {
+  try {
+    const userId = req.auth?.userId;
+    const norm = normalizeAllowedCidrs(req.body?.allowedCidrs);
+    if (!norm.ok) {
+      return res.status(400).json({ error: norm.error || 'Invalid allowlist' });
+    }
+    const user = await User.findOne({ clerkId: userId });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    user.set('apiAllowedCidrs', norm.cidrs);
+    await user.save();
+    res.json({ apiAllowedCidrs: norm.cidrs });
+  } catch (error) {
+    console.error('Account API IP allowlist error:', error);
+    res.status(500).json({ error: 'Failed to update account allowlist' });
   }
 };
 
@@ -65,6 +94,9 @@ export const patchApiKeyAllowlistHandler = async (req, res) => {
     } catch (e) {
       if (e?.statusCode === 400) {
         return res.status(400).json({ error: e.message });
+      }
+      if (e?.statusCode === 403) {
+        return res.status(403).json({ error: e.message, code: e.code || 'PLAN_LIMIT_IP_PER_KEY' });
       }
       throw e;
     }
