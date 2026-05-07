@@ -129,6 +129,21 @@ export const ERRORS = {
     code: 6014,
     textCode: 'PARTIAL_IMPLEMENTATION',
     message: 'Country validation is partially implemented.'
+  },
+  IMAGE_TOO_LARGE: {
+    code: 6015,
+    textCode: 'IMAGE_TOO_LARGE',
+    message: 'Uploaded object exceeds the maximum allowed size for verification images.'
+  },
+  UNSUPPORTED_IMAGE_TYPE: {
+    code: 6016,
+    textCode: 'UNSUPPORTED_IMAGE_TYPE',
+    message: 'Image content type is not allowed for KYC uploads.'
+  },
+  IMAGE_RESOLUTION_TOO_LOW: {
+    code: 6017,
+    textCode: 'IMAGE_RESOLUTION_TOO_LOW',
+    message: 'Image resolution is below minimum width, height, or megapixel thresholds for verification.'
   }
 };
 

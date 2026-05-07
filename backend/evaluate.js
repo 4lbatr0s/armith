@@ -1,4 +1,4 @@
-import { ValidationError } from '../src/validation/country-validator.interface.js';
+import { ValidationError } from './validation/country-validator.interface.js';
 import { ERRORS } from '../kyc/config.js';
 function severityForMinimum(score, threshold) {
     return score < threshold - 0.2 ? 'critical' : 'warning';

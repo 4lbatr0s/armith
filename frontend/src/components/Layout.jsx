@@ -55,6 +55,9 @@ export const Layout = ({ children }) => {
                 >
                   {t('layout.documentation')}
                 </a>
+                <Link to="/trust" className={navClass('/trust')}>
+                  {t('layout.trust_security')}
+                </Link>
                 {!isSignedIn && (
                   <>
                     <Link to="/" className={navClass('/')}>
@@ -70,8 +73,8 @@ export const Layout = ({ children }) => {
                     <Link to="/admin" className={navClass('/admin')}>
                       {t('layout.dashboard')}
                     </Link>
-                    <Link to="/profile" className={navClass('/profile')}>
-                      {t('layout.profile')}
+                    <Link to="/integrations" className={navClass('/integrations')}>
+                      {t('layout.integrations')}
                     </Link>
                     <Link
                       to="/upload-id"
@@ -152,6 +155,9 @@ export const Layout = ({ children }) => {
             <a href={docsHref} className="pm-link-nav whitespace-nowrap" rel="noopener noreferrer">
               {t('layout.documentation')}
             </a>
+            <Link to="/trust" className={`${navClass('/trust')} whitespace-nowrap`}>
+              {t('layout.trust_security')}
+            </Link>
             {!isSignedIn && (
               <>
                 <Link to="/" className={navClass('/')}>
@@ -190,7 +196,19 @@ export const Layout = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-sm text-pm-muted">
             <p className="font-display font-semibold text-pm-ink dark:text-pm-ink-soft">{t('layout.footer_text')}</p>
-            <p className="text-xs uppercase tracking-widest max-w-md sm:text-right">{t('layout.footer_subtext')}</p>
+            <div className="flex flex-col sm:items-end gap-2">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold uppercase tracking-wider">
+                <Link to="/trust" className="hover:text-pm-accent">
+                  {t('layout.trust_security')}
+                </Link>
+                {!isSignedIn ? (
+                  <Link to="/pricing" className="hover:text-pm-accent">
+                    {t('layout.pricing')}
+                  </Link>
+                ) : null}
+              </div>
+              <p className="text-xs uppercase tracking-widest max-w-md sm:text-right">{t('layout.footer_subtext')}</p>
+            </div>
           </div>
         </div>
       </footer>

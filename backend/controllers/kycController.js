@@ -8,7 +8,7 @@ import storageService from '../services/storageService.js';
 import { Profile, IdCardValidation, SelfieValidation } from '../models/index.js';
 import { createDefaultConfig } from '../kyc/defaults.js';
 import logger from '../lib/logger.js';
-import { VerificationService } from '../src/services/verification.service.js';
+import { VerificationService } from '../services/verificationService.js';
 import { getOrCreateUserKycConfig, buildEffectiveKycPlain } from '../services/kyc/runtimeConfig.js';
 import { deriveIdCheckpointStatus, computeProfileStatusAfterSelfie } from '../services/kyc/verificationOutcome.js';
 import {
@@ -25,6 +25,44 @@ import {
 } from '../thresholds/definitions.js';
 import { flattenedThresholdPayload } from '../thresholds/api-shape.js';
 import { resolveKycConfig } from '../thresholds/resolve.js';
+import { withPublicApiMeta } from '../config/public-api-meta.js';
+import { emitVerificationTerminalWebhook } from '../services/verificationWebhook.js';
+import { outcomeSemanticsForTerminalResponse } from '../services/kyc/webhookOutcomeSemantics.js';
+import { getPolicyPackForCountry } from '../thresholds/policyPack.js';
+import { validatePresignMime, getImageConstraintsForApi } from '../lib/kycImageConstraints.js';
+
+function deriveSessionLifecycle({
+    verificationRules,
+    profileStatus,
+    idCompleted,
+    idApproved,
+    selfieCompleted,
+    selfieApproved
+}) {
+    const ps = (profileStatus || '').toUpperCase();
+    const needsId = verificationRules.requireIdCard && !idCompleted;
+    const needsSelfie =
+        verificationRules.requireSelfie &&
+        !selfieCompleted &&
+        (!verificationRules.requireIdCard || idApproved);
+
+    if (ps === 'APPROVED') {
+        return { phase: 'approved', terminal: true };
+    }
+    if (ps === 'REJECTED' || ps === 'FAILED') {
+        return { phase: 'rejected_failed', terminal: true };
+    }
+    if (ps === 'UNDER_REVIEW') {
+        return { phase: 'under_review', terminal: false };
+    }
+    if (needsId) {
+        return { phase: 'awaiting_id', terminal: false };
+    }
+    if (needsSelfie) {
+        return { phase: 'awaiting_selfie', terminal: false };
+    }
+    return { phase: 'pending', terminal: false };
+}
 
 export const getSupportedCountries = async (_req, res) => {
     res.json({
@@ -87,8 +125,19 @@ export const generateUploadUrl = async (req, res) => {
                 errors: [{ code: 'INVALID_DOCUMENT_TYPE', message: `Document type must be one of: ${validDocumentTypes.join(', ')}` }]
             });
         }
-        const uploadData = await storageService.generatePresignedUploadUrl(fileType, userId, documentType);
-        res.json({ success: true, ...uploadData });
+        const mimeCheck = validatePresignMime(fileType);
+        if (!mimeCheck.ok) {
+            return res.status(400).json({
+                status: STATUS.FAILED,
+                errors: [ERRORS.UNSUPPORTED_IMAGE_TYPE]
+            });
+        }
+        const uploadData = await storageService.generatePresignedUploadUrl(mimeCheck.mime, userId, documentType);
+        res.json({
+            success: true,
+            ...uploadData,
+            constraints: getImageConstraintsForApi()
+        });
     } catch (error) {
         logger.error({ error }, 'Upload URL generation error');
         res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
@@ -199,24 +248,49 @@ export const verifyId = async (req, res) => {
             await incrementUserVerificationUsage(authUserId);
         }
 
-        const confidenceScores = buildIdConfidenceRowsFromVerification(result, resolved);
-
-        res.json({
-            status: overallStatus,
-            idStatus: result.status,
-            data: result.data,
-            confidence: result.confidence,
-            confidenceScores,
-            errors: result.errors,
-            rejectionReasons,
-            profileId: profile._id,
-            images: { front: frontImageUrl, back: backImageUrl || null },
-            message:
-                overallStatus === STATUS.PENDING
-                    ? 'ID verification successful. Please complete selfie verification.'
-                    : 'Verification complete!',
-            verificationRules: resolved.verificationSteps
+        emitVerificationTerminalWebhook({
+            tenantUserId: authUserId,
+            profile,
+            correlationId: req.correlationId
         });
+
+        const confidenceScores = buildIdConfidenceRowsFromVerification(result, resolved);
+        const policyExtras =
+            authUserId && kycConfigDoc
+                ? {
+                      ...getPolicyPackForCountry(countryCodeUpper),
+                      tenantConfigVersion: kycConfigDoc.version,
+                      policyCountryCode: countryCodeUpper
+                  }
+                : { ...getPolicyPackForCountry(countryCodeUpper), policyCountryCode: countryCodeUpper };
+        const semantics = outcomeSemanticsForTerminalResponse({
+            terminalStatusUpper: overallStatus,
+            profile,
+            rawVerificationErrors: rejectionReasons
+        });
+
+        res.json(
+            withPublicApiMeta(
+                {
+                    status: overallStatus,
+                    idStatus: result.status,
+                    data: result.data,
+                    confidence: result.confidence,
+                    confidenceScores,
+                    errors: result.errors,
+                    rejectionReasons,
+                    profileId: profile._id,
+                    images: { front: frontImageUrl, back: backImageUrl || null },
+                    message:
+                        overallStatus === STATUS.PENDING
+                            ? 'ID verification successful. Please complete selfie verification.'
+                            : 'Verification complete!',
+                    verificationRules: resolved.verificationSteps,
+                    ...(semantics !== undefined ? { outcomeSemantics: semantics } : {})
+                },
+                policyExtras
+            )
+        );
     } catch (error) {
         logger.error({ error: error.message, stack: error.stack }, 'Unexpected error in verifyId');
         res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
@@ -307,6 +381,7 @@ export const verifySelfie = async (req, res) => {
 
         let overallStatus = result.status;
 
+        let selfiePersistedProfile = null;
         if (profileId && result.success) {
             const idValidation = await IdCardValidation.findOne({ profileId }).sort({ createdAt: -1 });
             const idStatus = idValidation?.status || 'PENDING';
@@ -330,7 +405,13 @@ export const verifySelfie = async (req, res) => {
             if (!persisted.profile) {
                 logger.warn({ profileId }, 'Profile not found during selfie verification');
             } else {
+                selfiePersistedProfile = persisted.profile;
                 logger.info({ profileId, status: overallStatus }, 'Selfie verification completed and profile updated');
+                emitVerificationTerminalWebhook({
+                    tenantUserId: authUserId,
+                    profile: persisted.profile,
+                    correlationId: req.correlationId
+                });
             }
         } else if (
             result.success &&
@@ -344,27 +425,45 @@ export const verifySelfie = async (req, res) => {
 
         const confidenceScores = buildSelfieConfidenceRows(result.data || {}, resolved);
 
-        res.json({
-            status: overallStatus,
-            selfieStatus: result.status,
-            data: result.data,
-            confidenceScores,
-            errors: result.errors,
-            rejectionReasons,
-            images: { idPhoto: idPhotoUrl, selfies: selfieUrls },
-            profileId,
-            verificationRules
+        const policyExtrasSelfie =
+            authUserId && kycConfigDoc
+                ? {
+                      ...getPolicyPackForCountry(countryHint),
+                      tenantConfigVersion: kycConfigDoc.version,
+                      policyCountryCode: countryHint
+                  }
+                : { ...getPolicyPackForCountry(countryHint), policyCountryCode: countryHint };
+        const selfieSemantics = outcomeSemanticsForTerminalResponse({
+            terminalStatusUpper: overallStatus,
+            profile: selfiePersistedProfile,
+            rawVerificationErrors: rejectionReasons
         });
+
+        res.json(
+            withPublicApiMeta(
+                {
+                    status: overallStatus,
+                    selfieStatus: result.status,
+                    data: result.data,
+                    confidenceScores,
+                    errors: result.errors,
+                    rejectionReasons,
+                    images: { idPhoto: idPhotoUrl, selfies: selfieUrls },
+                    profileId,
+                    verificationRules,
+                    ...(selfieSemantics !== undefined ? { outcomeSemantics: selfieSemantics } : {})
+                },
+                policyExtrasSelfie
+            )
+        );
     } catch (error) {
         logger.error({ error: error.message, stack: error.stack }, 'Unexpected error in verifySelfie');
         res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
     }
 };
 
-export const getUserStatus = async (req, res) => {
+async function respondWithKycStatus(req, res, profileId) {
     try {
-        const { profileId } = req.params;
-
         const profile = await Profile.findById(profileId);
         if (!profile) {
             return res.status(404).json({
@@ -379,7 +478,23 @@ export const getUserStatus = async (req, res) => {
         ]);
 
         const authUserId = req.authContext?.userId || req.auth?.userId;
-        if (profile.userId && authUserId && profile.userId !== authUserId) {
+        const authMode = req.authContext?.mode;
+        const capPid = req.authContext?.captureProfileId;
+
+        if (authMode === 'captureSession') {
+            if (!capPid || String(capPid) !== String(profile._id)) {
+                return res.status(403).json({
+                    status: STATUS.FAILED,
+                    errors: [ERRORS.PROFILE_ACCESS_DENIED]
+                });
+            }
+            if (!profile.userId || profile.userId !== authUserId) {
+                return res.status(403).json({
+                    status: STATUS.FAILED,
+                    errors: [ERRORS.PROFILE_ACCESS_DENIED]
+                });
+            }
+        } else if (profile.userId && authUserId && profile.userId !== authUserId) {
             return res.status(403).json({
                 status: STATUS.FAILED,
                 errors: [ERRORS.PROFILE_ACCESS_DENIED]
@@ -404,6 +519,15 @@ export const getUserStatus = async (req, res) => {
         const isFullyVerified =
             (!verificationRules.requireIdCard || idApproved) &&
             (!verificationRules.requireSelfie || selfieApproved);
+
+        const lifecycle = deriveSessionLifecycle({
+            verificationRules,
+            profileStatus: profile.status,
+            idCompleted,
+            idApproved,
+            selfieCompleted,
+            selfieApproved
+        });
 
         const idVitality = idValidation?.documentVitalityScore;
         const idData =
@@ -441,88 +565,124 @@ export const getUserStatus = async (req, res) => {
 
         const mrzData = idValidation ? { mrz: idValidation.mrz, mrzInfo: idValidation.mrzInfo } : null;
 
-        const mapStructuredReasons = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).map((r) => formatStructuredError(r)) : []);
+        const mapStructuredReasons = (arr) =>
+            Array.isArray(arr) ? arr.filter(Boolean).map((r) => formatStructuredError(r)) : [];
 
-        res.json({
-            id: profile._id,
-            status: profile.status,
-            country: profile.country,
-            rejectionReasons: mapStructuredReasons(profile.rejectionReasons),
-            createdAt: profile.createdAt,
-            verificationRules,
-            progress: {
-                idVerification: {
-                    required: verificationRules.requireIdCard,
-                    completed: idCompleted,
-                    approved: idApproved
-                },
-                selfieVerification: {
-                    required: verificationRules.requireSelfie,
-                    completed: selfieCompleted,
-                    approved: selfieApproved
-                },
-                isFullyVerified
-            },
-            idVerification: idValidation
+        const correlationId = req.correlationId;
+
+        const cc = profile.country || 'TR';
+        const statusPolicyExtras =
+            authUserId && kycConfigDoc
                 ? {
-                      status: idValidation.status,
-                      data: idData ? { ...idData, ...mrzData } : null,
-                      confidence: {
-                          fullName: idValidation.fullNameConfidence,
-                          firstName: idValidation.firstNameConfidence,
-                          lastName: idValidation.lastNameConfidence,
-                          identityNumber: idValidation.identityNumberConfidence,
-                          dateOfBirth: idValidation.dateOfBirthConfidence,
-                          expiryDate: idValidation.expiryDateConfidence,
-                          mrz: idValidation.mrzConfidence,
-                          mrzConfidence: idValidation.mrzConfidence,
-                          imageQuality: idValidation.imageQuality,
-                          documentVitalityScore: idValidation.documentVitalityScore ?? null
-                      },
-                      confidenceScores: buildIdConfidenceRowsFromStoredRecord(
-                          typeof idValidation.toObject === 'function' ? idValidation.toObject() : idValidation,
-                          resolved
-                      ),
-                      rejectionReasons: mapStructuredReasons(idValidation.rejectionReasons),
-                      errors: mapStructuredReasons(idValidation.errors)
+                      ...getPolicyPackForCountry(cc),
+                      tenantConfigVersion: kycConfigDoc.version,
+                      policyCountryCode: cc
                   }
-                : null,
-            selfieVerification: selfieValidation
-                ? {
-                      status: selfieValidation.status,
-                      data: {
-                          isMatch: selfieValidation.isMatch,
-                          matchConfidence: selfieValidation.matchConfidence,
-                          spoofingRisk: selfieValidation.spoofingRisk,
-                          livenessConfidence: selfieValidation.livenessConfidence ?? null,
-                          livenessIndicators: selfieValidation.livenessIndicators || [],
-                          faceCount: selfieValidation.faceCount ?? null,
-                          faceDetectionConfidence: selfieValidation.faceDetectionConfidence ?? null,
-                          imageQuality: selfieValidation.imageQuality ?? null,
-                          lightingCondition: selfieValidation.lightingCondition ?? null,
-                          faceSize: selfieValidation.faceSize ?? null,
-                          faceCoverage: selfieValidation.faceCoverage ?? null,
-                          imageQualityIssues: selfieValidation.imageQualityIssues || []
-                      },
-                      confidenceScores: buildSelfieConfidenceRows(
-                          typeof selfieValidation.toObject === 'function'
-                              ? selfieValidation.toObject()
-                              : selfieValidation,
-                          resolved
-                      ),
-                      rejectionReasons: mapStructuredReasons(selfieValidation.rejectionReasons),
-                      errors: mapStructuredReasons(selfieValidation.errors)
-                  }
-                : null,
-            images: {
-                idFront: profile.idFrontImageUrl || idValidation?.frontImageUrl,
-                idBack: profile.idBackImageUrl || idValidation?.backImageUrl,
-                selfie: profile.selfieImageUrl || selfieValidation?.selfieUrls?.[0]
-            },
-            thresholds
-        });
+                : { ...getPolicyPackForCountry(cc), policyCountryCode: cc };
+        const statusOutcomeSemantics = lifecycle.terminal
+            ? outcomeSemanticsForTerminalResponse({
+                  terminalStatusUpper: profile.status,
+                  profile,
+                  rawVerificationErrors: mapStructuredReasons(profile.rejectionReasons)
+              })
+            : undefined;
+
+        res.json(
+            withPublicApiMeta(
+                {
+                id: profile._id,
+                status: profile.status,
+                country: profile.country,
+                rejectionReasons: mapStructuredReasons(profile.rejectionReasons),
+                createdAt: profile.createdAt,
+                verificationRules,
+                ...(statusOutcomeSemantics !== undefined ? { outcomeSemantics: statusOutcomeSemantics } : {}),
+                progress: {
+                    idVerification: {
+                        required: verificationRules.requireIdCard,
+                        completed: idCompleted,
+                        approved: idApproved
+                    },
+                    selfieVerification: {
+                        required: verificationRules.requireSelfie,
+                        completed: selfieCompleted,
+                        approved: selfieApproved
+                    },
+                    isFullyVerified
+                },
+                session: {
+                    id: String(profile._id),
+                    lifecycle,
+                    correlationId: correlationId ?? null
+                },
+                idVerification: idValidation
+                    ? {
+                          status: idValidation.status,
+                          data: idData ? { ...idData, ...mrzData } : null,
+                          confidence: {
+                              fullName: idValidation.fullNameConfidence,
+                              firstName: idValidation.firstNameConfidence,
+                              lastName: idValidation.lastNameConfidence,
+                              identityNumber: idValidation.identityNumberConfidence,
+                              dateOfBirth: idValidation.dateOfBirthConfidence,
+                              expiryDate: idValidation.expiryDateConfidence,
+                              mrz: idValidation.mrzConfidence,
+                              mrzConfidence: idValidation.mrzConfidence,
+                              imageQuality: idValidation.imageQuality,
+                              documentVitalityScore: idValidation.documentVitalityScore ?? null
+                          },
+                          confidenceScores: buildIdConfidenceRowsFromStoredRecord(
+                              typeof idValidation.toObject === 'function' ? idValidation.toObject() : idValidation,
+                              resolved
+                          ),
+                          rejectionReasons: mapStructuredReasons(idValidation.rejectionReasons),
+                          errors: mapStructuredReasons(idValidation.errors)
+                      }
+                    : null,
+                selfieVerification: selfieValidation
+                    ? {
+                          status: selfieValidation.status,
+                          data: {
+                              isMatch: selfieValidation.isMatch,
+                              matchConfidence: selfieValidation.matchConfidence,
+                              spoofingRisk: selfieValidation.spoofingRisk,
+                              livenessConfidence: selfieValidation.livenessConfidence ?? null,
+                              livenessIndicators: selfieValidation.livenessIndicators || [],
+                              faceCount: selfieValidation.faceCount ?? null,
+                              faceDetectionConfidence: selfieValidation.faceDetectionConfidence ?? null,
+                              imageQuality: selfieValidation.imageQuality ?? null,
+                              lightingCondition: selfieValidation.lightingCondition ?? null,
+                              faceSize: selfieValidation.faceSize ?? null,
+                              faceCoverage: selfieValidation.faceCoverage ?? null,
+                              imageQualityIssues: selfieValidation.imageQualityIssues || []
+                          },
+                          confidenceScores: buildSelfieConfidenceRows(
+                              typeof selfieValidation.toObject === 'function'
+                                  ? selfieValidation.toObject()
+                                  : selfieValidation,
+                              resolved
+                          ),
+                          rejectionReasons: mapStructuredReasons(selfieValidation.rejectionReasons),
+                          errors: mapStructuredReasons(selfieValidation.errors)
+                      }
+                    : null,
+                images: {
+                    idFront: profile.idFrontImageUrl || idValidation?.frontImageUrl,
+                    idBack: profile.idBackImageUrl || idValidation?.backImageUrl,
+                    selfie: profile.selfieImageUrl || selfieValidation?.selfieUrls?.[0]
+                },
+                thresholds
+                },
+                statusPolicyExtras
+            )
+        );
     } catch (error) {
-        logger.error({ error, profileId: req.params.profileId }, 'Status check error');
+        logger.error({ error, profileId }, 'Status check error');
         res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
     }
-};
+}
+
+export const getUserStatus = async (req, res) => respondWithKycStatus(req, res, req.params.profileId);
+
+export const getVerificationSession = async (req, res) =>
+    respondWithKycStatus(req, res, req.params.id);

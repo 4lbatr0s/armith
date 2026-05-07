@@ -34,6 +34,11 @@ const apiKeySchema = new mongoose.Schema(
     expiresAt: {
       type: Date,
       default: null
+    },
+    /** When non-empty, `X-API-Key` auth is rejected unless client IP matches (IPv4 + CIDR, or exact IPv6). */
+    allowedCidrs: {
+      type: [String],
+      default: []
     }
   },
   {

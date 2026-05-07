@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { ApiKey } from '../models/index.js';
+import { normalizeAllowedCidrs } from '../lib/ipAllowlist.js';
 
 const API_KEY_PREFIX = 'ak_live_';
 const TOKEN_BYTES = 24;
@@ -35,6 +36,22 @@ export const createApiKey = async ({ userId, name }) => {
 
 export const listApiKeysByUserId = async (userId) =>
   ApiKey.find({ userId }).sort({ createdAt: -1 });
+
+export const updateApiKeyAllowlist = async ({ userId, apiKeyId, allowedCidrs }) => {
+  const norm = normalizeAllowedCidrs(allowedCidrs);
+  if (!norm.ok) {
+    const err = new Error(norm.error || 'Invalid allowlist');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const apiKey = await ApiKey.findOne({ _id: apiKeyId, userId, revokedAt: null });
+  if (!apiKey) return null;
+
+  apiKey.set('allowedCidrs', norm.cidrs);
+  await apiKey.save();
+  return apiKey;
+};
 
 export const revokeApiKeyById = async ({ userId, apiKeyId }) => {
   const apiKey = await ApiKey.findOne({ _id: apiKeyId, userId });

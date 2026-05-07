@@ -111,6 +111,47 @@ export const apiService = {
 
   getStats: () => request('/admin/stats'),
 
+  getWebhookDeliveries: (page = 1, limit = 20, opts = {}) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (opts.failedOnly) params.set('failedOnly', '1');
+    return request(`/admin/webhook-deliveries?${params}`);
+  },
+
+  deleteVerification: (profileId) =>
+    request(`/admin/verifications/${profileId}`, { method: 'DELETE' }),
+
+  replayTerminalWebhook: (profileId) =>
+    request(`/admin/webhooks/replay/${profileId}`, { method: 'POST' }),
+
+  listManualReviews: (page = 1, limit = 10) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    return request(`/admin/manual-reviews?${params}`);
+  },
+
+  enqueueManualReview: (profileId, body = {}) =>
+    request(`/admin/manual-reviews/${profileId}/enqueue`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+
+  mintCaptureSession: (profileId, ttlSeconds) =>
+    request(`/admin/verifications/${profileId}/capture-session`, {
+      method: 'POST',
+      body: JSON.stringify(
+        ttlSeconds != null && Number.isFinite(Number(ttlSeconds))
+          ? { ttlSeconds: Number(ttlSeconds) }
+          : {}
+      )
+    }),
+
+  getKeyedErrorSummary: () => request('/admin/errors/summary'),
+
+  resolveManualReview: (profileId, body) =>
+    request(`/admin/manual-reviews/${profileId}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+
   getApiKeys: () => request('/admin/api-keys'),
 
   createApiKey: (name) => request('/admin/api-keys', {
@@ -121,6 +162,12 @@ export const apiService = {
   revokeApiKey: (id) => request(`/admin/api-keys/${id}`, {
     method: 'DELETE'
   }),
+
+  updateApiKeyAllowlist: (id, allowedCidrs) =>
+    request(`/admin/api-keys/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ allowedCidrs })
+    }),
 
   // Settings
   getSettings: () => request('/admin/settings'),

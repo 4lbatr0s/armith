@@ -4,6 +4,7 @@
  */
 
 import { KycConfiguration } from '../models/index.js';
+import { normalizeOutboundWebhookSubscriptions } from '../lib/integrationWebhookEvents.js';
 import { createDefaultConfig, createFromPreset, PRESETS } from '../kyc/defaults.js';
 
 /**
@@ -129,5 +130,19 @@ function applyUpdates(config, updates) {
     }
     if (updates.customThresholds) {
         Object.assign(config.customThresholds, updates.customThresholds);
+    }
+    if (updates.integrationWebhookUrl !== undefined) {
+        config.integrationWebhookUrl = updates.integrationWebhookUrl || null;
+    }
+    if (updates.integrationWebhookSecret !== undefined) {
+        config.integrationWebhookSecret =
+            updates.integrationWebhookSecret === '' || updates.integrationWebhookSecret == null
+                ? null
+                : updates.integrationWebhookSecret;
+    }
+    if (Array.isArray(updates.integrationWebhookEvents)) {
+        config.integrationWebhookEvents = normalizeOutboundWebhookSubscriptions(
+            updates.integrationWebhookEvents
+        );
     }
 }

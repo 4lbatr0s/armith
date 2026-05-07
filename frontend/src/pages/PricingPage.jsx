@@ -11,6 +11,11 @@ const Check = () => (
 
 export const PricingPage = () => {
   const { t } = useTranslation();
+  const enterpriseMail = (() => {
+    const sales = process.env.REACT_APP_SALES_EMAIL || process.env.REACT_APP_SUPPORT_EMAIL;
+    if (!sales) return null;
+    return `mailto:${sales}?subject=${encodeURIComponent(t('pricing.enterprise_mail_subject'))}`;
+  })();
 
   return (
     <div className="flex-1 w-full py-14 px-4 sm:px-6 lg:px-8">
@@ -92,11 +97,19 @@ export const PricingPage = () => {
             price={t('pricing.custom')}
             suffix=""
             cta={
-              <Link to="/contact" className="block">
-                <Button variant="outline" className="w-full border-2 border-pm-ink dark:border-white/25">
-                  {t('pricing.contact_sales')}
-                </Button>
-              </Link>
+              enterpriseMail ? (
+                <a href={enterpriseMail} className="block">
+                  <Button variant="outline" className="w-full border-2 border-pm-ink dark:border-white/25">
+                    {t('pricing.contact_sales')}
+                  </Button>
+                </a>
+              ) : (
+                <Link to="/auth" className="block">
+                  <Button variant="outline" className="w-full border-2 border-pm-ink dark:border-white/25">
+                    {t('home.get_started')}
+                  </Button>
+                </Link>
+              )
             }
             footer={
               <ul className="space-y-3 text-sm">
@@ -116,6 +129,19 @@ export const PricingPage = () => {
             }
           />
         </div>
+
+        <section className="mt-20 max-w-3xl rounded-sm border-2 border-pm-ink/15 dark:border-white/15 bg-pm-wash/30 dark:bg-pm-void/40 p-6 sm:p-8">
+          <h2 className="font-display text-2xl font-bold mb-4">{t('pricing.billing_heading')}</h2>
+          <p className="text-sm text-pm-muted leading-relaxed mb-3">{t('pricing.billable_unit')}</p>
+          <p className="text-sm text-pm-muted leading-relaxed mb-3">{t('pricing.not_billed')}</p>
+          <p className="text-sm text-pm-muted leading-relaxed">
+            {t('pricing.retention_note')}{' '}
+            <Link to="/trust" className="font-bold text-pm-accent underline">
+              {t('layout.trust_security')}
+            </Link>
+            .
+          </p>
+        </section>
       </div>
     </div>
   );

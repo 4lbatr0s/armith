@@ -9,3 +9,5 @@ export { Profile } from './Profile.js';
 export { IdCardValidation } from './IdCardValidation.js';
 export { SelfieValidation } from './SelfieValidation.js';
 export { KycConfiguration } from './KycConfiguration.js';
+export { IdempotencyLedger } from './IdempotencyLedger.js';
+export { WebhookDelivery } from './WebhookDelivery.js';

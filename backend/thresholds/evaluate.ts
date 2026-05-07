@@ -1,4 +1,4 @@
-import { ValidationError } from '../src/validation/country-validator.interface.js';
+import { ValidationError } from '../validation/country-validator.interface.js';
 import { ERRORS } from '../kyc/config.js';
 import type { KycConfigParsed } from './resolve.js';
 

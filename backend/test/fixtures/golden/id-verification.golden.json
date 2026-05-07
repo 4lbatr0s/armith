@@ -1,0 +1,61 @@
+{
+  "extraction": {
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "identityNumber": "12345678901",
+    "dateOfBirth": "1990-05-15",
+    "gender": "F",
+    "serialNumber": "ABC123",
+    "expiryDate": "2030-12-31",
+    "nationality": "USA",
+    "address": "1 Main Street"
+  },
+  "mrz": {
+    "raw": null,
+    "parsed": {
+      "documentType": "P",
+      "issuingCountry": "USA",
+      "documentNumber": "X1234567",
+      "dateOfBirth": "900515",
+      "sex": "F",
+      "expiryDate": "301231",
+      "nationality": "USA",
+      "surname": "DOE",
+      "givenNames": "JANE"
+    },
+    "checksumValid": true,
+    "mrzConfidence": 0.92
+  },
+  "authenticity": {
+    "documentCondition": "good",
+    "hologramPresence": true,
+    "photoQuality": "good",
+    "fontConsistency": true,
+    "edgeIntegrity": true,
+    "colorAccuracy": true,
+    "tamperingRisk": 0.05,
+    "documentVitalityScore": 0.88
+  },
+  "quality": {
+    "imageQuality": 0.91,
+    "readabilityIssues": [],
+    "countryCode": "US"
+  },
+  "confidence": {
+    "firstNameConfidence": 0.95,
+    "lastNameConfidence": 0.94,
+    "identityNumberConfidence": 0.9,
+    "dateOfBirthConfidence": 0.93,
+    "expiryDateConfidence": 0.92,
+    "mrzConfidence": 0.9,
+    "overallConfidence": 0.92
+  },
+  "validation": {
+    "isValid": true,
+    "errors": []
+  },
+  "metadata": {
+    "processingTime": "150ms",
+    "imagesProcessed": 1
+  }
+}

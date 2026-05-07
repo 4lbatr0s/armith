@@ -6,21 +6,26 @@ import {
   verifyId,
   verifySelfie,
   getUserStatus,
-  getLLMStatus
+  getLLMStatus,
+  getVerificationSession
 } from '../controllers/kycController.js';
 import { authenticateApiKeyOrUser } from '../middleware/authMiddleware.js';
+import { optionalKycIdempotencyForPostJson } from '../middleware/kycIdempotency.js';
+import { apiKeyKycRateLimiter } from '../middleware/apiKeyRateLimit.js';
 
 const router = express.Router();
+const kycAuth = [authenticateApiKeyOrUser, apiKeyKycRateLimiter];
 
 // Public routes
 router.get('/countries', getSupportedCountries);
 router.get('/llm-status', getLLMStatus);
 
 // Protected routes
-router.post('/upload-url', authenticateApiKeyOrUser, generateUploadUrl);
-router.post('/secure-download-url', authenticateApiKeyOrUser, generateSecureDownloadUrlEndpoint);
-router.post('/id-check', authenticateApiKeyOrUser, verifyId);
-router.post('/selfie-check', authenticateApiKeyOrUser, verifySelfie);
-router.get('/status/:profileId', authenticateApiKeyOrUser, getUserStatus);
+router.post('/upload-url', ...kycAuth, generateUploadUrl);
+router.post('/secure-download-url', ...kycAuth, generateSecureDownloadUrlEndpoint);
+router.post('/id-check', ...kycAuth, optionalKycIdempotencyForPostJson, verifyId);
+router.post('/selfie-check', ...kycAuth, optionalKycIdempotencyForPostJson, verifySelfie);
+router.get('/status/:profileId', ...kycAuth, getUserStatus);
+router.get('/sessions/:id', ...kycAuth, getVerificationSession);
 
 export default router; 

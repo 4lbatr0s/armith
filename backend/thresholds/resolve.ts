@@ -1,4 +1,4 @@
-import { KycConfigSchema } from '../src/schemas/config.schema.js';
+import { KycConfigSchema } from '../schemas/config.schema.js';
 
 export type KycConfigParsed = ReturnType<(typeof KycConfigSchema)['parse']>;
 

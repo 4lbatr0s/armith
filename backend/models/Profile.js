@@ -87,6 +87,11 @@ const profileSchema = new mongoose.Schema(
         // Additional metadata
         notes: String, // Admin notes about this profile
         tags: [String], // Tags for categorization/filtering
+
+        manualReviewQueuedAt: { type: Date, default: null },
+        manualReviewDeadlineAt: { type: Date, default: null },
+        manualReviewAssigneeLabel: { type: String, maxlength: 160, trim: true, default: '' },
+        manualReviewAssignedAt: { type: Date, default: null }
     },
     {
         timestamps: true,

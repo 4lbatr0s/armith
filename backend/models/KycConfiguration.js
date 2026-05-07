@@ -94,6 +94,22 @@ const kycConfigurationSchema = new mongoose.Schema(
             default: 'TR',
             uppercase: true,
             index: true,
+        },
+
+        integrationWebhookUrl: {
+            type: String,
+            default: null,
+            trim: true
+        },
+        integrationWebhookSecret: {
+            type: String,
+            default: null,
+            select: false
+        },
+        /** When absent or non-array, all outbound event types behave as subscribed (legacy). Empty array disables automatic deliveries. */
+        integrationWebhookEvents: {
+            type: [String],
+            default: undefined
         }
     },
     {

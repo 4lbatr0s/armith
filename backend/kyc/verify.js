@@ -17,7 +17,7 @@ import {
 import { generateIdCardPrompt } from '../prompts/load-prompt.js';
 import { ID_VERIFICATION_SCHEMA, IdVerificationSchema } from './schemas.js';
 import { createDefaultConfig } from './defaults.js';
-import { VerificationService } from '../src/services/verification.service.js';
+import { VerificationService } from '../services/verificationService.js';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -136,10 +136,7 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
         // Log MRZ information (LLM returned and parsed)
         logger.info({
           msg: 'MRZ parsing completed',
-          mrz: {
-            raw: data.mrz.raw, // MRZ string returned by LLM
-            parsed: mrzInfo // Parsed MRZ data from mrz package
-          },
+          mrzRawLength: data.mrz.raw?.length ?? 0,
           verification: {
             hasMrz: !!data.mrz?.raw,
             parseSuccess: !!mrzInfo,
@@ -151,7 +148,7 @@ export async function verifyId(frontImageUrl, backImageUrl = null, config = null
         logger.warn({
           msg: 'MRZ parsing failed',
           error: error.message,
-          rawMrz: data.mrz?.raw
+          mrzRawLength: data.mrz?.raw?.length ?? 0
         });
         // Continue without mrzInfo if parsing fails
       }

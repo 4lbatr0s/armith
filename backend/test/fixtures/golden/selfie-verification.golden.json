@@ -1,0 +1,47 @@
+{
+  "faceDetection": {
+    "idPhotoFaceCount": 1,
+    "selfie1FaceCount": 1,
+    "selfie2FaceCount": null,
+    "faceDetectionConfidence": 0.94
+  },
+  "biometricMatch": {
+    "isMatch": true,
+    "matchConfidence": 91,
+    "facialFeatureScores": {
+      "facialStructure": 0.9,
+      "eyes": 0.88,
+      "nose": 0.87,
+      "mouthAndChin": 0.89,
+      "ears": 0.85
+    }
+  },
+  "liveness": {
+    "spoofingRisk": 0.06,
+    "livenessConfidence": 0.89,
+    "spoofingIndicators": [],
+    "livenessIndicators": ["natural_motion"]
+  },
+  "imageQuality": {
+    "selfie1Quality": 0.9,
+    "selfie2Quality": null,
+    "lightingCondition": "good",
+    "faceSize": "optimal",
+    "faceCoverage": "fully_visible",
+    "qualityIssues": []
+  },
+  "validation": {
+    "status": "pass",
+    "errors": []
+  },
+  "explainability": {
+    "matchingReasons": ["structure_match"],
+    "mismatchReasons": [],
+    "spoofingIndicators": [],
+    "qualityIssues": []
+  },
+  "metadata": {
+    "processingTime": "220ms",
+    "imagesAnalyzed": 2
+  }
+}

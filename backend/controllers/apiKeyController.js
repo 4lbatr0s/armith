@@ -1,4 +1,9 @@
-import { listApiKeysByUserId, createApiKey, revokeApiKeyById } from '../services/apiKeyService.js';
+import {
+  listApiKeysByUserId,
+  createApiKey,
+  revokeApiKeyById,
+  updateApiKeyAllowlist
+} from '../services/apiKeyService.js';
 
 const mapApiKey = (apiKey) => ({
   id: apiKey._id,
@@ -6,7 +11,8 @@ const mapApiKey = (apiKey) => ({
   prefix: apiKey.prefix,
   createdAt: apiKey.createdAt,
   lastUsedAt: apiKey.lastUsedAt,
-  revokedAt: apiKey.revokedAt
+  revokedAt: apiKey.revokedAt,
+  allowedCidrs: Array.isArray(apiKey.allowedCidrs) ? apiKey.allowedCidrs : []
 });
 
 export const getApiKeys = async (req, res) => {
@@ -38,6 +44,33 @@ export const createApiKeyHandler = async (req, res) => {
   } catch (error) {
     console.error('Create API key error:', error);
     res.status(500).json({ error: 'Failed to create API key' });
+  }
+};
+
+export const patchApiKeyAllowlistHandler = async (req, res) => {
+  try {
+    const userId = req.auth?.userId;
+    const { id } = req.params;
+
+    try {
+      const apiKey = await updateApiKeyAllowlist({
+        userId,
+        apiKeyId: id,
+        allowedCidrs: req.body?.allowedCidrs
+      });
+      if (!apiKey) {
+        return res.status(404).json({ error: 'API key not found' });
+      }
+      res.json({ apiKey: mapApiKey(apiKey) });
+    } catch (e) {
+      if (e?.statusCode === 400) {
+        return res.status(400).json({ error: e.message });
+      }
+      throw e;
+    }
+  } catch (error) {
+    console.error('Patch API key allowlist error:', error);
+    res.status(500).json({ error: 'Failed to update allowlist' });
   }
 };
 

@@ -4,6 +4,15 @@ import { apiService } from '../services/api';
 import { Button } from '../components/ui/button';
 import { useTranslation } from 'react-i18next';
 
+function normalizeDashboardSettings(raw) {
+  if (!raw) return null;
+  return {
+    verificationRules: raw.verificationRules || {},
+    thresholds: raw.thresholds || {},
+    metadata: raw.metadata
+  };
+}
+
 export const AdminPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -14,7 +23,7 @@ export const AdminPage = () => {
   const [page, setPage] = useState(1);
   
   // Settings state
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' or 'settings'
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [settings, setSettings] = useState(null);
   const [defaults, setDefaults] = useState(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -22,16 +31,41 @@ export const AdminPage = () => {
   const [settingsError, setSettingsError] = useState(null);
   const [settingsSuccess, setSettingsSuccess] = useState(null);
 
+  const [webhookDeliveries, setWebhookDeliveries] = useState([]);
+  const [webhookPagination, setWebhookPagination] = useState(null);
+  const [webhookPage, setWebhookPage] = useState(1);
+  const [webhooksLoading, setWebhooksLoading] = useState(false);
+  const [webhooksError, setWebhooksError] = useState(null);
+  const [webhookFailuresOverview, setWebhookFailuresOverview] = useState([]);
+  const [deleteBusyId, setDeleteBusyId] = useState(null);
+  const [rowBusyKey, setRowBusyKey] = useState('');
+  const [flashSuccess, setFlashSuccess] = useState(null);
+  const [manualRows, setManualRows] = useState([]);
+  const [mrPagination, setMrPagination] = useState(null);
+  const [mrPage, setMrPage] = useState(1);
+  const [mrLoading, setMrLoading] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState({});
+  const [errorsInsight, setErrorsInsight] = useState(null);
+  const [errorsInsightLoading, setErrorsInsightLoading] = useState(false);
+
+  const mergeServerSettings = useCallback((raw) => {
+    const n = normalizeDashboardSettings(raw);
+    if (!n) return;
+    setSettings(n);
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [statsData, verificationsData] = await Promise.all([
+      const [statsData, verificationsData, webhookFailResponse] = await Promise.all([
         apiService.getStats(),
-        apiService.getVerifications(page)
+        apiService.getVerifications(page),
+        apiService.getWebhookDeliveries(1, 5, { failedOnly: true }).catch(() => ({ deliveries: [] }))
       ]);
 
       setStats(statsData);
       setVerifications(verificationsData.users);
+      setWebhookFailuresOverview(webhookFailResponse.deliveries || []);
     } catch (err) {
       console.error('Failed to load admin data:', err);
       setError(t('common.error'));
@@ -44,25 +78,196 @@ export const AdminPage = () => {
     try {
       setSettingsLoading(true);
       const settingsData = await apiService.getSettings();
-      setSettings(settingsData.settings);
+      mergeServerSettings(settingsData.settings);
       setDefaults(settingsData.defaults);
+      setSettingsError(null);
     } catch (err) {
       console.error('Failed to load settings:', err);
       setSettingsError(t('settings.load_error'));
     } finally {
       setSettingsLoading(false);
     }
+  }, [t, mergeServerSettings]);
+
+  const fetchManualReviews = useCallback(async () => {
+    try {
+      setMrLoading(true);
+      const data = await apiService.listManualReviews(mrPage, 10);
+      setManualRows(data.users || []);
+      setMrPagination(data.pagination || null);
+    } catch (err) {
+      console.error('Manual review queue load failed:', err);
+      setError(err.message || t('common.error'));
+      setManualRows([]);
+      setMrPagination(null);
+    } finally {
+      setMrLoading(false);
+    }
+  }, [mrPage, t]);
+
+  const fetchErrorsInsight = useCallback(async () => {
+    try {
+      setErrorsInsightLoading(true);
+      const data = await apiService.getKeyedErrorSummary();
+      setErrorsInsight(data);
+    } catch (err) {
+      console.error('Error insight load failed:', err);
+      setError(err.message || t('common.error'));
+      setErrorsInsight(null);
+    } finally {
+      setErrorsInsightLoading(false);
+    }
   }, [t]);
+
+  const fetchWebhooks = useCallback(async () => {
+    try {
+      setWebhooksLoading(true);
+      setWebhooksError(null);
+      const data = await apiService.getWebhookDeliveries(webhookPage, 20);
+      setWebhookDeliveries(data.deliveries || []);
+      setWebhookPagination(data.pagination);
+    } catch (err) {
+      console.error('Failed to load webhook deliveries:', err);
+      setWebhooksError(err.message || t('common.error'));
+      setWebhookDeliveries([]);
+      setWebhookPagination(null);
+    } finally {
+      setWebhooksLoading(false);
+    }
+  }, [webhookPage, t]);
+
+  const handleDeleteVerification = async (profileId) => {
+    const ok = window.confirm(t('dashboard.delete_verification_confirm'));
+    if (!ok) return;
+    try {
+      setDeleteBusyId(profileId);
+      setError(null);
+      await apiService.deleteVerification(profileId);
+      await fetchData();
+    } catch (err) {
+      console.error('Delete verification failed:', err);
+      setError(err.message || t('common.error'));
+    } finally {
+      setDeleteBusyId(null);
+    }
+  };
+
+  const bumpFlashSuccess = useCallback((message) => {
+    setFlashSuccess(message);
+    setTimeout(() => setFlashSuccess(null), 3500);
+  }, []);
+
+  const handleReplayWebhook = async (profileId) => {
+    setFlashSuccess(null);
+    setRowBusyKey(`${profileId}:replay`);
+    try {
+      setError(null);
+      await apiService.replayTerminalWebhook(profileId);
+      bumpFlashSuccess(t('dashboard.webhook_replay_queued'));
+    } catch (err) {
+      console.error('Replay webhook failed:', err);
+      setError(err.message || t('common.error'));
+    } finally {
+      setRowBusyKey('');
+    }
+  };
+
+  const handleEscalateManualReview = async (profileId) => {
+    const ok = window.confirm(t('dashboard.escalate_manual_review_confirm'));
+    if (!ok) return;
+    const assigneeRaw = window.prompt(t('dashboard.manual_review_assignee_prompt'), '');
+    if (assigneeRaw === null) return;
+    setFlashSuccess(null);
+    setRowBusyKey(`${profileId}:escalate`);
+    try {
+      setError(null);
+      const assigneeLabel = typeof assigneeRaw === 'string' ? assigneeRaw.trim() : '';
+      await apiService.enqueueManualReview(
+        profileId,
+        assigneeLabel ? { assigneeLabel } : {}
+      );
+      bumpFlashSuccess(t('dashboard.manual_review_queued_ok'));
+      await fetchData();
+      await fetchManualReviews();
+    } catch (err) {
+      console.error('Enqueue manual review failed:', err);
+      setError(err.message || t('common.error'));
+    } finally {
+      setRowBusyKey('');
+    }
+  };
+
+  const handleResolveManualReview = async (profileId, decision) => {
+    setRowBusyKey(`${profileId}:${decision}`);
+    setFlashSuccess(null);
+    try {
+      setError(null);
+      const note = decision === 'REJECTED' ? rejectNotes[profileId] : undefined;
+      await apiService.resolveManualReview(profileId, { decision, note });
+      bumpFlashSuccess(t('dashboard.manual_review_resolve_ok'));
+      setRejectNotes((prev) => {
+        const next = { ...prev };
+        delete next[profileId];
+        return next;
+      });
+      await fetchManualReviews();
+      await fetchData();
+    } catch (err) {
+      console.error('Resolve manual review failed:', err);
+      setError(err.message || t('common.error'));
+    } finally {
+      setRowBusyKey('');
+    }
+  };
+
+  const handleMintCaptureSession = async (profileId) => {
+    setRowBusyKey(`${profileId}:session`);
+    setFlashSuccess(null);
+    try {
+      setError(null);
+      const data = await apiService.mintCaptureSession(profileId);
+      const line = `${data.headerName}: ${data.token}`;
+      try {
+        await navigator.clipboard.writeText(line);
+        bumpFlashSuccess(t('dashboard.capture_session_copied'));
+      } catch {
+        window.prompt(t('dashboard.capture_session_copy_fallback'), line);
+      }
+    } catch (err) {
+      console.error('Mint capture session failed:', err);
+      setError(err.message || t('dashboard.capture_session_failed'));
+    } finally {
+      setRowBusyKey('');
+    }
+  };
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   useEffect(() => {
-    if (activeTab === 'settings' && !settings) {
+    if (activeTab === 'settings') {
       fetchSettings();
     }
-  }, [activeTab, fetchSettings, settings]);
+  }, [activeTab, fetchSettings]);
+
+  useEffect(() => {
+    if (activeTab === 'webhooks') {
+      fetchWebhooks();
+    }
+  }, [activeTab, fetchWebhooks]);
+
+  useEffect(() => {
+    if (activeTab === 'manual_review') {
+      fetchManualReviews();
+    }
+  }, [activeTab, fetchManualReviews]);
+
+  useEffect(() => {
+    if (activeTab === 'errors_insight') {
+      fetchErrorsInsight();
+    }
+  }, [activeTab, fetchErrorsInsight]);
 
   const handleSaveSettings = async () => {
     if (!settings) return;
@@ -72,11 +277,13 @@ export const AdminPage = () => {
       setSettingsError(null);
       setSettingsSuccess(null);
       
-      await apiService.updateSettings({
+      const data = await apiService.updateSettings({
         verificationRules: settings.verificationRules || {},
         thresholds: settings.thresholds || {}
       });
-      
+      if (data?.settings) {
+        mergeServerSettings(data.settings);
+      }
       setSettingsSuccess(t('settings.save_success'));
       setTimeout(() => setSettingsSuccess(null), 3000);
     } catch (err) {
@@ -96,7 +303,9 @@ export const AdminPage = () => {
       setSettingsSuccess(null);
       
       const data = await apiService.resetSettings();
-      setSettings(data.settings);
+      if (data?.settings) {
+        mergeServerSettings(data.settings);
+      }
       setSettingsSuccess(t('settings.reset_success'));
       setTimeout(() => setSettingsSuccess(null), 3000);
     } catch (err) {
@@ -156,7 +365,7 @@ export const AdminPage = () => {
             </h1>
           </div>
 
-          <div className="flex border-2 border-pm-ink dark:border-white/20 rounded-sm overflow-hidden shadow-brutal">
+          <div className="flex flex-wrap border-2 border-pm-ink dark:border-white/20 rounded-sm overflow-hidden shadow-brutal">
             <button
               type="button"
               onClick={() => setActiveTab('dashboard')}
@@ -167,6 +376,39 @@ export const AdminPage = () => {
               }`}
             >
               {t('dashboard.overview')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('webhooks')}
+              className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest border-l-2 border-pm-ink dark:border-white/20 transition-colors ${
+                activeTab === 'webhooks'
+                  ? 'bg-pm-accent text-white'
+                  : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
+              }`}
+            >
+              {t('dashboard.webhooks_tab')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('manual_review')}
+              className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest border-l-2 border-pm-ink dark:border-white/20 transition-colors ${
+                activeTab === 'manual_review'
+                  ? 'bg-pm-accent text-white'
+                  : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
+              }`}
+            >
+              {t('dashboard.manual_review_tab')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('errors_insight')}
+              className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest border-l-2 border-pm-ink dark:border-white/20 transition-colors ${
+                activeTab === 'errors_insight'
+                  ? 'bg-pm-accent text-white'
+                  : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
+              }`}
+            >
+              {t('dashboard.errors_insight_tab')}
             </button>
             <button
               type="button"
@@ -181,6 +423,18 @@ export const AdminPage = () => {
             </button>
           </div>
         </div>
+
+        {flashSuccess && (
+          <div className="mb-6 rounded-sm border-2 border-pm-accent-alt/50 bg-pm-accent-alt/10 px-4 py-3 text-sm text-pm-ink dark:text-pm-ink-soft">
+            {flashSuccess}
+          </div>
+        )}
+
+        {error && activeTab !== 'settings' && (
+          <div className="mb-6 rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-4 py-3 text-sm text-pm-ink dark:text-pm-ink-soft">
+            {error}
+          </div>
+        )}
 
         {activeTab === 'dashboard' && (
           <>
@@ -215,6 +469,7 @@ export const AdminPage = () => {
                     {t('dashboard.refresh')}
                   </Button>
                   <Button
+                    type="button"
                     onClick={() => navigate('/profile?tab=security')}
                     variant="outline"
                     className="border-2 border-white/50 bg-white/10 text-white hover:bg-white/20 dark:border-white/25 dark:text-pm-ink-soft dark:hover:bg-white/10"
@@ -226,7 +481,7 @@ export const AdminPage = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-8">
               <StatCard
                 icon={<DocumentIcon />}
                 label={t('dashboard.total_verifications')}
@@ -246,18 +501,64 @@ export const AdminPage = () => {
                 color="yellow"
               />
               <StatCard
+                icon={<ClipboardListIcon />}
+                label={t('dashboard.under_review_stat')}
+                value={stats?.underReviewCount ?? 0}
+                color="yellow"
+              />
+              <StatCard
                 icon={<XCircleIcon />}
                 label={t('dashboard.rejected')}
                 value={stats?.rejectedCount || 0}
                 color="red"
               />
+              <StatCard
+                icon={<KeyIcon />}
+                label={t('dashboard.active_api_keys')}
+                value={stats?.activeApiKeysCount ?? 0}
+                color="gray"
+              />
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-4 py-3 text-sm text-pm-ink dark:text-pm-ink-soft">
-            {error}
+        <div className="pm-panel overflow-hidden mb-8">
+          <div className="px-4 py-5 sm:px-6 border-b-2 border-pm-ink/10 dark:border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">{t('dashboard.recent_webhook_failures')}</h3>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-pm-muted max-w-xl">{t('dashboard.recent_webhook_failures_desc')}</p>
+            </div>
+            <Button type="button" variant="outline" className="border-2 border-pm-ink/20 shrink-0" onClick={() => setActiveTab('webhooks')}>
+              {t('dashboard.view_all_webhooks')}
+            </Button>
           </div>
-        )}
+          <div className="overflow-x-auto">
+            {webhookFailuresOverview.length === 0 ? (
+              <p className="px-6 py-8 text-center text-sm text-pm-muted uppercase tracking-widest">{t('dashboard.no_webhook_failures')}</p>
+            ) : (
+              <table className="min-w-full divide-y divide-pm-ink/10 dark:divide-white/10">
+                <thead className="bg-pm-wash/50 dark:bg-pm-void/80">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_event')}</th>
+                    <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_http')}</th>
+                    <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_profile')}</th>
+                    <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_created')}</th>
+                    <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_error')}</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-pm-surface dark:bg-pm-surface-dark divide-y divide-pm-ink/10 dark:divide-white/10">
+                  {webhookFailuresOverview.map((row) => (
+                    <tr key={String(row.id)} className="text-sm">
+                      <td className="px-4 py-3 font-mono text-xs">{row.event}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{row.httpStatus ?? '—'}</td>
+                      <td className="px-4 py-3 font-mono text-xs max-w-[8rem] truncate">{row.profileId ? String(row.profileId) : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-pm-muted">{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-pm-muted max-w-md truncate">{row.errorMessage || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
 
         <div className="pm-panel overflow-hidden sm:rounded-sm transition-colors duration-200">
           <div className="px-4 py-5 sm:px-6 border-b-2 border-pm-ink/10 dark:border-white/10">
@@ -275,11 +576,18 @@ export const AdminPage = () => {
                       <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.overall_status')}</th>
                       <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.date')}</th>
                       <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('common.view')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.actions')}</th>
+                      <th scope="col" className="px-6 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.delete_data')}</th>
                 </tr>
               </thead>
               <tbody className="bg-pm-surface dark:bg-pm-surface-dark divide-y divide-pm-ink/10 dark:divide-white/10">
                 {verifications.length > 0 ? (
-                  verifications.map((verification) => (
+                  verifications.map((verification) => {
+                    const rowId = String(verification.id);
+                    const ost = String(verification.status ?? '').toUpperCase();
+                    const canReplayTerminal = ['APPROVED', 'REJECTED', 'FAILED'].includes(ost);
+                    const canEscalatePending = ost === 'PENDING';
+                    return (
                     <tr key={verification.id} className="hover:bg-pm-wash/40 dark:hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-pm-ink dark:text-pm-ink-soft">
                         {verification.fullName || '-'}
@@ -316,11 +624,65 @@ export const AdminPage = () => {
                           {t('common.view')}
                         </Button>
                       </td>
+                      <td className="px-6 py-4 text-sm align-top">
+                        <div className="flex flex-col gap-2 max-w-[10rem]">
+                          {canReplayTerminal && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="text-[10px] uppercase border-pm-ink/20 py-1 h-auto"
+                              disabled={rowBusyKey === `${rowId}:replay`}
+                              onClick={() => handleReplayWebhook(rowId)}
+                            >
+                              {rowBusyKey === `${rowId}:replay` ? t('common.loading') : t('dashboard.replay_webhook')}
+                            </Button>
+                          )}
+                          {canEscalatePending && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="text-[10px] uppercase border-pm-ink/20 py-1 h-auto"
+                              disabled={rowBusyKey === `${rowId}:escalate`}
+                              onClick={() => handleEscalateManualReview(rowId)}
+                            >
+                              {rowBusyKey === `${rowId}:escalate`
+                                ? t('common.loading')
+                                : t('dashboard.escalate_manual_review')}
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-[10px] uppercase border-pm-ink/20 py-1 h-auto"
+                            disabled={rowBusyKey === `${rowId}:session`}
+                            onClick={() => handleMintCaptureSession(rowId)}
+                          >
+                            {rowBusyKey === `${rowId}:session`
+                              ? t('common.loading')
+                              : t('dashboard.capture_session_btn')}
+                          </Button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs uppercase border-pm-accent/40"
+                          disabled={deleteBusyId === String(verification.id)}
+                          onClick={() => handleDeleteVerification(String(verification.id))}
+                        >
+                          {deleteBusyId === String(verification.id) ? t('common.loading') : t('dashboard.delete_data')}
+                        </Button>
+                      </td>
                     </tr>
-                  ))
+                  );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="7" className="px-6 py-10 text-center text-pm-muted text-sm uppercase tracking-widest">
+                    <td colSpan="9" className="px-6 py-10 text-center text-pm-muted text-sm uppercase tracking-widest">
                           {t('dashboard.no_verifications')}
                     </td>
                   </tr>
@@ -361,6 +723,343 @@ export const AdminPage = () => {
           </>
         )}
 
+        {activeTab === 'manual_review' && (
+          <div className="space-y-6">
+            <div className="pm-panel overflow-hidden px-4 py-5 sm:px-6 border-b-2 border-pm-ink/10 dark:border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">
+                    {t('dashboard.manual_review_title')}
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-pm-muted max-w-2xl">
+                    {t('dashboard.manual_review_desc')}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fetchManualReviews()}
+                  disabled={mrLoading}
+                  className="border-2 border-pm-ink/20 dark:border-white/25"
+                >
+                  {mrLoading ? t('common.loading') : t('dashboard.refresh')}
+                </Button>
+              </div>
+            </div>
+
+            <div className="pm-panel overflow-hidden transition-colors duration-200">
+              {mrLoading && manualRows.length === 0 ? (
+                <div className="flex justify-center py-16">
+                  <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin" />
+                </div>
+              ) : manualRows.length === 0 ? (
+                <p className="px-6 py-10 text-center text-pm-muted text-sm uppercase tracking-widest">
+                  {t('dashboard.manual_review_empty')}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-pm-ink/10 dark:divide-white/10">
+                    <thead className="bg-pm-wash/50 dark:bg-pm-void/80">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('dashboard.name')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('dashboard.overall_status')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('dashboard.manual_review_col_assignee')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('dashboard.manual_review_col_queued_at')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('dashboard.manual_review_col_deadline')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('dashboard.date')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('common.view')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]"
+                        >
+                          {t('dashboard.actions')}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-pm-surface dark:bg-pm-surface-dark divide-y divide-pm-ink/10 dark:divide-white/10">
+                      {manualRows.map((row) => {
+                        const mid = String(row.id);
+                        const isoCell = (v) => (v ? new Date(v).toLocaleString() : '—');
+                        return (
+                          <tr key={mid} className="text-sm">
+                            <td className="px-4 py-3 font-semibold text-pm-ink dark:text-pm-ink-soft">
+                              {row.fullName || '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusBadge status={row.status} />
+                            </td>
+                            <td className="px-4 py-3 text-pm-muted text-xs max-w-[8rem] break-words">
+                              {row.manualReviewAssigneeLabel || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-pm-muted text-xs whitespace-nowrap">
+                              {isoCell(row.manualReviewQueuedAt)}
+                            </td>
+                            <td className="px-4 py-3 text-pm-muted text-xs whitespace-nowrap">
+                              {isoCell(row.manualReviewDeadlineAt)}
+                            </td>
+                            <td className="px-4 py-3 text-pm-muted">
+                              {isoCell(row.createdAt)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                variant="link"
+                                className="text-pm-accent p-0 h-auto font-bold uppercase tracking-wide"
+                                onClick={() => navigate(`/result/${mid}`)}
+                              >
+                                {t('common.view')}
+                              </Button>
+                            </td>
+                            <td className="px-4 py-3 align-top space-y-2 max-w-xs">
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="text-[10px] uppercase bg-pm-accent-alt/20 border-2 border-pm-accent-alt/40"
+                                  disabled={rowBusyKey === `${mid}:APPROVED`}
+                                  onClick={() => handleResolveManualReview(mid, 'APPROVED')}
+                                >
+                                  {rowBusyKey === `${mid}:APPROVED` ? t('common.loading') : t('dashboard.approve')}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-[10px] uppercase border-pm-accent/40"
+                                  disabled={rowBusyKey === `${mid}:REJECTED`}
+                                  onClick={() => handleResolveManualReview(mid, 'REJECTED')}
+                                >
+                                  {rowBusyKey === `${mid}:REJECTED` ? t('common.loading') : t('dashboard.reject')}
+                                </Button>
+                              </div>
+                              <textarea
+                                value={rejectNotes[mid] ?? ''}
+                                onChange={(e) =>
+                                  setRejectNotes((prev) => ({ ...prev, [mid]: e.target.value }))
+                                }
+                                placeholder={t('dashboard.reject_note_placeholder')}
+                                rows={2}
+                                className="w-full border-2 border-pm-ink/15 rounded-sm px-2 py-1 text-xs bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {mrPagination && manualRows.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+                <p className="text-sm text-pm-muted uppercase tracking-wide">
+                  {t('dashboard.showing_page')} <span className="font-mono">{mrPagination.currentPage ?? mrPage}</span>
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={mrPage <= 1}
+                    onClick={() => setMrPage((p) => Math.max(1, p - 1))}
+                  >
+                    {t('dashboard.previous')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={mrPagination?.hasNext === false}
+                    onClick={() => setMrPage((p) => p + 1)}
+                  >
+                    {t('dashboard.next')}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {activeTab === 'errors_insight' && (
+          <div className="space-y-6">
+            <div className="pm-panel overflow-hidden px-4 py-5 sm:px-6 border-b-2 border-pm-ink/10 dark:border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">
+                    {t('dashboard.errors_insight_title')}
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-pm-muted max-w-2xl">
+                    {t('dashboard.errors_insight_desc')}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fetchErrorsInsight()}
+                  disabled={errorsInsightLoading}
+                  className="border-2 border-pm-ink/20 dark:border-white/25"
+                >
+                  {errorsInsightLoading ? t('common.loading') : t('dashboard.errors_insight_refresh')}
+                </Button>
+              </div>
+            </div>
+
+            <div className="pm-panel overflow-hidden px-4 py-6 sm:px-6 transition-colors duration-200">
+              {errorsInsightLoading && !errorsInsight ? (
+                <div className="flex justify-center py-16">
+                  <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin" />
+                </div>
+              ) : !errorsInsight?.top?.length ? (
+                <p className="text-center text-pm-muted text-sm uppercase tracking-widest px-4">
+                  {t('dashboard.errors_insight_empty')}
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-pm-muted">
+                    <span className="font-mono font-semibold text-pm-ink dark:text-pm-ink-soft">
+                      {errorsInsight.totals}
+                    </span>{' '}
+                    {t('dashboard.errors_insight_totals')}
+                  </p>
+                  <ul className="divide-y divide-pm-ink/10 dark:divide-white/10 border border-pm-ink/10 dark:border-white/10 rounded-sm">
+                    {errorsInsight.top.map((row) => (
+                      <li
+                        key={row.key}
+                        className="px-4 py-2 flex flex-wrap justify-between gap-2 text-sm items-baseline"
+                      >
+                        <span className="font-mono text-xs text-pm-ink dark:text-pm-ink-soft break-all flex-1 min-w-[12rem]">
+                          {row.key}
+                        </span>
+                        <span className="text-pm-muted font-bold tabular-nums shrink-0">{row.count}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+
+        {activeTab === 'webhooks' && (
+          <div className="space-y-6">
+            <div className="pm-panel overflow-hidden px-4 py-5 sm:px-6 border-b-2 border-pm-ink/10 dark:border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">{t('dashboard.webhooks_tab')}</h3>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-pm-muted max-w-xl">{t('dashboard.webhooks_desc')}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={fetchWebhooks}
+                  disabled={webhooksLoading}
+                  className="border-2 border-pm-ink/20 dark:border-white/25"
+                >
+                  {webhooksLoading ? t('common.loading') : t('dashboard.webhooks_refresh')}
+                </Button>
+              </div>
+            </div>
+            {webhooksError && (
+              <div className="rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-4 py-3 text-sm text-pm-ink dark:text-pm-ink-soft">{webhooksError}</div>
+            )}
+            <div className="pm-panel overflow-hidden transition-colors duration-200">
+              {webhooksLoading ? (
+                <div className="flex justify-center py-16">
+                  <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin" />
+                </div>
+              ) : webhookDeliveries.length === 0 && !webhooksError ? (
+                <p className="px-6 py-10 text-center text-pm-muted text-sm uppercase tracking-widest">{t('dashboard.webhooks_empty')}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-pm-ink/10 dark:divide-white/10">
+                    <thead className="bg-pm-wash/50 dark:bg-pm-void/80">
+                      <tr>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_event')}</th>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_succeeded')}</th>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_http')}</th>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_attempts')}</th>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_profile')}</th>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_delivery_id')}</th>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_created')}</th>
+                        <th scope="col" className="px-4 py-3 text-left text-[10px] font-bold text-pm-muted uppercase tracking-[0.15em]">{t('dashboard.webhooks_error')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-pm-surface dark:bg-pm-surface-dark divide-y divide-pm-ink/10 dark:divide-white/10">
+                      {webhookDeliveries.map((row) => {
+                        const err = row.errorMessage
+                          ? String(row.errorMessage).length > 80
+                            ? `${String(row.errorMessage).slice(0, 80)}…`
+                            : String(row.errorMessage)
+                          : '—';
+                        const pid = row.profileId ? String(row.profileId) : '—';
+                        return (
+                          <tr key={row.id || row.deliveryId} className="hover:bg-pm-wash/40 dark:hover:bg-white/5">
+                            <td className="px-4 py-3 whitespace-nowrap text-xs font-semibold font-mono text-pm-ink dark:text-pm-ink-soft">{row.event || '—'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-xs text-pm-muted">{row.succeeded ? 'yes' : 'no'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-xs text-pm-muted">{row.httpStatus ?? '—'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-xs text-pm-muted">{row.attempts ?? '—'}</td>
+                            <td className="px-4 py-3 text-xs font-mono text-pm-muted max-w-[120px] truncate" title={pid}>{pid}</td>
+                            <td className="px-4 py-3 text-xs font-mono text-pm-muted max-w-[140px] truncate" title={row.deliveryId}>{row.deliveryId || '—'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-xs text-pm-muted">
+                              {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-pm-muted max-w-[200px]" title={row.errorMessage || ''}>{err}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            {webhookPagination && webhookPagination.total > 0 && (
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <p className="text-sm text-pm-muted">
+                  {t('dashboard.showing_page')} <span className="font-medium">{webhookPagination.currentPage}</span> / {webhookPagination.totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" disabled={webhookPage <= 1} onClick={() => setWebhookPage((p) => Math.max(1, p - 1))}>{t('dashboard.previous')}</Button>
+                  <Button variant="outline" disabled={!webhookPagination.hasNext} onClick={() => setWebhookPage((p) => p + 1)}>{t('dashboard.next')}</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
@@ -380,8 +1079,26 @@ export const AdminPage = () => {
               <div className="flex items-center justify-center py-12">
                 <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin" />
               </div>
-            ) : settings && (
+            ) : !settings ? (
+              <div className="pm-panel px-6 py-10 text-center space-y-4">
+                <p className="text-sm text-pm-muted uppercase tracking-widest">{t('settings.load_error')}</p>
+                <Button type="button" variant="outline" onClick={() => fetchSettings()}>
+                  {t('dashboard.refresh')}
+                </Button>
+              </div>
+            ) : (
               <>
+                <div className="rounded-sm border-2 border-pm-ink/15 dark:border-white/15 bg-pm-wash/40 dark:bg-white/5 px-4 py-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <p className="text-sm text-pm-ink dark:text-pm-ink-soft max-w-2xl">{t('settings.integration_moved_banner')}</p>
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    <Button type="button" className="border-2 border-pm-ink/20 dark:border-white/25" onClick={() => navigate('/integrations')}>
+                      {t('settings.integration_moved_webhook_cta')}
+                    </Button>
+                    <Button type="button" variant="outline" className="border-2" onClick={() => navigate('/profile?tab=security')}>
+                      {t('settings.integration_moved_keys_cta')}
+                    </Button>
+                  </div>
+                </div>
                 {/* Verification Rules */}
                 <div className="pm-panel overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -695,22 +1412,26 @@ const StatCard = ({ icon, label, value, color }) => {
 };
 
 const StatusBadge = ({ status }) => {
+  const normalized = String(status ?? 'unknown').toLowerCase();
+  const label = String(status ?? '').toUpperCase();
+
   const config = {
     approved:
       'border-pm-ink/25 dark:border-white/20 text-pm-ink dark:text-pm-accent-alt bg-pm-accent-alt/25 dark:bg-pm-accent-alt/15',
     rejected:
       'border-pm-ink/25 dark:border-white/20 text-pm-ink dark:text-pm-ink-soft bg-pm-accent/20 dark:bg-pm-accent/25',
     pending: 'border-pm-ink/20 text-pm-muted dark:border-white/25',
-    failed: 'border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10'
+    failed: 'border-amber-500/50 text-amber-700 dark:text-amber-300 bg-amber-500/10',
+    under_review: 'border-sky-500/40 text-sky-800 dark:text-sky-200 bg-sky-500/10'
   };
 
   return (
     <span
       className={`px-2 py-0.5 inline-flex text-[10px] uppercase tracking-widest font-bold border-2 rounded-sm ${
-        config[status] || config.pending
+        config[normalized] || config.pending
       }`}
     >
-      {status}
+      {label}
     </span>
   );
 };
@@ -779,6 +1500,17 @@ const ThresholdSlider = ({ label, value, onChange, min, max, step, defaultValue,
 };
 
 // Icons
+const ClipboardListIcon = () => (
+  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+    />
+  </svg>
+);
+
 const DocumentIcon = () => (
   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -800,5 +1532,11 @@ const ClockIcon = () => (
 const XCircleIcon = () => (
   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const KeyIcon = () => (
+  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1721 9z" />
   </svg>
 );

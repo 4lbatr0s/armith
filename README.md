@@ -58,3 +58,27 @@ Blueprint: `render.yaml` includes this `routes` block; it only applies if this r
 - `R2_ENDPOINT`
 
 Use local `.env` files for local development, and set the same values in Render environment variables for deployed services.
+
+## Product backlog
+
+- [`docs/TODO_PRODUCT_BACKLOG.md`](docs/TODO_PRODUCT_BACKLOG.md) — planning (non-agent vs agent backlog).
+
+## Public API changelog (summary — API semantic version `1`)
+
+Canonical **`meta.api.semanticVersion`** and **`meta.policy.bundleVersion`** live in **`backend/config/public-api-meta.js`**.
+
+- **Correlation:** optional `X-Correlation-Id`; echoed where applicable.
+- **Sessions:** `GET /kyc/sessions/:id` and `GET /kyc/status/:profileId`; payload includes **`session.lifecycle`**, **`outcomeSemantics`** when terminal, **`meta.policy`** (tenant + country + **`policyPackId`** / **`policyPackVersion`** when enabled).
+- **Idempotency:** `Idempotency-Key` on `POST /kyc/id-check` and `POST /kyc/selfie-check`.
+- **Webhooks:** `verification.completed` / `verification.failed`; `verification.manual_review_queued`; HMAC signatures — see **`backend/services/verificationWebhook.js`**. Tenants choose which event types are delivered on **`/integrations`** (`integrationWebhookEvents` on `KycConfiguration`). Timing vs profile status is in **`docs/OUTBOUND_WEBHOOK_EVENTS.md`**.
+- **Admin:** webhook deliveries list, **`DELETE /admin/verifications/:id`**, webhook replay, manual-review queue APIs, **`POST /admin/verifications/:profileId/capture-session`** (mint **`X-Verification-Session`** for read-only status polling), **`GET /admin/errors/summary`**, **`PATCH /admin/api-keys/:id`** (**`allowedCidrs`** includes IPv6 CIDR when supported).
+
+## Observability
+
+- **`GET /health`** — OK for synthetic uptime probes (configure Better Stack, Pingdom, or similar against your deployed API URL).
+- **`npm run golden`** — Zod validation of LLM-shape fixtures (**`backend/scripts/golden-validation.mjs`**).
+- **`npm run test:ci`** (backend) — pipeline regression tests with mocked integrations.
+
+## Commerce / metering (deferred)
+
+**`STRIPE_METERING_NOTE`:** Stripe (or equivalent) metering is backlog until billable-unit definition is finalized. No Stripe code ships in-repo until product locks charging semantics (`docs/TODO_PRODUCT_BACKLOG.md` §3).

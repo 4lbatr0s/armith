@@ -4,11 +4,13 @@ import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
 import { PricingPage } from './pages/PricingPage';
+import { TrustSupportPage } from './pages/TrustSupportPage';
 import { UploadIdPage } from './pages/UploadIdPage';
 import { UploadSelfiePage } from './pages/UploadSelfiePage';
 import { ResultPage } from './pages/ResultPage';
 import { AdminPage } from './pages/AdminPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { IntegrationsPage } from './pages/IntegrationsPage';
 import { Layout } from './components/Layout';
 import { ApiTokenProvider } from './components/ApiTokenProvider';
 import './index.css';
@@ -91,21 +93,24 @@ export const App = () => {
     >
       <ApiTokenProvider>
         <ThemeProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Router>
           <Layout>
             <Routes>
-              <Route path="/" element={
-                <PublicRoute>
-                  <HomePage />
-                </PublicRoute>
-              } />
+              {/* Public pages before `/` and `*` */}
+              <Route path="/trust" element={<TrustSupportPage />} />
+              <Route path="/trust/" element={<TrustSupportPage />} />
+              <Route path="/docs" element={<DocsRedirectRoute />} />
               <Route path="/auth/*" element={<AuthPage />} />
               <Route path="/pricing" element={
                 <PublicPricingRoute>
                   <PricingPage />
                 </PublicPricingRoute>
               } />
-              <Route path="/docs" element={<DocsRedirectRoute />} />
+              <Route path="/" element={
+                <PublicRoute>
+                  <HomePage />
+                </PublicRoute>
+              } />
 
               <Route path="/upload-id" element={
                 <ProtectedRoute>
@@ -131,6 +136,16 @@ export const App = () => {
               <Route path="/profile" element={
                 <ProtectedRoute>
                   <ProfilePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/integrations" element={
+                <ProtectedRoute>
+                  <IntegrationsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/integrations/" element={
+                <ProtectedRoute>
+                  <IntegrationsPage />
                 </ProtectedRoute>
               } />
 

@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import logger from './lib/logger.js';
 import routes from './routes/index.js';
 import { connectDB } from './lib/mongodb.js';
+import { correlationIdMiddleware } from './middleware/correlationIdMiddleware.js';
 
 dotenv.config();
 
@@ -18,6 +19,17 @@ connectDB().catch(err => {
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Behind Render / nginx: honor X-Forwarded-For for req.ip and rate-limit keys.
+const tp = process.env.TRUST_PROXY;
+if (tp === 'true' || tp === '1') {
+  app.set('trust proxy', true);
+} else if (tp && /^\d+$/.test(tp)) {
+  app.set('trust proxy', parseInt(tp, 10));
+} else if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 
 // Security headers
 app.use(helmet());
@@ -56,13 +68,15 @@ app.use(cors({
     'Content-Type',
     'Authorization',
     'x-api-key',
+    'Idempotency-Key',
+    'X-Correlation-Id',
     'X-Requested-With',
     'Accept',
     'Origin',
     'Access-Control-Request-Method',
     'Access-Control-Request-Headers'
   ],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range', 'Idempotent-Replayed', 'X-Correlation-Id'],
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
@@ -88,6 +102,7 @@ app.use(cookieParser());
 // Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(correlationIdMiddleware);
 
 // Clerk middleware - skip for OPTIONS requests (CORS preflight)
 const clerkAuth = clerkMiddleware();

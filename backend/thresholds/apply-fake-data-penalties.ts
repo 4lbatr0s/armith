@@ -1,5 +1,5 @@
 import { ERRORS } from '../kyc/config.js';
-import { ValidationError } from '../src/validation/country-validator.interface.js';
+import { ValidationError } from '../validation/country-validator.interface.js';
 import {
     equalsDenylistToken,
     isDenylistDocumentNumber,

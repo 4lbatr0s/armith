@@ -2,8 +2,10 @@ import React from 'react';
 import { SignIn, SignUp, useUser } from '@clerk/clerk-react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const AuthPage = () => {
+  const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useUser();
   const location = useLocation();
   const [mode, setMode] = useState('sign-in');
@@ -15,7 +17,7 @@ export const AuthPage = () => {
       <div className="flex-1 flex items-center justify-center min-h-[40vh]">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-pm-ink dark:border-white/30 border-t-pm-accent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm uppercase tracking-widest text-pm-muted">Loading…</p>
+          <p className="text-sm uppercase tracking-widest text-pm-muted">{t('auth.loading')}</p>
         </div>
       </div>
     );
@@ -32,9 +34,9 @@ export const AuthPage = () => {
         <div className="text-center space-y-2">
           <span className="pm-kicker">Armith</span>
           <h2 className="font-display text-3xl font-bold tracking-tight">
-            {mode === 'sign-in' ? 'Sign in' : 'Create account'}
+            {mode === 'sign-in' ? t('auth.heading_sign_in') : t('auth.heading_sign_up')}
           </h2>
-          <p className="text-sm text-pm-muted uppercase tracking-wider">KYC verification workspace</p>
+          <p className="text-sm text-pm-muted uppercase tracking-wider">{t('auth.subtitle')}</p>
         </div>
 
         <div className="flex border-2 border-pm-ink dark:border-white/15 rounded-sm overflow-hidden shadow-brutal">
@@ -47,7 +49,7 @@ export const AuthPage = () => {
                 : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
             }`}
           >
-            Sign In
+            {t('auth.sign_in_tab')}
           </button>
           <button
             type="button"
@@ -58,7 +60,7 @@ export const AuthPage = () => {
                 : 'bg-pm-wash/50 dark:bg-pm-void text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft'
             }`}
           >
-            Sign Up
+            {t('auth.sign_up_tab')}
           </button>
         </div>
 

@@ -1,5 +1,5 @@
 import { ERRORS } from '../kyc/config.js';
-import { ValidationError } from '../src/validation/country-validator.interface.js';
+import { ValidationError } from '../validation/country-validator.interface.js';
 import { equalsDenylistToken, isDenylistDocumentNumber, isDenylistIdentityNumber, isPlaceholderDate, mergeFieldDenylist, normToken, tokenInDenylist } from './fake-value-denylist.js';
 function cloneParsed(parsed) {
     return JSON.parse(JSON.stringify(parsed));

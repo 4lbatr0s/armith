@@ -147,3 +147,14 @@
 .btn-secondary {
   @apply inline-flex items-center justify-center bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft font-semibold uppercase tracking-wide text-sm px-8 py-4 rounded-sm border-2 border-pm-ink dark:border-white/20 shadow-brutal hover:bg-pm-wash dark:hover:bg-white/10 transition-all;
 }
+
+/* Turkish: CSS uppercase uses simple Unicode mapping and corrupts dotted i (i→İ değil, I görünümü vb.) */
+html[lang^='tr'] .uppercase {
+  text-transform: none !important;
+}
+html[lang^='tr'] .pm-kicker,
+html[lang^='tr'] .pm-link-nav,
+html[lang^='tr'] .btn-primary,
+html[lang^='tr'] .btn-secondary {
+  text-transform: none !important;
+}

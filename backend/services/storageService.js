@@ -1,3 +1,4 @@
+import { buffer as streamConsumeBuffer } from 'stream/consumers';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
@@ -393,6 +394,65 @@ class StorageService {
   /**
    * Check if file exists
    */
+  /**
+   * Single HEAD for preflight: existence + size + declared content type (no throw on missing key).
+   */
+  async peekObjectHead(fileName) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName
+      });
+
+      const result = await this.client.send(command);
+
+      return {
+        exists: true,
+        contentLength: Number(result.ContentLength ?? 0),
+        contentType: result.ContentType ? String(result.ContentType) : null
+      };
+    } catch (error) {
+      if (error.name === 'NotFound') {
+        return { exists: false, contentLength: 0, contentType: null };
+      }
+      console.error('Error in peekObjectHead:', error);
+      throw new Error('Failed to read object metadata');
+    }
+  }
+
+  /**
+   * First `maxBytes` of an object — for MIME/dimension probing (Range GET).
+   */
+  async peekObjectRange(fileName, maxBytes = 65536) {
+    if (!this.isAvailable()) {
+      throw new Error('R2 storage service is not available');
+    }
+    const cap = Math.max(4096, Math.min(Number(maxBytes) || 65536, 2 * 1024 * 1024));
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName,
+        Range: `bytes=0-${cap - 1}`
+      });
+      const result = await this.client.send(command);
+      if (!result.Body) {
+        return Buffer.alloc(0);
+      }
+      const buf = Buffer.from(await streamConsumeBuffer(result.Body));
+      return buf;
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.name === 'NotFound') {
+        return Buffer.alloc(0);
+      }
+      console.error('Error in peekObjectRange:', error);
+      throw new Error('Failed to range-read object');
+    }
+  }
+
   async fileExists(fileName) {
     if (!this.isAvailable()) {
       throw new Error('R2 storage service is not available');
@@ -562,6 +622,8 @@ export const {
   listFiles,
   cleanupOldFiles,
   extractKeyFromUrl,
+  peekObjectHead,
+  peekObjectRange,
   healthCheck,
   getConfig
 } = storageService;

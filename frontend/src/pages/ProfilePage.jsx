@@ -1,16 +1,33 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { Fragment, useCallback, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { Button } from '../components/ui/button';
 import { apiService } from '../services/api';
 import { useTranslation } from 'react-i18next';
 
+function splitAllowlistInput(text) {
+  const chunks = [];
+  for (const part of String(text ?? '').split(/[\n,;]+/)) {
+    for (const s of part.trim().split(/\s+/)) {
+      if (s) chunks.push(s);
+    }
+  }
+  return chunks;
+}
+
+function isSecurityQueryTab(searchParams) {
+  const raw = searchParams.get('tab');
+  if (typeof raw !== 'string') return false;
+  const v = raw.trim().toLowerCase();
+  return v === 'security' || v === 'integration';
+}
+
 export const ProfilePage = () => {
   const { user } = useUser();
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() =>
-    searchParams.get('tab') === 'security' ? 'security' : 'account'
+    isSecurityQueryTab(searchParams) ? 'security' : 'account'
   );
   const [apiKeys, setApiKeys] = useState([]);
   const [usage, setUsage] = useState(null);
@@ -20,10 +37,36 @@ export const ProfilePage = () => {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [expandedAllowlistKey, setExpandedAllowlistKey] = useState(null);
+  const [allowlistDraft, setAllowlistDraft] = useState('');
 
   useEffect(() => {
-    if (searchParams.get('tab') === 'security') setActiveTab('security');
+    if (isSecurityQueryTab(searchParams)) setActiveTab('security');
   }, [searchParams]);
+
+  const goAccountTab = useCallback(() => {
+    setActiveTab('account');
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('tab');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
+  const goSecurityTab = useCallback(() => {
+    setActiveTab('security');
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', 'security');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
 
   const loadApiKeys = useCallback(async () => {
     try {
@@ -102,6 +145,30 @@ export const ProfilePage = () => {
     }
   };
 
+  const openAllowlistEditor = (item) => {
+    const list = Array.isArray(item.allowedCidrs) ? item.allowedCidrs : [];
+    setAllowlistDraft(list.join('\n'));
+    setExpandedAllowlistKey(item.id);
+    setMessage(null);
+    setError(null);
+  };
+
+  const saveAllowlist = async (keyId) => {
+    try {
+      setSaving(true);
+      setError(null);
+      const lines = splitAllowlistInput(allowlistDraft);
+      await apiService.updateApiKeyAllowlist(keyId, lines);
+      setExpandedAllowlistKey(null);
+      setMessage(t('profile.security.allowlist_saved'));
+      await loadApiKeys();
+    } catch (err) {
+      setError(err.message || t('profile.security.allowlist_error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="flex-1 w-full py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
@@ -115,7 +182,7 @@ export const ProfilePage = () => {
           <div className="flex border-2 border-pm-ink dark:border-white/20 rounded-sm overflow-hidden shadow-brutal">
             <button
               type="button"
-              onClick={() => setActiveTab('account')}
+              onClick={goAccountTab}
               className={`px-4 py-2 text-xs font-bold uppercase tracking-widest ${
                 activeTab === 'account'
                   ? 'bg-pm-accent text-white'
@@ -126,7 +193,7 @@ export const ProfilePage = () => {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('security')}
+              onClick={goSecurityTab}
               className={`px-4 py-2 text-xs font-bold uppercase tracking-widest border-l-2 border-pm-ink dark:border-white/20 ${
                 activeTab === 'security'
                   ? 'bg-pm-accent text-white'
@@ -145,6 +212,18 @@ export const ProfilePage = () => {
           <div className="pm-panel p-6 space-y-4">
             <h2 className="font-display text-xl font-bold">{t('profile.account.title')}</h2>
             <p className="text-sm text-pm-muted">{t('profile.account.description')}</p>
+            <div className="rounded-sm border-2 border-pm-ink/10 dark:border-white/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <p className="text-sm text-pm-muted">{t('profile.account.security_here_hint')}</p>
+              <Button type="button" variant="outline" className="shrink-0" onClick={goSecurityTab}>
+                {t('profile.account.open_security_tab')}
+              </Button>
+            </div>
+            <div className="rounded-sm border-2 border-pm-ink/10 dark:border-white/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <p className="text-sm text-pm-muted">{t('profile.account.webhook_here_hint')}</p>
+              <Button type="button" variant="outline" className="shrink-0" asChild>
+                <Link to="/integrations">{t('profile.account.open_integrations')}</Link>
+              </Button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs uppercase tracking-widest text-pm-muted">{t('profile.account.name')}</p>
@@ -162,6 +241,30 @@ export const ProfilePage = () => {
           <div className="pm-panel p-6 space-y-5">
             <h2 className="font-display text-xl font-bold">{t('profile.security.title')}</h2>
             <p className="text-sm text-pm-muted">{t('profile.security.description')}</p>
+            <p className="text-sm text-pm-muted border-l-4 border-pm-ink/20 dark:border-white/20 pl-3 py-1">
+              {t('profile.security.tabs_hint')}
+            </p>
+
+            <div className="rounded-sm border-2 border-pm-ink/15 dark:border-white/20 bg-pm-wash/30 dark:bg-pm-void/50 px-4 py-4 text-sm space-y-2">
+              <p className="font-display font-bold text-pm-ink dark:text-pm-ink-soft">{t('profile.security.rotation_heading')}</p>
+              <p className="text-pm-muted">{t('profile.security.rotation_intro')}</p>
+              <ul className="list-disc list-inside text-pm-muted space-y-1">
+                <li>{t('profile.security.rotation_keys')}</li>
+                <li>{t('profile.security.rotation_webhook')}</li>
+              </ul>
+              <p className="text-xs uppercase tracking-widest text-pm-muted">{t('profile.security.rotation_doc_hint')}</p>
+            </div>
+
+            <div className="rounded-sm border-2 border-pm-ink/15 dark:border-white/20 px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+              <div>
+                <p className="font-display font-bold text-pm-ink dark:text-pm-ink-soft">{t('profile.security.webhook_moved_title')}</p>
+                <p className="text-sm text-pm-muted mt-1">{t('profile.security.webhook_moved_desc')}</p>
+              </div>
+              <Button type="button" variant="outline" className="shrink-0 border-2" asChild>
+                <Link to="/integrations">{t('profile.security.open_integrations')}</Link>
+              </Button>
+            </div>
+
             {usage && (
               <div className="rounded-sm border-2 border-pm-ink/15 dark:border-white/20 bg-pm-wash/40 dark:bg-pm-void/60 px-4 py-3 text-sm">
                 <p className="font-semibold">
@@ -189,6 +292,14 @@ export const ProfilePage = () => {
               </div>
             )}
 
+            <div id="profile-api-keys">
+              <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft mb-2 scroll-mt-24">
+                {t('settings.api_keys_title')}
+              </h3>
+              {!apiKeysLoading && apiKeys.length === 0 ? (
+                <p className="text-sm text-pm-muted mb-3">{t('profile.security.api_keys_where_allowlist')}</p>
+              ) : null}
+            </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
@@ -225,22 +336,71 @@ export const ProfilePage = () => {
                       </tr>
                     ) : (
                       apiKeys.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-3 py-3 text-sm font-semibold">{item.name}</td>
-                          <td className="px-3 py-3 text-sm font-mono text-pm-muted">{item.prefix}</td>
-                          <td className="px-3 py-3 text-sm text-pm-muted">{new Date(item.createdAt).toLocaleString()}</td>
-                          <td className="px-3 py-3 text-sm text-pm-muted">{item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString() : '-'}</td>
-                          <td className="px-3 py-3 text-sm text-pm-muted">
-                            {item.revokedAt ? t('profile.security.revoked') : t('profile.security.active')}
-                          </td>
-                          <td className="px-3 py-3">
-                            {!item.revokedAt && (
-                              <Button variant="outline" onClick={() => handleRevokeApiKey(item.id)} disabled={saving}>
-                                {t('profile.security.revoke')}
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
+                        <Fragment key={item.id}>
+                          <tr>
+                            <td className="px-3 py-3 text-sm font-semibold">{item.name}</td>
+                            <td className="px-3 py-3 text-sm font-mono text-pm-muted">{item.prefix}</td>
+                            <td className="px-3 py-3 text-sm text-pm-muted">{new Date(item.createdAt).toLocaleString()}</td>
+                            <td className="px-3 py-3 text-sm text-pm-muted">{item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString() : '-'}</td>
+                            <td className="px-3 py-3 text-sm text-pm-muted">
+                              {item.revokedAt ? (
+                                t('profile.security.revoked')
+                              ) : (
+                                <>
+                                  <span>{t('profile.security.active')}</span>
+                                  {Array.isArray(item.allowedCidrs) && item.allowedCidrs.length > 0 ? (
+                                    <span className="block mt-1 text-[10px] uppercase tracking-wide text-pm-accent">
+                                      {t('profile.security.allowlist_count', { count: item.allowedCidrs.length })}
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
+                            </td>
+                            <td className="px-3 py-3">
+                              {!item.revokedAt && (
+                                <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                                  <Button variant="outline" onClick={() => openAllowlistEditor(item)} disabled={saving}>
+                                    {t('profile.security.allowlist_edit')}
+                                  </Button>
+                                  <Button variant="outline" onClick={() => handleRevokeApiKey(item.id)} disabled={saving}>
+                                    {t('profile.security.revoke')}
+                                  </Button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                          {!item.revokedAt && expandedAllowlistKey === item.id ? (
+                            <tr>
+                              <td colSpan={6} className="px-3 pb-6 pt-0 bg-pm-wash/20 dark:bg-pm-void/40 border-t border-pm-ink/10">
+                                <p className="text-xs uppercase tracking-widest text-pm-muted mb-2">{t('profile.security.allowlist_heading')}</p>
+                                <p className="text-xs text-pm-muted mb-2">{t('profile.security.allowlist_hint')}</p>
+                                <textarea
+                                  value={allowlistDraft}
+                                  onChange={(e) => setAllowlistDraft(e.target.value)}
+                                  rows={5}
+                                  className="w-full font-mono text-sm px-3 py-2 border rounded-sm bg-white dark:bg-gray-950 dark:text-white border-pm-ink/20 mb-3"
+                                  placeholder={t('profile.security.allowlist_placeholder')}
+                                />
+                                <div className="flex gap-2">
+                                  <Button type="button" onClick={() => saveAllowlist(item.id)} disabled={saving}>
+                                    {t('profile.security.allowlist_save')}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setExpandedAllowlistKey(null);
+                                      setAllowlistDraft('');
+                                    }}
+                                    disabled={saving}
+                                  >
+                                    {t('common.cancel')}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
                       ))
                     )}
                   </tbody>

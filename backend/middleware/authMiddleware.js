@@ -1,5 +1,8 @@
 import { requireAuth, getAuth } from '@clerk/express';
 import { authenticateApiKeyToken } from '../services/apiKeyService.js';
+import { getClientIp } from '../lib/clientIp.js';
+import { ipAllowedByRules } from '../lib/ipAllowlist.js';
+import { verifyCaptureSessionToken } from '../lib/captureSessionToken.js';
 
 /**
  * Middleware to require authentication
@@ -43,12 +46,49 @@ const extractApiKeyToken = (req) => {
 
 export const authenticateApiKeyOrUser = async (req, res, next) => {
   try {
+    const captureHeaderRaw = req.headers['x-verification-session'];
+    const captureHeader =
+      typeof captureHeaderRaw === 'string' && captureHeaderRaw.trim().length > 0
+        ? captureHeaderRaw.trim()
+        : '';
+    const captureSecret =
+      typeof process.env.VERIFICATION_CAPTURE_TOKEN_SECRET === 'string'
+        ? process.env.VERIFICATION_CAPTURE_TOKEN_SECRET.trim()
+        : '';
+
+    if (captureHeader) {
+      if (!captureSecret || captureSecret.length < 16) {
+        return res.status(503).json({ error: 'Capture session tokens are not configured on this deployment' });
+      }
+      const claims = verifyCaptureSessionToken({ secret: captureSecret, token: captureHeader });
+      if (!claims) {
+        return res.status(401).json({ error: 'Invalid or expired capture session token' });
+      }
+      req.authContext = {
+        mode: 'captureSession',
+        userId: claims.tenantUserId,
+        captureProfileId: claims.profileId
+      };
+      return next();
+    }
+
     const apiKeyToken = extractApiKeyToken(req);
 
     if (apiKeyToken) {
       const apiKey = await authenticateApiKeyToken(apiKeyToken);
       if (!apiKey) {
         return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      const rules = Array.isArray(apiKey.allowedCidrs) ? apiKey.allowedCidrs : [];
+      if (rules.length > 0) {
+        const ip = getClientIp(req);
+        if (!ipAllowedByRules(ip, rules)) {
+          return res.status(403).json({
+            error: 'IP address not allowed for this API key',
+            code: 'API_KEY_IP_FORBIDDEN'
+          });
+        }
       }
 
       req.authContext = {
