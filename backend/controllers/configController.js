@@ -4,15 +4,23 @@
  */
 
 import { KycConfiguration } from '../models/index.js';
+import { User } from '../models/User.js';
 import { normalizeOutboundWebhookSubscriptions } from '../lib/integrationWebhookEvents.js';
 import { createDefaultConfig, createFromPreset, PRESETS } from '../kyc/defaults.js';
+
+async function resolveMongoUserId(req) {
+    const clerkId = req.auth?.userId;
+    if (!clerkId) return null;
+    const user = await User.findOne({ clerkId }).select('_id').lean();
+    return user?._id ? String(user._id) : null;
+}
 
 /**
  * Get user's KYC configuration (creates default if not exists)
  */
 export async function getConfig(req, res) {
     try {
-        const userId = req.auth?.userId;
+        const userId = await resolveMongoUserId(req);
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
@@ -36,7 +44,7 @@ export async function getConfig(req, res) {
  */
 export async function updateConfig(req, res) {
     try {
-        const userId = req.auth?.userId;
+        const userId = await resolveMongoUserId(req);
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
@@ -70,7 +78,7 @@ export async function updateConfig(req, res) {
  */
 export async function applyPreset(req, res) {
     try {
-        const userId = req.auth?.userId;
+        const userId = await resolveMongoUserId(req);
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }

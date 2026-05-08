@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Profile, IdCardValidation, SelfieValidation, User } from '../../models/index.js';
+import { Profile, IdCardValidation, SelfieValidation } from '../../models/index.js';
 import { STATUS, formatStructuredError } from '../../kyc/config.js';
 import { getOrCreateUsageUser } from '../quotaService.js';
 
@@ -28,14 +28,6 @@ function isTerminalProfileStatus(value) {
     return u === 'APPROVED' || u === 'REJECTED' || u === 'FAILED';
 }
 
-/** Clerk user id used only for locating legacy docs where `merchantUserId` holds Clerk ids. */
-function clerkActorForMerchantLookup(authUserId, authMode) {
-    if (!authUserId) return null;
-    const o = String(process.env.APP_DEFAULT_MERCHANT_CLERK_ID ?? '').trim();
-    if (authMode === 'userAuth' && o.length > 0) return o.trim();
-    return authUserId;
-}
-
 /**
  * Mongo `_id` of the billing/dashboard account for this request.
  * When APP_DEFAULT_MERCHANT_CLERK_ID is set under userAuth, ownership follows that account.
@@ -54,18 +46,11 @@ async function tenantMongoHexFromExistingProfile(existing) {
     if (!existing || typeof existing !== 'object') return '';
     const own = typeof existing.ownerUserId === 'string' ? existing.ownerUserId.trim() : '';
     if (own && mongoose.Types.ObjectId.isValid(own)) return own;
-    const leg = typeof existing.merchantUserId === 'string' ? existing.merchantUserId.trim() : '';
-    if (!leg) return '';
-    if (mongoose.Types.ObjectId.isValid(leg)) return leg;
-    if (leg.startsWith('user_')) {
-        const u = await User.findOne({ clerkId: leg }).select('_id').lean();
-        return u?._id != null ? String(u._id) : '';
-    }
     return '';
 }
 
 /** Sets `ownerUserId` (Mongo tenant) and optionally `userId` (Mongo subject); never persists Clerk ids. */
-function applyOwnerAndSubjectIds(profileLike, clerkActor, authMode, subjectMongoUserId, ownerMongoUserId) {
+function applyOwnerAndSubjectIds(profileLike, authMode, subjectMongoUserId, ownerMongoUserId) {
     if (!profileLike || !ownerMongoUserId) return;
     profileLike.ownerUserId = ownerMongoUserId;
 
@@ -73,7 +58,7 @@ function applyOwnerAndSubjectIds(profileLike, clerkActor, authMode, subjectMongo
 
     const cur = profileLike.userId ? String(profileLike.userId) : '';
     const isLegacyClerkInUserField = cur.startsWith('user_');
-    if (!cur || cur === subjectMongoUserId || (clerkActor && cur === clerkActor) || isLegacyClerkInUserField) {
+    if (!cur || cur === subjectMongoUserId || isLegacyClerkInUserField) {
         profileLike.userId = subjectMongoUserId;
     }
 }
@@ -136,7 +121,6 @@ export async function persistIdVerification({
     integrationTenant
 }) {
     const idNum = normalizeIdentityNumber(result.data?.identityNumber);
-    const clerkLeg = clerkActorForMerchantLookup(authUserId, authMode);
     const tenantMongoResolved =
         mongoUserId && authUserId
             ? await resolveOwnerMongoUserId(authUserId, authMode, mongoUserId)
@@ -147,18 +131,8 @@ export async function persistIdVerification({
         profile = await Profile.findOne({ userId: mongoUserId, identityNumber: idNum });
     }
 
-    /** Legacy Profile.userId mistakenly stored Clerk id */
-    if (!profile && authUserId?.startsWith('user_') && idNum) {
-        profile = await Profile.findOne({ userId: authUserId, identityNumber: idNum });
-    }
-
     if (!profile && tenantMongoResolved && idNum) {
-        const parts = [{ ownerUserId: tenantMongoResolved, identityNumber: idNum }];
-        parts.push({ merchantUserId: tenantMongoResolved, identityNumber: idNum });
-        if (clerkLeg?.startsWith('user_')) {
-            parts.push({ merchantUserId: clerkLeg, identityNumber: idNum });
-        }
-        profile = await Profile.findOne({ $or: parts });
+        profile = await Profile.findOne({ ownerUserId: tenantMongoResolved, identityNumber: idNum });
     }
 
     if (!profile && idNum) {
@@ -188,7 +162,7 @@ export async function persistIdVerification({
         profile.idVerificationStatus = result.status.toUpperCase();
 
         if (authUserId && tenantMongoResolved) {
-            applyOwnerAndSubjectIds(profile, authUserId, authMode, mongoUserId, tenantMongoResolved);
+            applyOwnerAndSubjectIds(profile, authMode, mongoUserId, tenantMongoResolved);
         }
 
         const shouldRefreshIdSnapshot =
@@ -254,7 +228,7 @@ export async function persistIdVerification({
             rejectionReasons
         };
         if (authUserId && tenantMongoResolved) {
-            applyOwnerAndSubjectIds(newProfilePayload, authUserId, authMode, mongoUserId, tenantMongoResolved);
+            applyOwnerAndSubjectIds(newProfilePayload, authMode, mongoUserId, tenantMongoResolved);
         }
         applyIntegrationTenantFields(newProfilePayload, integrationTenant);
         profile = await Profile.create(newProfilePayload);
@@ -343,7 +317,7 @@ export async function persistSelfieVerification({
         profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
     }
     if (authUserId && tenantMongoResolved) {
-        applyOwnerAndSubjectIds(profile, authUserId, authMode, mongoUserId, tenantMongoResolved);
+        applyOwnerAndSubjectIds(profile, authMode, mongoUserId, tenantMongoResolved);
     }
     applyIntegrationTenantFields(profile, integrationTenant);
     await profile.save();

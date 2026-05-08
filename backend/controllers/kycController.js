@@ -70,12 +70,10 @@ function deriveSessionLifecycle({
     return { phase: 'pending', terminal: false };
 }
 
-function profileReadableByAuthenticatedUser(profile, authUserId, mongoUserId) {
-    if (!profile || !authUserId) return false;
-    if (profile.merchantUserId === authUserId) return true;
-    if (mongoUserId && String(profile.userId) === String(mongoUserId)) return true;
-    /** Legacy rows stored Clerk id in userId */
-    if (String(profile.userId) === String(authUserId)) return true;
+function profileReadableByAuthenticatedUser(profile, mongoUserId) {
+    if (!profile || !mongoUserId) return false;
+    if (String(profile.ownerUserId || '') === String(mongoUserId)) return true;
+    if (String(profile.userId || '') === String(mongoUserId)) return true;
     return false;
 }
 
@@ -115,8 +113,9 @@ export const getLLMStatus = async (_req, res) => {
 
 export const generateSecureDownloadUrlEndpoint = async (req, res) => {
     try {
-        const tenantUserId = req.authContext?.userId;
-        if (!tenantUserId) {
+        const tenantMongoUserId = req.authContext?.mongoUserId;
+        const tenantClerkUserId = req.authContext?.clerkUserId ?? null;
+        if (!tenantMongoUserId) {
             return res.status(401).json({
                 status: STATUS.FAILED,
                 errors: [{ code: 'UNAUTHORIZED', message: 'Authentication required for download URL.' }]
@@ -140,7 +139,7 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
                 errors: [{ code: 'INVALID_FILENAME', message: 'Invalid or unsafe storage key.' }]
             });
         }
-        const owned = isStorageKeyOwnedByTenant(key, tenantUserId);
+        const owned = isStorageKeyOwnedByTenant(key, tenantMongoUserId, tenantClerkUserId);
         const legacy =
             isLegacyKycUploadsKey(key) && legacyKycUploadsDownloadAllowed();
         if (!owned && !legacy) {
@@ -165,8 +164,8 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
 
 export const generateUploadUrl = async (req, res) => {
     try {
-        const tenantUserId = req.authContext?.userId;
-        if (!tenantUserId) {
+        const tenantMongoUserId = req.authContext?.mongoUserId;
+        if (!tenantMongoUserId) {
             return res.status(401).json({
                 status: STATUS.FAILED,
                 errors: [{ code: 'UNAUTHORIZED', message: 'Tenant identity required for upload URL.' }]
@@ -175,7 +174,7 @@ export const generateUploadUrl = async (req, res) => {
         const { fileType, userId: bodyUserId, documentType } = req.body;
         if (bodyUserId != null && bodyUserId !== '') {
             const b = String(bodyUserId).trim();
-            if (b && b !== String(tenantUserId)) {
+            if (b && b !== String(tenantMongoUserId)) {
                 return res.status(400).json({
                     status: STATUS.FAILED,
                     errors: [{ code: 'INVALID_USER_ID', message: 'userId must match the authenticated tenant.' }]
@@ -198,7 +197,7 @@ export const generateUploadUrl = async (req, res) => {
         }
         const uploadData = await storageService.generatePresignedUploadUrl(
             mimeCheck.mime,
-            tenantUserId,
+            tenantMongoUserId,
             typeof documentType === 'string' ? documentType : null
         );
         res.json({
@@ -240,12 +239,12 @@ export const verifyId = async (req, res) => {
 
         const countryCodeUpper = countryCode.toUpperCase();
         
-        const authUserId = req.authContext?.userId || req.auth?.userId;
+        const clerkUserId = req.authContext?.clerkUserId ?? req.auth?.userId ?? null;
         const authMode = req.authContext?.mode ?? 'userAuth';
         const mongoUserId = req.authContext?.mongoUserId ?? null;
 
-        if (authUserId) {
-            const quota = await checkUserVerificationQuota(authUserId);
+        if (mongoUserId) {
+            const quota = await checkUserVerificationQuota(mongoUserId);
             if (!quota.allowed) {
                 return res.status(429).json({
                     status: STATUS.FAILED,
@@ -265,15 +264,15 @@ export const verifyId = async (req, res) => {
             }
         }
 
-        const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
+        const kycConfigDoc = mongoUserId ? await getOrCreateUserKycConfig(mongoUserId) : null;
 
         const { effectivePlain, resolved } = buildEffectiveKycPlain({
             kycConfigDoc,
             countryCodeOverride: countryCodeUpper,
-            anonymousUserLabel: authUserId || 'system'
+            anonymousUserLabel: mongoUserId || 'system'
         });
 
-        logger.info({ authUserId, countryCode: countryCodeUpper }, 'Starting ID verification');
+        logger.info({ clerkUserId, mongoUserId, countryCode: countryCodeUpper }, 'Starting ID verification');
 
         const urlsToCheck = backImageUrl ? [frontImageUrl, backImageUrl] : [frontImageUrl];
         const preflight = await assertImagesReadyForLlm(urlsToCheck);
@@ -295,10 +294,10 @@ export const verifyId = async (req, res) => {
         const overallStatus = deriveIdCheckpointStatus(result.status, resolved.verificationSteps);
 
         let profile;
-        let clerkIdToIncrementQuota = null;
+        let mongoUserIdToIncrementQuota = null;
         try {
             const idPersist = await persistIdVerification({
-                authUserId,
+                authUserId: clerkUserId,
                 mongoUserId,
                 authMode,
                 countryCodeUpper,
@@ -310,10 +309,10 @@ export const verifyId = async (req, res) => {
                 integrationTenant
             });
             profile = idPersist.profile;
-            clerkIdToIncrementQuota = idPersist.clerkIdToIncrementQuota;
+            mongoUserIdToIncrementQuota = idPersist.mongoUserIdToIncrementQuota;
         } catch (err) {
             if (err instanceof IdentityNumberConflictError) {
-                logger.warn({ authUserId, msg: err.message }, 'Identity number belongs to another user');
+                logger.warn({ clerkUserId, mongoUserId, msg: err.message }, 'Identity number belongs to another user');
                 return res.status(409).json({
                     status: STATUS.FAILED,
                     errors: [
@@ -330,19 +329,19 @@ export const verifyId = async (req, res) => {
 
         logger.info({ profileId: profile._id, status: overallStatus }, 'ID verification completed');
 
-        if (clerkIdToIncrementQuota) {
-            await incrementUserVerificationUsage(clerkIdToIncrementQuota);
+        if (mongoUserIdToIncrementQuota) {
+            await incrementUserVerificationUsage(mongoUserIdToIncrementQuota);
         }
 
         emitVerificationTerminalWebhook({
-            tenantUserId: authUserId,
+            tenantMongoUserId: String(profile.ownerUserId || mongoUserId || ''),
             profile,
             correlationId: req.correlationId
         });
 
         const confidenceScores = buildIdConfidenceRowsFromVerification(result, resolved);
         const policyExtras =
-            authUserId && kycConfigDoc
+            mongoUserId && kycConfigDoc
                 ? {
                       ...getPolicyPackForCountry(countryCodeUpper),
                       tenantConfigVersion: kycConfigDoc.version,
@@ -411,23 +410,21 @@ export const verifySelfie = async (req, res) => {
                 : undefined;
         const profileId = profileIdFromBody || verificationId;
 
-        const authUserId = req.authContext?.userId || req.auth?.userId;
+        const clerkUserId = req.authContext?.clerkUserId ?? req.auth?.userId ?? null;
         const authMode = req.authContext?.mode ?? 'userAuth';
         const mongoUserId = req.authContext?.mongoUserId ?? null;
-        const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
+        const kycConfigDoc = mongoUserId ? await getOrCreateUserKycConfig(mongoUserId) : null;
 
         let countryHint = 'TR';
         if (profileId) {
-            const profileDoc = await Profile.findById(profileId)
-                .select('country userId merchantUserId')
-                .lean();
+            const profileDoc = await Profile.findById(profileId).select('country userId ownerUserId').lean();
             if (!profileDoc) {
                 return res.status(404).json({
                     status: STATUS.FAILED,
                     errors: [{ code: ERRORS.INVALID_REQUEST.code, message: 'Profile not found.' }]
                 });
             }
-            if (authUserId && !profileReadableByAuthenticatedUser(profileDoc, authUserId, mongoUserId)) {
+            if (!profileReadableByAuthenticatedUser(profileDoc, mongoUserId)) {
                 return res.status(403).json({
                     status: STATUS.FAILED,
                     errors: [ERRORS.PROFILE_ACCESS_DENIED]
@@ -439,7 +436,7 @@ export const verifySelfie = async (req, res) => {
         const { effectivePlain, resolved } = buildEffectiveKycPlain({
             kycConfigDoc,
             countryCodeOverride: countryHint,
-            anonymousUserLabel: authUserId || 'system'
+            anonymousUserLabel: mongoUserId || 'system'
         });
         const verificationRules = resolved.verificationSteps;
 
@@ -462,7 +459,7 @@ export const verifySelfie = async (req, res) => {
             return res.status(400).json({ status: STATUS.FAILED, errors: [storageCheck.error] });
         }
 
-        logger.info({ authUserId, profileId }, 'Starting selfie verification');
+        logger.info({ clerkUserId, mongoUserId, profileId }, 'Starting selfie verification');
 
         const result = await VerificationService.verifySelfie(effectivePlain, {
             idPhotoUrl,
@@ -494,7 +491,7 @@ export const verifySelfie = async (req, res) => {
             });
 
             const persisted = await persistSelfieVerification({
-                authUserId,
+                authUserId: clerkUserId,
                 mongoUserId,
                 authMode,
                 profileId,
@@ -511,12 +508,12 @@ export const verifySelfie = async (req, res) => {
                 logger.warn({ profileId }, 'Profile not found during selfie verification');
             } else {
                 selfiePersistedProfile = persisted.profile;
-                if (persisted.clerkIdToIncrementQuota) {
-                    await incrementUserVerificationUsage(persisted.clerkIdToIncrementQuota);
+                if (persisted.mongoUserIdToIncrementQuota) {
+                    await incrementUserVerificationUsage(persisted.mongoUserIdToIncrementQuota);
                 }
                 logger.info({ profileId, status: overallStatus }, 'Selfie verification completed and profile updated');
                 emitVerificationTerminalWebhook({
-                    tenantUserId: authUserId,
+                    tenantMongoUserId: String(persisted.profile.ownerUserId || mongoUserId || ''),
                     profile: persisted.profile,
                     correlationId: req.correlationId
                 });
@@ -534,7 +531,7 @@ export const verifySelfie = async (req, res) => {
         const confidenceScores = buildSelfieConfidenceRows(result.data || {}, resolved);
 
         const policyExtrasSelfie =
-            authUserId && kycConfigDoc
+            mongoUserId && kycConfigDoc
                 ? {
                       ...getPolicyPackForCountry(countryHint),
                       tenantConfigVersion: kycConfigDoc.version,
@@ -585,7 +582,6 @@ async function respondWithKycStatus(req, res, profileId) {
             SelfieValidation.findOne({ profileId }).sort({ createdAt: -1 })
         ]);
 
-        const authUserId = req.authContext?.userId || req.auth?.userId;
         const authMode = req.authContext?.mode;
         const capPid = req.authContext?.captureProfileId;
         const mongoUserId = req.authContext?.mongoUserId ?? null;
@@ -597,13 +593,13 @@ async function respondWithKycStatus(req, res, profileId) {
                     errors: [ERRORS.PROFILE_ACCESS_DENIED]
                 });
             }
-        } else if (!profileReadableByAuthenticatedUser(profile, authUserId, mongoUserId)) {
+        } else if (!profileReadableByAuthenticatedUser(profile, mongoUserId)) {
             return res.status(403).json({
                 status: STATUS.FAILED,
                 errors: [ERRORS.PROFILE_ACCESS_DENIED]
             });
         }
-        const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
+        const kycConfigDoc = mongoUserId ? await getOrCreateUserKycConfig(mongoUserId) : null;
         const resolved = kycConfigDoc
             ? buildEffectiveKycPlain({
                   kycConfigDoc,
@@ -675,7 +671,7 @@ async function respondWithKycStatus(req, res, profileId) {
 
         const cc = profile.country || 'TR';
         const statusPolicyExtras =
-            authUserId && kycConfigDoc
+            mongoUserId && kycConfigDoc
                 ? {
                       ...getPolicyPackForCountry(cc),
                       tenantConfigVersion: kycConfigDoc.version,

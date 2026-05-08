@@ -51,12 +51,10 @@ function envFlagTruthy(v) {
   return s === '1' || s === 'true' || s === 'yes';
 }
 
-/** `userId` on ApiKey | KycConfiguration | WebhookDelivery is Mongo `users._id` — match legacy Clerk-valued rows as well */
-function storedTenantUserClause(mongoHex, clerkOwnerId) {
-  const ids = [...new Set([mongoHex, clerkOwnerId].filter(Boolean))];
-  if (ids.length === 0) return { userId: '__no_stored_docs__' };
-  if (ids.length === 1) return { userId: ids[0] };
-  return { userId: { $in: ids } };
+/** `userId` on ApiKey | KycConfiguration | WebhookDelivery must be Mongo `users._id`. */
+function storedTenantUserClause(mongoHex) {
+  if (!mongoHex) return { userId: '__no_stored_docs__' };
+  return { userId: mongoHex };
 }
 
 async function mongoHexForDashboardClerk(clerkOwnerId) {
@@ -72,8 +70,7 @@ function webhookMongoFromProfile(profile, dashboardMongoFallback) {
 }
 
 /**
- * Mongo filter for dashboards: profiles scoped to tenant Mongo account (`ownerUserId`) or legacy `merchantUserId`,
- * optional subject linkage on `userId`, plus webhook-scoped ids.
+ * Mongo filter for dashboards: profiles scoped to tenant Mongo account and subject links.
  */
 async function tenantDashboardProfileFilter(ownerId, { permissiveList = false } = {}) {
   if (permissiveList && envFlagTruthy(process.env.ADMIN_DASHBOARD_LIST_ALL_PROFILES)) {
@@ -82,14 +79,11 @@ async function tenantDashboardProfileFilter(ownerId, { permissiveList = false } 
   const mongoHex = await mongoHexForDashboardClerk(ownerId);
   const orParts = [
     ...(mongoHex ? [{ ownerUserId: mongoHex }] : []),
-    ...(mongoHex ? [{ merchantUserId: mongoHex }] : []),
-    { merchantUserId: ownerId },
     ...(mongoHex ? [{ userId: mongoHex }] : []),
-    { userId: ownerId },
   ];
   try {
     const webhookProfileIds = await WebhookDelivery.distinct('profileId', {
-      ...storedTenantUserClause(mongoHex, ownerId),
+      ...storedTenantUserClause(mongoHex),
       profileId: { $exists: true, $ne: null }
     });
     const ids = webhookProfileIds.filter((id) => id != null && id !== '');
@@ -261,7 +255,7 @@ export const getStats = async (req, res) => {
       Profile.countDocuments({ ...base, status: 'REJECTED' }),
       Profile.countDocuments({ ...base, status: 'PENDING' }),
       Profile.countDocuments({ ...base, status: 'UNDER_REVIEW' }),
-      ApiKey.countDocuments({ revokedAt: null, ...storedTenantUserClause(mongoHex, ownerId) })
+      ApiKey.countDocuments({ revokedAt: null, ...storedTenantUserClause(mongoHex) })
     ]);
 
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
@@ -298,7 +292,7 @@ export const getWebhookDeliveries = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const failedOnly = req.query.failedOnly === '1' || req.query.failedOnly === 'true';
-    const baseUser = storedTenantUserClause(mongoHex, ownerId);
+    const baseUser = storedTenantUserClause(mongoHex);
     const filter = failedOnly ? { ...baseUser, succeeded: false } : { ...baseUser };
     const [rows, total] = await Promise.all([
       WebhookDelivery.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
@@ -440,7 +434,7 @@ export const replayTerminalWebhook = async (req, res) => {
     if (useStoredDelivery) {
       const event = st === 'APPROVED' ? 'verification.completed' : 'verification.failed';
       const last = await WebhookDelivery.findOne({
-        ...storedTenantUserClause(mongoHexReplay, ownerId),
+        ...storedTenantUserClause(mongoHexReplay),
         profileId: profile._id,
         event,
         payload: { $type: 'object' }
@@ -858,7 +852,7 @@ export const getSettings = async (req, res) => {
     }
 
     let config = await KycConfiguration.findOne({
-      ...storedTenantUserClause(mongoHex, clerkId),
+      ...storedTenantUserClause(mongoHex),
       environment: 'production'
     }).select('+integrationWebhookSecret');
 
@@ -886,7 +880,7 @@ export const updateSettings = async (req, res) => {
     const clerkId = req.auth?.userId;
     const mongoHexUpd = clerkId ? await mongoHexForDashboardClerk(clerkId) : null;
     const accountClauseUpd =
-      mongoHexUpd != null ? storedTenantUserClause(mongoHexUpd, clerkId) : { userId: '__none__' };
+      mongoHexUpd != null ? storedTenantUserClause(mongoHexUpd) : { userId: '__none__' };
     const body = typeof req.body === 'object' && req.body ? req.body : {};
     const { verificationRules, thresholds } = body;
 
@@ -994,7 +988,7 @@ export const resetSettings = async (req, res) => {
     const clerkId = req.auth?.userId;
     const mongoHexReset = clerkId ? await mongoHexForDashboardClerk(clerkId) : null;
     const accountClauseReset =
-      mongoHexReset != null ? storedTenantUserClause(mongoHexReset, clerkId) : { userId: '__none__' };
+      mongoHexReset != null ? storedTenantUserClause(mongoHexReset) : { userId: '__none__' };
     const defaultConfig = mongoHexReset ? createDefaultConfig(mongoHexReset) : null;
     if (!defaultConfig) {
       return res.status(401).json({

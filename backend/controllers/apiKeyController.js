@@ -18,15 +18,26 @@ const mapApiKey = (apiKey) => ({
   allowedCidrs: Array.isArray(apiKey.allowedCidrs) ? apiKey.allowedCidrs : []
 });
 
+async function resolveMongoUserFromClerk(clerkId) {
+  if (!clerkId) return null;
+  const user = await User.findOne({ clerkId }).select('_id planTier limitsOverride apiAllowedCidrs').lean();
+  return user || null;
+}
+
 export const getApiKeys = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
+    const clerkId = req.auth?.userId;
+    if (!clerkId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    const mongoUser = await resolveMongoUserFromClerk(clerkId);
+    if (!mongoUser?._id) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const mongoUserId = String(mongoUser._id);
     const [apiKeys, user] = await Promise.all([
-      listApiKeysByUserId(userId),
-      User.findOne({ clerkId: userId }).lean()
+      listApiKeysByUserId(mongoUserId),
+      User.findById(mongoUserId).lean()
     ]);
     res.json({
       apiKeys: apiKeys.map(mapApiKey),
@@ -40,12 +51,12 @@ export const getApiKeys = async (req, res) => {
 
 export const putAccountApiIpAllowlist = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
+    const clerkId = req.auth?.userId;
     const norm = normalizeAllowedCidrs(req.body?.allowedCidrs);
     if (!norm.ok) {
       return res.status(400).json({ error: norm.error || 'Invalid allowlist' });
     }
-    const user = await User.findOne({ clerkId: userId });
+    const user = clerkId ? await User.findOne({ clerkId }) : null;
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -60,9 +71,14 @@ export const putAccountApiIpAllowlist = async (req, res) => {
 
 export const createApiKeyHandler = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
+    const clerkId = req.auth?.userId;
+    const mongoUser = await resolveMongoUserFromClerk(clerkId);
+    const userId = mongoUser?._id ? String(mongoUser._id) : null;
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
 
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     if (!name) {
       return res.status(400).json({ error: 'API key name is required' });
     }
@@ -81,8 +97,13 @@ export const createApiKeyHandler = async (req, res) => {
 
 export const patchApiKeyAllowlistHandler = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
+    const clerkId = req.auth?.userId;
+    const mongoUser = await resolveMongoUserFromClerk(clerkId);
+    const userId = mongoUser?._id ? String(mongoUser._id) : null;
     const { id } = req.params;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     try {
       const apiKey = await updateApiKeyAllowlist({
@@ -111,8 +132,13 @@ export const patchApiKeyAllowlistHandler = async (req, res) => {
 
 export const revokeApiKeyHandler = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
+    const clerkId = req.auth?.userId;
+    const mongoUser = await resolveMongoUserFromClerk(clerkId);
+    const userId = mongoUser?._id ? String(mongoUser._id) : null;
     const { id } = req.params;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     const apiKey = await revokeApiKeyById({ userId, apiKeyId: id });
     if (!apiKey) {
