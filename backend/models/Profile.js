@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 
 const profileSchema = new mongoose.Schema(
     {
+        /** Mongo `users` document _id (hex string); not a Clerk user id */
         userId: {
             type: String,
             index: true,

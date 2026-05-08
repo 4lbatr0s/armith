@@ -5,6 +5,7 @@ import { ipAllowedByRules } from '../lib/ipAllowlist.js';
 import { canUsePerKeyIpAllowlist } from '../lib/planFeatures.js';
 import { User } from '../models/User.js';
 import { verifyCaptureSessionToken } from '../lib/captureSessionToken.js';
+import { getOrCreateUsageUser } from '../services/quotaService.js';
 
 /**
  * Middleware to require authentication
@@ -80,13 +81,14 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
       if (!claims) {
         return res.status(401).json({ error: 'Invalid or expired capture session token' });
       }
-      const captureTenant = await User.findOne({ clerkId: claims.tenantUserId }).lean();
+      const captureTenant = await getOrCreateUsageUser(claims.tenantUserId);
       if (!ipAllowedForAccount(req, captureTenant)) {
         return denyAccountIp(res);
       }
       req.authContext = {
         mode: 'captureSession',
         userId: claims.tenantUserId,
+        mongoUserId: captureTenant._id.toString(),
         captureProfileId: claims.profileId
       };
       return next();
@@ -100,11 +102,12 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
         return res.status(401).json({ error: 'Invalid API key' });
       }
 
-      const tenant = await User.findOne({ clerkId: apiKey.userId }).lean();
+      const tenant = await getOrCreateUsageUser(apiKey.userId);
       if (!ipAllowedForAccount(req, tenant)) {
         return denyAccountIp(res);
       }
 
+      const ip = getClientIp(req);
       const keyRules = Array.isArray(apiKey.allowedCidrs) ? apiKey.allowedCidrs : [];
       if (keyRules.length > 0 && canUsePerKeyIpAllowlist(tenant)) {
         if (!ipAllowedByRules(ip, keyRules)) {
@@ -118,7 +121,8 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
       req.authContext = {
         mode: 'apiKey',
         userId: apiKey.userId,
-        apiKeyId: apiKey._id.toString()
+        mongoUserId: tenant._id.toString(),
+        apiKeyId: apiKey._id.toString(),
       };
 
       return next();
@@ -129,7 +133,7 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const sessionTenant = await User.findOne({ clerkId: auth.userId }).lean();
+    const sessionTenant = await getOrCreateUsageUser(auth.userId);
     if (!ipAllowedForAccount(req, sessionTenant)) {
       return denyAccountIp(res);
     }
@@ -137,7 +141,8 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
     req.auth = auth;
     req.authContext = {
       mode: 'userAuth',
-      userId: auth.userId
+      userId: auth.userId,
+      mongoUserId: sessionTenant._id.toString(),
     };
 
     next();

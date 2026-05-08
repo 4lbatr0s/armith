@@ -3,7 +3,7 @@ import { STATUS, formatStructuredError } from '../../kyc/config.js';
 
 /** Thrown when (country + identityNumber) belongs to another tenant (merchant Clerk id differs). */
 export class IdentityNumberConflictError extends Error {
-    constructor(message = 'This identity number is already linked to another account.') {
+    constructor(message = 'This identity number is already registered under another tenant.') {
         super(message);
         this.name = 'IdentityNumberConflictError';
     }
@@ -34,14 +34,17 @@ function resolveProfileMerchantClerkId(authUserId, authMode) {
     return authUserId;
 }
 
-function applyMerchantAndSubjectIds(profileLike, authUserId, authMode) {
+/** Link Profile.userId → Mongo User._id hex; never Clerk. */
+function applyMerchantAndSubjectIds(profileLike, authUserId, authMode, mongoUserId) {
     if (!profileLike || !authUserId) return;
     const merchantId = resolveProfileMerchantClerkId(authUserId, authMode);
     if (merchantId) profileLike.merchantUserId = merchantId;
-    if (authMode !== 'apiKey') {
-        if (!profileLike.userId || profileLike.userId === authUserId) {
-            profileLike.userId = authUserId;
-        }
+    if (!mongoUserId || authMode === 'apiKey') return;
+
+    const cur = profileLike.userId ? String(profileLike.userId) : '';
+    const isLegacyClerkInUserField = typeof cur === 'string' && cur.startsWith('user_');
+    if (!cur || cur === mongoUserId || cur === authUserId || isLegacyClerkInUserField) {
+        profileLike.userId = mongoUserId;
     }
 }
 
@@ -92,6 +95,7 @@ export function deduplicateReasons(existing, newReasons) {
 
 export async function persistIdVerification({
     authUserId,
+    mongoUserId,
     authMode = 'userAuth',
     countryCodeUpper,
     result,
@@ -105,14 +109,20 @@ export async function persistIdVerification({
     const merchantScopeId = authUserId ? resolveProfileMerchantClerkId(authUserId, authMode) : null;
     let profile = null;
 
-    if (authUserId && idNum) {
+    if (mongoUserId && idNum) {
+        profile = await Profile.findOne({ userId: mongoUserId, identityNumber: idNum });
+    }
+
+    /** Legacy Profile.userId mistakenly stored Clerk id */
+    if (!profile && authUserId && idNum) {
         profile = await Profile.findOne({ userId: authUserId, identityNumber: idNum });
-        if (!profile && merchantScopeId) {
-            profile = await Profile.findOne({
-                merchantUserId: merchantScopeId,
-                identityNumber: idNum,
-            });
-        }
+    }
+
+    if (!profile && merchantScopeId && idNum) {
+        profile = await Profile.findOne({
+            merchantUserId: merchantScopeId,
+            identityNumber: idNum,
+        });
     }
 
     if (!profile && idNum) {
@@ -145,7 +155,7 @@ export async function persistIdVerification({
         profile.idVerificationStatus = result.status.toUpperCase();
 
         if (authUserId) {
-            applyMerchantAndSubjectIds(profile, authUserId, authMode);
+            applyMerchantAndSubjectIds(profile, authUserId, authMode, mongoUserId);
         }
 
         const shouldRefreshIdSnapshot =
@@ -211,7 +221,7 @@ export async function persistIdVerification({
             rejectionReasons
         };
         if (authUserId) {
-            applyMerchantAndSubjectIds(newProfilePayload, authUserId, authMode);
+            applyMerchantAndSubjectIds(newProfilePayload, authUserId, authMode, mongoUserId);
         }
         applyIntegrationTenantFields(newProfilePayload, integrationTenant);
         profile = await Profile.create(newProfilePayload);
@@ -263,6 +273,7 @@ export async function persistIdVerification({
 
 export async function persistSelfieVerification({
     authUserId,
+    mongoUserId,
     authMode = 'userAuth',
     profileId,
     idPhotoUrl,
@@ -291,16 +302,15 @@ export async function persistSelfieVerification({
         profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
     }
     if (authUserId) {
-        applyMerchantAndSubjectIds(profile, authUserId, authMode);
+        applyMerchantAndSubjectIds(profile, authUserId, authMode, mongoUserId);
     }
     applyIntegrationTenantFields(profile, integrationTenant);
     await profile.save();
 
     const nextStatusUpper = String(overallStatus ?? '').toUpperCase();
-    const quotaUserId =
-        authUserId || profile.merchantUserId || profile.userId || null;
+    const quotaClerkActor = authUserId || profile.merchantUserId || null;
     const shouldIncrementQuota =
-        Boolean(quotaUserId) &&
+        Boolean(quotaClerkActor) &&
         isTerminalProfileStatus(nextStatusUpper) &&
         !isTerminalProfileStatus(previousProfileStatus);
 
@@ -325,5 +335,8 @@ export async function persistSelfieVerification({
         rejectionReasons
     });
 
-    return { profile, clerkIdToIncrementQuota: shouldIncrementQuota ? quotaUserId : null };
+    return {
+        profile,
+        clerkIdToIncrementQuota: shouldIncrementQuota ? quotaClerkActor : null,
+    };
 }

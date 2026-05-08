@@ -5,7 +5,15 @@
 
 import mongoose from 'mongoose';
 import { ERRORS, STATUS } from '../kyc/config.js';
-import { Profile, IdCardValidation, SelfieValidation, KycConfiguration, WebhookDelivery, ApiKey } from '../models/index.js';
+import {
+  Profile,
+  IdCardValidation,
+  SelfieValidation,
+  KycConfiguration,
+  WebhookDelivery,
+  ApiKey,
+  User,
+} from '../models/index.js';
 import { createDefaultConfig, PRESETS } from '../kyc/defaults.js';
 import { resolveKycConfig } from '../thresholds/resolve.js';
 import { flattenedThresholdPayload, applyFlatThresholdPatches } from '../thresholds/api-shape.js';
@@ -52,7 +60,14 @@ async function tenantDashboardProfileFilter(ownerId, { permissiveList = false } 
   if (permissiveList && envFlagTruthy(process.env.ADMIN_DASHBOARD_LIST_ALL_PROFILES)) {
     return {};
   }
-  const orParts = [{ merchantUserId: ownerId }, { userId: ownerId }];
+  const mongoAccount = await User.findOne({ clerkId: ownerId }).select('_id').lean();
+  const mongoHex = mongoAccount?._id != null ? String(mongoAccount._id) : null;
+  /** userId stores Mongo User._id (hex); `{ userId: ownerId }` matches legacy Clerk-in-userId rows */
+  const orParts = [
+    { merchantUserId: ownerId },
+    ...(mongoHex ? [{ userId: mongoHex }] : []),
+    { userId: ownerId },
+  ];
   try {
     const webhookProfileIds = await WebhookDelivery.distinct('profileId', {
       userId: ownerId,

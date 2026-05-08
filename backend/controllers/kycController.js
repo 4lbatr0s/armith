@@ -70,9 +70,13 @@ function deriveSessionLifecycle({
     return { phase: 'pending', terminal: false };
 }
 
-function profileReadableByAuthenticatedUser(profile, authUserId) {
+function profileReadableByAuthenticatedUser(profile, authUserId, mongoUserId) {
     if (!profile || !authUserId) return false;
-    return profile.userId === authUserId || profile.merchantUserId === authUserId;
+    if (profile.merchantUserId === authUserId) return true;
+    if (mongoUserId && String(profile.userId) === String(mongoUserId)) return true;
+    /** Legacy rows stored Clerk id in userId */
+    if (String(profile.userId) === String(authUserId)) return true;
+    return false;
 }
 
 export const getSupportedCountries = async (_req, res) => {
@@ -238,6 +242,7 @@ export const verifyId = async (req, res) => {
         
         const authUserId = req.authContext?.userId || req.auth?.userId;
         const authMode = req.authContext?.mode ?? 'userAuth';
+        const mongoUserId = req.authContext?.mongoUserId ?? null;
 
         if (authUserId) {
             const quota = await checkUserVerificationQuota(authUserId);
@@ -294,6 +299,7 @@ export const verifyId = async (req, res) => {
         try {
             const idPersist = await persistIdVerification({
                 authUserId,
+                mongoUserId,
                 authMode,
                 countryCodeUpper,
                 result,
@@ -407,6 +413,7 @@ export const verifySelfie = async (req, res) => {
 
         const authUserId = req.authContext?.userId || req.auth?.userId;
         const authMode = req.authContext?.mode ?? 'userAuth';
+        const mongoUserId = req.authContext?.mongoUserId ?? null;
         const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
 
         let countryHint = 'TR';
@@ -420,7 +427,7 @@ export const verifySelfie = async (req, res) => {
                     errors: [{ code: ERRORS.INVALID_REQUEST.code, message: 'Profile not found.' }]
                 });
             }
-            if (authUserId && !profileReadableByAuthenticatedUser(profileDoc, authUserId)) {
+            if (authUserId && !profileReadableByAuthenticatedUser(profileDoc, authUserId, mongoUserId)) {
                 return res.status(403).json({
                     status: STATUS.FAILED,
                     errors: [ERRORS.PROFILE_ACCESS_DENIED]
@@ -488,6 +495,7 @@ export const verifySelfie = async (req, res) => {
 
             const persisted = await persistSelfieVerification({
                 authUserId,
+                mongoUserId,
                 authMode,
                 profileId,
                 idPhotoUrl,
@@ -580,6 +588,7 @@ async function respondWithKycStatus(req, res, profileId) {
         const authUserId = req.authContext?.userId || req.auth?.userId;
         const authMode = req.authContext?.mode;
         const capPid = req.authContext?.captureProfileId;
+        const mongoUserId = req.authContext?.mongoUserId ?? null;
 
         if (authMode === 'captureSession') {
             if (!capPid || String(capPid) !== String(profile._id)) {
@@ -588,8 +597,7 @@ async function respondWithKycStatus(req, res, profileId) {
                     errors: [ERRORS.PROFILE_ACCESS_DENIED]
                 });
             }
-        }
-        if (!profileReadableByAuthenticatedUser(profile, authUserId)) {
+        } else if (!profileReadableByAuthenticatedUser(profile, authUserId, mongoUserId)) {
             return res.status(403).json({
                 status: STATUS.FAILED,
                 errors: [ERRORS.PROFILE_ACCESS_DENIED]
