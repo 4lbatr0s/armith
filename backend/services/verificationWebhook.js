@@ -5,6 +5,11 @@ import { createHmac, randomUUID } from 'crypto';
 
 import logger from '../lib/logger.js';
 import { outboundWebhookAllowsEvent } from '../lib/integrationWebhookEvents.js';
+import {
+  buildWebhookOptionalData,
+  mergeWebhookDataSection,
+  normalizeIntegrationWebhookDataFields
+} from '../lib/webhookPayloadExtras.js';
 import { KycConfiguration, WebhookDelivery } from '../models/index.js';
 import { deriveOutcomeSemantics } from './kyc/webhookOutcomeSemantics.js';
 
@@ -31,6 +36,18 @@ function backoffDelayForAttempt(attemptIndex) {
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function enrichWebhookPayloadData(profile, cfg, payload) {
+  if (!payload || typeof payload !== 'object' || typeof payload.data !== 'object' || payload.data === null) {
+    return payload;
+  }
+  const normalized = normalizeIntegrationWebhookDataFields(cfg?.integrationWebhookDataFields);
+  const extras = buildWebhookOptionalData(profile, normalized);
+  return {
+    ...payload,
+    data: mergeWebhookDataSection(payload.data, extras)
+  };
 }
 
 async function deliverWebhook({
@@ -164,21 +181,26 @@ export function emitVerificationTerminalWebhook({
             ) {
                 return;
             }
-            const payload =
+            const basePayload =
               forcePayload && typeof forcePayload === 'object'
                 ? forcePayload
                 : {
-                type: eventType,
-                created: new Date().toISOString(),
-                apiVersion: '2026-05-06',
-                data: {
-                    profileId: String(profile._id),
-                    sessionId: String(profile._id),
-                    status: st,
-                    correlationId: correlationId ?? null,
-                    outcomeSemantics: deriveOutcomeSemantics(profile)
-                }
-            };
+                    type: eventType,
+                    created: new Date().toISOString(),
+                    apiVersion: '2026-05-06',
+                    data: {
+                      profileId: String(profile._id),
+                      sessionId: String(profile._id),
+                      status: st,
+                      correlationId: correlationId ?? null,
+                      outcomeSemantics: deriveOutcomeSemantics(profile)
+                    }
+                  };
+            const payload =
+              forcePayload && typeof forcePayload === 'object'
+                ? basePayload
+                : enrichWebhookPayloadData(profile, cfg, basePayload);
+
             await deliverWebhook({
               tenantUserId,
               profileId: profile._id,
@@ -216,17 +238,17 @@ export function emitManualReviewQueuedWebhook({ tenantUserId, profile, correlati
                 return;
             }
 
-            const payload = {
-                type: 'verification.manual_review_queued',
-                created: new Date().toISOString(),
-                apiVersion: '2026-05-06',
-                data: {
-                    profileId: String(profile._id),
-                    sessionId: String(profile._id),
-                    status: String(profile.status ?? '').toUpperCase(),
-                    correlationId: correlationId ?? null
-                }
-            };
+            const payload = enrichWebhookPayloadData(profile, cfg, {
+              type: 'verification.manual_review_queued',
+              created: new Date().toISOString(),
+              apiVersion: '2026-05-06',
+              data: {
+                profileId: String(profile._id),
+                sessionId: String(profile._id),
+                status: String(profile.status ?? '').toUpperCase(),
+                correlationId: correlationId ?? null
+              }
+            });
             await deliverWebhook({
               tenantUserId,
               profileId: profile._id,
@@ -266,7 +288,7 @@ export function emitManualReviewResolvedWebhook({
       const eventType = 'verification.manual_review_resolved';
       if (!outboundWebhookAllowsEvent(cfg, eventType)) return;
 
-      const payload = {
+      const payload = enrichWebhookPayloadData(profile, cfg, {
         type: eventType,
         created: new Date().toISOString(),
         apiVersion: '2026-05-06',
@@ -277,7 +299,7 @@ export function emitManualReviewResolvedWebhook({
           decision: resolved,
           correlationId: correlationId ?? null
         }
-      };
+      });
       await deliverWebhook({
         tenantUserId,
         profileId: profile._id,

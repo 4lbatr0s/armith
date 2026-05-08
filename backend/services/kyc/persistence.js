@@ -26,6 +26,25 @@ function isTerminalProfileStatus(value) {
   return u === 'APPROVED' || u === 'REJECTED' || u === 'FAILED';
 }
 
+function applyIntegrationTenantFields(profile, tenant) {
+    if (!profile || !tenant) return;
+    if (tenant.integrationExternalRef !== undefined) {
+        profile.integrationExternalRef = String(tenant.integrationExternalRef).trim().slice(0, 256);
+    }
+    if (tenant.integrationMetadata !== undefined) {
+        if (
+            tenant.integrationMetadata &&
+            typeof tenant.integrationMetadata === 'object' &&
+            !Array.isArray(tenant.integrationMetadata) &&
+            Object.keys(tenant.integrationMetadata).length > 0
+        ) {
+            profile.integrationMetadata = { ...tenant.integrationMetadata };
+        } else {
+            profile.integrationMetadata = undefined;
+        }
+    }
+}
+
 function shapePersistedErrors(errors) {
     if (!Array.isArray(errors)) return [];
     return errors.map(e => {
@@ -59,7 +78,8 @@ export async function persistIdVerification({
     frontImageUrl,
     backImageUrl,
     rejectionReasons,
-    overallStatus
+    overallStatus,
+    integrationTenant
 }) {
     const idNum = normalizeIdentityNumber(result.data?.identityNumber);
     let profile = null;
@@ -132,10 +152,11 @@ export async function persistIdVerification({
         } else if (rejectionReasons.length > 0) {
             profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
         }
+        applyIntegrationTenantFields(profile, integrationTenant);
         await profile.save();
     } else {
         previousProfileStatus = null;
-        profile = await Profile.create({
+        const newProfilePayload = {
             userId: authUserId,
             fullName: `${result.data?.firstName} ${result.data?.lastName}`.trim(),
             firstName: result.data?.firstName,
@@ -157,7 +178,9 @@ export async function persistIdVerification({
             verificationAttempts: 1,
             lastVerificationAttempt: new Date(),
             rejectionReasons
-        });
+        };
+        applyIntegrationTenantFields(newProfilePayload, integrationTenant);
+        profile = await Profile.create(newProfilePayload);
     }
 
     const nextStatusUpper = String(overallStatus ?? '').toUpperCase();
@@ -211,7 +234,8 @@ export async function persistSelfieVerification({
     result,
     rejectionReasons,
     overallStatus,
-    idCardStatusUpper = 'PENDING'
+    idCardStatusUpper = 'PENDING',
+    integrationTenant
 }) {
     const profile = await Profile.findById(profileId);
     if (!profile) {
@@ -230,6 +254,7 @@ export async function persistSelfieVerification({
     if (rejectionReasons.length > 0) {
         profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
     }
+    applyIntegrationTenantFields(profile, integrationTenant);
     await profile.save();
 
     const nextStatusUpper = String(overallStatus ?? '').toUpperCase();

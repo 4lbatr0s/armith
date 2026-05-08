@@ -110,6 +110,11 @@ const kycConfigurationSchema = new mongoose.Schema(
         integrationWebhookEvents: {
             type: [String],
             default: undefined
+        },
+        /** Optional keys merged into webhook `data` (see WEBHOOK_OPTIONAL_DATA_FIELDS). Empty/absent → no extras beyond base payload. */
+        integrationWebhookDataFields: {
+            type: [String],
+            default: undefined
         }
     },
     {

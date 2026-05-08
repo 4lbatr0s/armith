@@ -107,7 +107,20 @@ const profileSchema = new mongoose.Schema(
                 assigneeLabel: { type: String, maxlength: 160, trim: true, default: '' },
                 note: { type: String, maxlength: 300, trim: true, default: '' }
             }
-        ]
+        ],
+
+        /** Tenant CRM / order reference; may appear in outbound webhooks when allowlisted. */
+        integrationExternalRef: {
+            type: String,
+            maxlength: 256,
+            trim: true,
+            default: ''
+        },
+        /** Flat string map (max enforced in API); may appear as `metadata` in webhooks when allowlisted. */
+        integrationMetadata: {
+            type: mongoose.Schema.Types.Mixed,
+            default: undefined
+        }
     },
     {
         timestamps: true,

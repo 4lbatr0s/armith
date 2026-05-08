@@ -17,12 +17,24 @@ prompt: |
 
   Task: Decide whether the selfie(s) depict the **same real person** as the ID portrait, captured **live** (not replayed from a screen or file), and whether the submission is trustworthy.
 
+  <task_goal>
+  Produce a strict JSON biometric verification result that can be enforced automatically. The result must clearly separate identity match, liveness/spoofing, face-count validity, image quality, and threshold policy.
+  </task_goal>
+
   # OPERATING PRINCIPLES
   - Treat this as a high-risk KYC biometric decision. A false accept is worse than a false reject.
   - Use only visible evidence. Do not assume that a clear portrait is live, or that two faces match because demographics, hairstyle, pose, or expression are similar.
   - Separate the decisions: face count, same-person match, liveness/spoofing, and image quality are independent gates. Strong performance in one gate cannot compensate for a clear failure in another.
-  - Before producing JSON, internally check: face detection → anti-spoofing evidence → facial feature comparison → quality thresholds → final validation status. Do not output your internal reasoning, only the final JSON.
+  - Apply every instruction in this prompt to every provided selfie and the ID portrait, not only to the first or clearest image.
+  - Before producing JSON, internally evaluate: face detection -> anti-spoofing evidence -> facial feature comparison -> quality thresholds -> final validation status. Do not output your internal reasoning, only the final JSON.
   - Every warning or failure must be backed by a concrete visual reason in `explainability`, not a generic statement.
+
+  <evidence_rules>
+  - Ground every score in visible evidence from the images.
+  - Prefer concrete visual observations: eye spacing mismatch, different nasal bridge, jaw width difference, screen moire, printed-photo paper edge, glare blocking landmarks, mask covering lower face, etc.
+  - Do not use broad demographic similarity, hairstyle, clothing, pose, background, or image clarity as proof of identity.
+  - If evidence is ambiguous, use `review` only when there is no clear fraud signal. Use `fail` for material spoofing or material identity mismatch.
+  </evidence_rules>
 
   # STEP 1: FACE DETECTION
 
@@ -37,6 +49,11 @@ prompt: |
   - `faceDetectionConfidence` should be high only when the face boundaries, landmarks, and main facial features are clearly visible.
   - If a face is cropped, masked, heavily blurred, profile-only, tiny, or partly outside frame, lower face detection confidence and add a quality issue.
   - Multiple people, background faces, printed faces, or screen faces count as detected faces when visible and should trigger face-count errors.
+
+  <face_detection_examples>
+  - One real selfie face plus a visible face on a poster or phone screen in the background is more than one visible face; add `INVALID_FACE_COUNT`.
+  - A selfie where sunglasses, mask, crop, or blur hides stable landmarks may still have one face, but should receive lower `faceDetectionConfidence` and relevant quality issues.
+  </face_detection_examples>
 
   # STEP 2: LIVENESS & ANTI-SPOOFING (CRITICAL)
 
@@ -60,6 +77,12 @@ prompt: |
   - `spoofingRisk` <= 0.20 only when replay/file/print/screen cues are absent.
   - `spoofingRisk` 0.40-0.70 when artifacts are suspicious but not conclusive.
   - `spoofingRisk` >= 0.75 for visible screen/print/photo-of-photo, stock/downloaded portrait cues, specimen ID, synthetic-looking face, or inconsistent capture provenance.
+
+  <liveness_examples>
+  - A sharp studio portrait or downloaded-looking headshot is not strong liveness by itself. Treat it as low liveness unless there are live camera capture cues.
+  - A phone-screen replay with visible bezel, RGB grid, moire, or glare should produce high spoofing risk even if the face matches the ID portrait.
+  - Multiple selfies with different angles improve liveness only when they appear to be live captures of the same person, not repeated crops or edited files.
+  </liveness_examples>
 
   Check for liveness indicators (when present):
   - Natural micro-expressions, realistic shadows, coherent catchlights
@@ -95,6 +118,12 @@ prompt: |
   - If `isMatch` is false, `matchingReasons` may be empty or minimal, but `mismatchReasons` must contain concrete differences.
   - If `isMatch` is true, `mismatchReasons` should be empty unless there are minor non-blocking differences that do not affect identity.
 
+  <matching_examples>
+  - Same hairstyle, beard, smile, or lighting is supporting context only; it is never enough to pass without stable facial geometry alignment.
+  - If the ID portrait and selfie show different eye spacing, nose bridge, jaw shape, and age cohort, set `isMatch` false and keep `matchConfidence` below 45 even if both images are high quality.
+  - If glasses, aging, lighting, or expression explain minor differences but stable landmarks align, `isMatch` can be true when thresholds are met and liveness is acceptable.
+  </matching_examples>
+
   # STEP 4: IMAGE QUALITY
 
   Check lighting, face size, coverage, and technical quality.
@@ -128,6 +157,19 @@ prompt: |
   - Use `validation.status` **fail** for any critical gate failure: no/extra face, clear mismatch, match below threshold, spoofing risk above threshold, liveness below threshold, unacceptable coverage, specimen/sample ID, or unusable image.
   - Include the failed threshold in each error's `threshold` field when applicable, for example `">= {{selfieThresholds.minMatchConfidence}}%"`, `"<= {{spoofRiskFormatted}}"`, or `">= {{livenessConfidenceFormatted}}"`.
   - Do not set `pass` when any critical error is present, even if `validation.errors` would otherwise be empty.
+  - For custom thresholds, interpret the threshold name, type, value, and description literally. Apply them in addition to the standard thresholds without replacing any standard threshold unless the description explicitly says so.
+
+  <final_self_check>
+  Before returning JSON, verify all of the following:
+  - The response is a single valid JSON object with no markdown, commentary, XML tags, or prefix text.
+  - Every schema field is present.
+  - Unknown optional values use JSON null, not empty strings or placeholder text.
+  - Scores are numeric and within range.
+  - `validation.status` is `fail` whenever any critical error is present.
+  - `biometricMatch.isMatch`, `biometricMatch.matchConfidence`, and `explainability.mismatchReasons` agree with each other.
+  - `liveness.spoofingRisk`, `liveness.livenessConfidence`, and spoofing indicators agree with each other.
+  - Threshold failures have corresponding errors with the relevant threshold string when applicable.
+  </final_self_check>
 
   {{#if hasCustomThresholds}}
 

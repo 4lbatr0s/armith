@@ -21,6 +21,11 @@ import {
   normalizeOutboundWebhookSubscriptions,
   resolveOutboundWebhookSubscriptionsForPublic
 } from '../lib/integrationWebhookEvents.js';
+import {
+  normalizeIntegrationWebhookDataFields,
+  resolveWebhookDataFieldsForPublic,
+  WEBHOOK_OPTIONAL_DATA_FIELDS
+} from '../lib/webhookPayloadExtras.js';
 
 const MAX_INTEGRATION_WEBHOOK_URL = 2048;
 const MAX_INTEGRATION_WEBHOOK_SECRET = 512;
@@ -53,7 +58,9 @@ function buildPublicSettingsFromConfig(cfg) {
     integration: {
       webhookUrl: oc.integrationWebhookUrl ? String(oc.integrationWebhookUrl).trim() : '',
       hasWebhookSecret,
-      webhookEvents: resolveOutboundWebhookSubscriptionsForPublic(oc.integrationWebhookEvents)
+      webhookEvents: resolveOutboundWebhookSubscriptionsForPublic(oc.integrationWebhookEvents),
+      webhookDataFields: resolveWebhookDataFieldsForPublic(oc.integrationWebhookDataFields),
+      webhookDataFieldCatalog: [...WEBHOOK_OPTIONAL_DATA_FIELDS]
     },
     metadata: oc.updatedAt ? { lastUpdated: oc.updatedAt } : undefined
   };
@@ -801,6 +808,13 @@ export const updateSettings = async (req, res) => {
         }
         config.integrationWebhookEvents =
           normalizeOutboundWebhookSubscriptions(integ.webhookEvents);
+      }
+      if (integ.webhookDataFields !== undefined) {
+        integrationTouched = true;
+        if (!Array.isArray(integ.webhookDataFields)) {
+          throw Object.assign(new Error('webhookDataFields must be an array'), { statusCode: 400 });
+        }
+        config.integrationWebhookDataFields = normalizeIntegrationWebhookDataFields(integ.webhookDataFields);
       }
     };
 

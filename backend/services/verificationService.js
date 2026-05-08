@@ -29,12 +29,22 @@ const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const TEMPERATURE = 0.1;
 const MAX_TOKENS = 2000;
 
-function groqAbortOptions() {
+/** Wall-clock guard only — Groq rejects `signal` on `chat.completions.create` (400 unsupported property). */
+function groqCompletionWithTimeout(createPromise) {
     const ms = Number(process.env.GROQ_TIMEOUT_MS || 120000);
-    if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') {
-        return {};
-    }
-    return { signal: AbortSignal.timeout(ms) };
+    if (!Number.isFinite(ms) || ms <= 0)
+        return createPromise;
+    let id;
+    const timeout = new Promise((_, rej) => {
+        id = setTimeout(() => rej(new Error(`Groq request timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([
+        createPromise.finally(() => {
+            if (id)
+                clearTimeout(id);
+        }),
+        timeout
+    ]);
 }
 function parseJsonContent(content) {
     if (!content)
@@ -208,8 +218,7 @@ export class VerificationService {
                 imageContent.push({ type: 'image_url', image_url: { url: images.back } });
             }
 
-            const response = await getGroqClient().chat.completions.create({
-                ...groqAbortOptions(),
+            const response = await groqCompletionWithTimeout(getGroqClient().chat.completions.create({
                 model: MODEL,
                 temperature: TEMPERATURE,
                 max_tokens: MAX_TOKENS,
@@ -222,7 +231,7 @@ export class VerificationService {
                     }
                 },
                 messages: [{ role: 'system', content: prompt }, { role: 'user', content: imageContent }]
-            });
+            }));
             const rawContent = response.choices[0]?.message?.content;
             if (!rawContent)
                 throw new Error('Empty response from LLM');
@@ -257,8 +266,7 @@ export class VerificationService {
                 ...selfies.map(url => ({ type: 'image_url', image_url: { url } }))
             ];
 
-            const response = await getGroqClient().chat.completions.create({
-                ...groqAbortOptions(),
+            const response = await groqCompletionWithTimeout(getGroqClient().chat.completions.create({
                 model: MODEL,
                 temperature: TEMPERATURE,
                 max_tokens: MAX_TOKENS,
@@ -283,7 +291,7 @@ export class VerificationService {
                         ]
                     }
                 ]
-            });
+            }));
             const rawData = parseJsonContent(response.choices[0]?.message?.content);
             if (!rawData) {
                 return {

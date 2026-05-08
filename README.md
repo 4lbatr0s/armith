@@ -63,10 +63,8 @@ Use local `.env` files for local development, and set the same values in Render 
 
 - [`docs/TODO_PRODUCT_BACKLOG.md`](docs/TODO_PRODUCT_BACKLOG.md) — planning (non-agent vs agent backlog).
 - [`docs/RETENTION_DECISION_CHECKLIST.md`](docs/RETENTION_DECISION_CHECKLIST.md) — retention / purge decisions (R2 + Mongo).
-- [`docs/BILLABLE_UNIT_DECISION_GUIDE.md`](docs/BILLABLE_UNIT_DECISION_GUIDE.md) — lock billable-unit semantics before commerce.
-- [`docs/SLO_AND_ONCALL_STUB.md`](docs/SLO_AND_ONCALL_STUB.md) — SLO / on-call placeholders after traffic baseline.
 
-Lifecycle jobs: set `R2_LIFECYCLE_CRON` / `MONGO_LIFECYCLE_CRON` for periodic ticks. **Destructive** R2 purge stays off unless `R2_LIFECYCLE_PURGE_ENABLED=1` and `R2_RETENTION_MIN_AGE_DAYS` (see `backend/.env.example`).
+Lifecycle jobs: set `R2_LIFECYCLE_CRON` / `MONGO_LIFECYCLE_CRON` for periodic ticks. **Destructive** R2 purge stays off unless `R2_LIFECYCLE_PURGE_ENABLED=1` and `R2_RETENTION_MIN_AGE_DAYS`; configure **`R2_LIFECYCLE_PREFIXES`** (or legacy `R2_LIFECYCLE_PREFIX`). Purge skips keys linked to profiles on **`legalHold`** or **unresolved manual review** (see [`docs/RETENTION_DECISION_CHECKLIST.md`](docs/RETENTION_DECISION_CHECKLIST.md)). Optional **`MONGO_PROFILE_AGE_DAYS`** enables a read-only terminal-profile age report when the Mongo lifecycle tick runs — see `backend/.env.example`.
 
 ## Public API changelog (summary — API semantic version `1`)
 
@@ -80,10 +78,10 @@ Canonical **`meta.api.semanticVersion`** and **`meta.policy.bundleVersion`** liv
 
 ## Observability
 
-- **`GET /health`** — configure external synthetic uptime probes against your deployed API URL (runbook: `docs/SYNTHETIC_UPTIME_PROBES.md`).
+- **`GET /health`** — point an external uptime check at `/health` (interval, timeouts, alerts: see [`docs/TODO_PRODUCT_BACKLOG.md`](docs/TODO_PRODUCT_BACKLOG.md) §1 observability).
 - **`npm run golden`** — Zod validation of LLM-shape fixtures (**`backend/scripts/golden-validation.mjs`**).
 - **`npm run test:ci`** (backend) — pipeline regression tests with mocked integrations.
 
 ## Commerce / metering (deferred)
 
-**`STRIPE_METERING_NOTE`:** Stripe (or equivalent) metering is backlog until billable-unit definition is finalized. No Stripe code ships in-repo until product locks charging semantics (`docs/TODO_PRODUCT_BACKLOG.md` §1–§3). Use [`docs/BILLABLE_UNIT_DECISION_GUIDE.md`](docs/BILLABLE_UNIT_DECISION_GUIDE.md) to record the product lock; public list pricing is indicative until metering exists.
+**`STRIPE_METERING_NOTE`:** Stripe (or equivalent) metering is backlog until billable-unit definition is finalized. No Stripe code ships in-repo until product locks charging semantics (`docs/TODO_PRODUCT_BACKLOG.md` §1–§3); public list pricing is indicative until metering exists.

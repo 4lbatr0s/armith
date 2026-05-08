@@ -217,7 +217,17 @@ export const verifyId = async (req, res) => {
             });
         }
 
-        const { countryCode = 'TR', frontImageUrl, backImageUrl } = validation.data;
+        const {
+            countryCode = 'TR',
+            frontImageUrl,
+            backImageUrl,
+            integrationExternalRef,
+            integrationMetadata
+        } = validation.data;
+        const integrationTenant =
+            integrationExternalRef !== undefined || integrationMetadata !== undefined
+                ? { integrationExternalRef, integrationMetadata }
+                : undefined;
 
         const countryCodeUpper = countryCode.toUpperCase();
         
@@ -283,7 +293,8 @@ export const verifyId = async (req, res) => {
                 frontImageUrl,
                 backImageUrl,
                 rejectionReasons,
-                overallStatus
+                overallStatus,
+                integrationTenant
             });
             profile = idPersist.profile;
             clerkIdToIncrementQuota = idPersist.clerkIdToIncrementQuota;
@@ -373,7 +384,18 @@ export const verifySelfie = async (req, res) => {
             });
         }
 
-        const { idPhotoUrl, selfieUrls, profileId: profileIdFromBody, verificationId } = validation.data;
+        const {
+            idPhotoUrl,
+            selfieUrls,
+            profileId: profileIdFromBody,
+            verificationId,
+            integrationExternalRef,
+            integrationMetadata
+        } = validation.data;
+        const integrationTenantSelfie =
+            integrationExternalRef !== undefined || integrationMetadata !== undefined
+                ? { integrationExternalRef, integrationMetadata }
+                : undefined;
         const profileId = profileIdFromBody || verificationId;
 
         const authUserId = req.authContext?.userId || req.auth?.userId;
@@ -461,7 +483,8 @@ export const verifySelfie = async (req, res) => {
                 result,
                 rejectionReasons,
                 overallStatus,
-                idCardStatusUpper: idStatus
+                idCardStatusUpper: idStatus,
+                integrationTenant: integrationTenantSelfie
             });
 
             if (!persisted.profile) {
