@@ -13,65 +13,70 @@
 
 @layer base {
   :root {
-    --background: 40 24% 94%;
-    --foreground: 0 0% 5%;
+    /* Secondary label/body tint; inverted in .dark via separate RGB — same class `text-pm-muted` in both modes */
+    --pm-muted-rgb: 61 71 86;
 
-    --card: 40 33% 98%;
-    --card-foreground: 0 0% 5%;
+    --background: 220 14% 96%;
+    --foreground: 222 47% 11%;
 
-    --popover: 40 33% 98%;
-    --popover-foreground: 0 0% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --primary: 326 100% 45%;
-    --primary-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --secondary: 40 12% 90%;
-    --secondary-foreground: 0 0% 8%;
+    --primary: 174 61% 22%;
+    --primary-foreground: 210 36% 98%;
 
-    --muted: 40 10% 88%;
-    --muted-foreground: 30 6% 38%;
+    --secondary: 220 13% 91%;
+    --secondary-foreground: 222 40% 14%;
 
-    --accent: 172 100% 38%;
-    --accent-foreground: 0 0% 6%;
+    --muted: 220 13% 90%;
+    --muted-foreground: 215 19% 34%;
+
+    --accent: 170 30% 92%;
+    --accent-foreground: 174 55% 17%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 8%;
-    --input: 0 0% 8%;
-    --ring: 326 100% 45%;
+    --border: 220 18% 18%;
+    --input: 220 18% 18%;
+    --ring: 174 61% 22%;
 
     --radius: 0.125rem;
   }
 
   .dark {
-    --background: 240 6% 4%;
-    --foreground: 40 20% 96%;
+    --pm-muted-rgb: 176 186 201;
 
-    --card: 240 5% 8%;
-    --card-foreground: 40 20% 96%;
+    --background: 240 6% 7%;
+    --foreground: 220 18% 94%;
 
-    --popover: 240 5% 8%;
-    --popover-foreground: 40 20% 96%;
+    --card: 240 5% 11%;
+    --card-foreground: 220 18% 94%;
 
-    --primary: 326 100% 55%;
-    --primary-foreground: 0 0% 100%;
+    --popover: 240 5% 11%;
+    --popover-foreground: 220 18% 94%;
 
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 40 20% 96%;
+    --primary: 172 52% 42%;
+    --primary-foreground: 210 36% 98%;
 
-    --muted: 240 4% 18%;
-    --muted-foreground: 40 8% 68%;
+    --secondary: 240 4% 15%;
+    --secondary-foreground: 220 16% 92%;
 
-    --accent: 172 90% 42%;
-    --accent-foreground: 0 0% 6%;
+    --muted: 240 4% 17%;
+    --muted-foreground: 218 12% 72%;
+
+    --accent: 240 5% 15%;
+    --accent-foreground: 168 35% 82%;
 
     --destructive: 0 62% 46%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 100%;
-    --input: 0 0% 100%;
-    --ring: 326 100% 55%;
+    --border: 220 10% 100%;
+    --input: 220 10% 100%;
+    --ring: 172 52% 45%;
   }
 }
 
@@ -79,13 +84,32 @@
   * {
     @apply border-border;
   }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-pm-accent ring-offset-2 ring-offset-pm-paper dark:ring-offset-pm-void;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer utilities {
+  .sr-only-focusable {
+    @apply absolute left-4 top-4 z-[100] -translate-y-[120%] rounded-sm border-2 border-pm-ink bg-pm-accent px-4 py-2 text-sm font-semibold text-white shadow-brutal transition-transform focus:translate-y-0 focus-visible:translate-y-0;
+  }
+
   .pm-grid-bg {
     background-image:
-      linear-gradient(to right, rgba(12, 12, 12, 0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(12, 12, 12, 0.06) 1px, transparent 1px);
+      linear-gradient(to right, rgba(18, 24, 38, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(18, 24, 38, 0.06) 1px, transparent 1px);
     background-size: 48px 48px;
   }
   .dark .pm-grid-bg {
@@ -95,7 +119,7 @@
   }
 
   .shadow-brutal {
-    box-shadow: 5px 5px 0 0 #0c0c0c;
+    box-shadow: 5px 5px 0 0 #121826;
   }
   .dark .shadow-brutal {
     box-shadow: 5px 5px 0 0 rgba(255, 255, 255, 0.22);
@@ -105,8 +129,16 @@
     @apply bg-pm-surface dark:bg-pm-surface-dark border-2 border-pm-ink dark:border-white/15 shadow-brutal rounded-sm;
   }
 
+  /** Clerk SignIn/SignUp cards — offset shadow matches `shadow-brutal` (Clerk may set its own box-shadow). */
+  .cl-pm-auth-card {
+    box-shadow: 5px 5px 0 0 #121826;
+  }
+  .dark .cl-pm-auth-card {
+    box-shadow: 5px 5px 0 0 rgba(255, 255, 255, 0.22);
+  }
+
   .pm-kicker {
-    @apply inline-block font-sans text-xs font-semibold uppercase tracking-[0.25em] text-pm-muted dark:text-pm-muted border border-pm-ink/20 dark:border-white/20 px-3 py-1.5 rounded-sm bg-pm-wash/60 dark:bg-white/5;
+    @apply inline-block font-sans text-xs font-semibold uppercase tracking-[0.25em] text-pm-muted border border-pm-ink/20 dark:border-white/20 px-3 py-1.5 rounded-sm bg-pm-wash/60 dark:bg-white/5;
   }
 
   .pm-heading-xl {
@@ -122,10 +154,9 @@
 
   /**
    * Neo-brutalist pointer (fallback: pointer). Hotspot ~ tip of arrow.
-   * Light: magenta fill + ink stroke. Dark mode: browser may still use light asset — pointer fallback suffices.
    */
   .cursor-brutal {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath fill='%23e4007a' stroke='%230c0c0c' stroke-width='2' stroke-linejoin='miter' d='M4 6 L4 22 L11 15 L15 24 L19 22 L14 13 L22 13 L22 9 L12 9 L12 4 Z'/%3E%3C/svg%3E")
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath fill='%23145f57' stroke='%23121826' stroke-width='2' stroke-linejoin='miter' d='M4 6 L4 22 L11 15 L15 24 L19 22 L14 13 L22 13 L22 9 L12 9 L12 4 Z'/%3E%3C/svg%3E")
         4 6,
       pointer;
   }
@@ -141,7 +172,7 @@
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center bg-pm-accent text-white font-semibold uppercase tracking-wide text-sm px-8 py-4 rounded-sm border-2 border-pm-ink dark:border-white/20 shadow-brutal hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[3px_3px_0_0_#0c0c0c] dark:hover:shadow-[3px_3px_0_0_rgba(255,255,255,0.22)] transition-all;
+  @apply inline-flex items-center justify-center bg-pm-accent text-white font-semibold uppercase tracking-wide text-sm px-8 py-4 rounded-sm border-2 border-pm-ink dark:border-white/20 shadow-brutal hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[3px_3px_0_0_#121826] dark:hover:shadow-[3px_3px_0_0_rgba(255,255,255,0.22)] transition-all;
 }
 
 .btn-secondary {

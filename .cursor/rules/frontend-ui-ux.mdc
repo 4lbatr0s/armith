@@ -10,7 +10,7 @@ When creating or editing UI in `frontend/`, follow this system so landing, dashb
 
 ## Design direction (postmodern / neo-system)
 
-- **Tone**: Confident, editorial, slightly brutalist — not generic “SaaS blue”. Prefer **high contrast**, **hard edges** (small radius), **offset hard shadows**, and **one loud accent** (`pm-accent`) plus a **secondary accent** (`pm-accent-alt`) for highlights only.
+- **Tone**: Confident and structured — **not** SaaS-generic, **not** harsh “pure black + neon accent”. Prefer **muted contrast**, **hard edges** (small radius), **offset hard shadows**, and **two restrained accents**: primary **`pm-accent`** (deep teal, CTAs) and **`pm-accent-alt`** (sage teal, success / highlights). Surfaces stay **cool neutral** (zinc‑slate) for long-session readability.
 - **Typography**: Headlines use **`font-display`** (Syne). Body and UI use **`font-sans`** (IBM Plex Sans). **Uppercase + wide tracking** (`tracking-[0.2em] text-xs`) for meta labels, nav groups, and table headers — never for long paragraphs.
 - **Surfaces**: Pages sit on **`bg-pm-paper` / `dark:bg-pm-void`**. Cards and panels use **`bg-pm-surface` / `dark:bg-pm-surface-dark`** with **`border-2 border-pm-ink dark:border-white/15`** and **`shadow-brutal`** (see `index.css`). Avoid mixing unrelated motifs (e.g. heavy glassmorphism on one page and flat gray cards on another).
 - **Layout**: Use **`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`** for primary content; **`flex-1 w-full`** for route bodies inside `Layout` (do not stack a second full viewport background that fights the shell).
@@ -23,12 +23,12 @@ Prefer semantic **`pm-*`** classes from `tailwind.config.js` / `index.css`:
 | Role        | Light                          | Dark                                      |
 |------------|--------------------------------|-------------------------------------------|
 | Page base  | `bg-pm-paper text-pm-ink`      | `bg-pm-void text-pm-ink-soft`             |
-| Panel/card | `bg-pm-surface border-pm-ink`  | `bg-pm-surface-dark border-white/15`      |
-| Muted copy | `text-pm-muted`                | same                                      |
-| Primary CTA| `bg-pm-accent text-white`      | same                                      |
+| Panel/card | `bg-pm-surface border-pm-ink`  | `bg-pm-surface-dark border-white/15`       |
+| Muted copy | `text-pm-muted`                | `--pm-muted-rgb` flips in `.dark`: dark gray on light surfaces, lighter gray on dark backgrounds |
+| Primary CTA| `bg-pm-accent text-white`       | same                                      |
 | Links / 2° | `text-pm-accent` hover underline | `text-pm-accent-alt` where contrast needs it |
 
-Shadcn **`primary`** in `:root` is aligned to the accent — use `<Button>` defaults for primary actions.
+Shadcn **`primary`** in `:root` is aligned to **`pm-accent`** — use `<Button>` defaults for primary actions.
 
 ## Components
 
@@ -44,13 +44,36 @@ Shadcn **`primary`** in `:root` is aligned to the accent — use `<Button>` defa
 - **Don’t** introduce a third font family or rainbow gradients per page.
 - **Don’t** use `rounded-2xl` + soft shadow on one screen and `rounded-lg` + flat gray on another for the same hierarchy level.
 
+## Focus and motion
+
+- **Skip link**: `Layout.jsx` exposes **“Skip to main content”** (`.sr-only-focusable` in `index.css`); `<main id="main" tabIndex={-1}>`.
+- **Focus visible**: Global **`*:focus-visible`** ring uses **`ring-pm-accent`** + offset in `index.css` (don’t remove focus outlines on interactive elements).
+- **Reduced motion**: `@media (prefers-reduced-motion: reduce)` in `index.css` short-circuits animations/transitions.
+
+## Toasts vs inline banners
+
+- **Sonner**: `<ToasterHost />` in `App.jsx` (inside `ThemeProvider` + `Router`). Use **`notify`** from `frontend/src/lib/notify.js` for transient success (saves, replays, API key actions).
+- **Inline**: Keep **validation errors**, **destructive confirmations**, and **load failures** next to the form/table (e.g. `settingsError`, `webhooksError`).
+
+## External links
+
+- Use **`ExternalLink`** (`frontend/src/components/ExternalLink.jsx`) for `https?://` URLs so **`rel="noopener noreferrer"`** and **`target="_blank"`** stay consistent.
+
+## Admin dashboard tabs
+
+- Tab UI: **`TabsBar`** (`frontend/src/components/admin/TabsBar.jsx`) — `role="tablist"`, arrow keys, `aria-selected`.
+- Tab panels: under **`frontend/src/pages/admin/tabs/`**; each root has **`role="tabpanel"`** and **`aria-labelledby`** matching the tab id.
+- **URL**: `?tab=webhooks` (etc.); valid ids: `dashboard`, `webhooks`, `manual_review`, `errors_insight`, `settings`.
+- **Data**: Dashboard fetch only while the Dashboard tab is active — **`useAdminDashboardSync`** in `frontend/src/pages/admin/useAdminDashboardSync.js`.
+- **Loading**: Prefer **`Skeleton` / `SkeletonRow`** (`frontend/src/components/ui/Skeleton.jsx`) over spinners for tables.
+
 ## i18n
 
 All user-visible strings go through **`react-i18next`** (`t('...')`); add keys to `en.json` and `tr.json`.
 
 ## Checklist before merging UI work
 
-1. Light + dark both readable (contrast on `pm-accent` on white/black).
+1. Light + dark both readable (contrast on `pm-accent` on white / dark surfaces).
 2. Route uses **`flex-1 w-full`** when inside `Layout` (no double `min-h-screen` backgrounds).
 3. Headings use **`font-display`**; labels use **uppercase + tracking** sparingly.
 4. Cards use **`border-2`** + **`shadow-brutal`** (or documented exception in the PR).

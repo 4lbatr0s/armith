@@ -29,7 +29,7 @@ export const ProfilePage = () => {
       if (!profileUser) return;
       const limit =
         profileUser?.limitsOverride?.monthlyVerificationLimit ??
-        (profileUser?.planTier === 'growth' ? 5000 : profileUser?.planTier === 'enterprise' ? null : 100);
+        (profileUser?.planTier === 'free' ? 20 : null);
       const used = profileUser?.verificationUsage?.currentPeriodCount || 0;
       const remaining = limit == null ? null : Math.max(limit - used, 0);
       setUsage({

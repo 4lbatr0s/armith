@@ -21,6 +21,11 @@ function omitNullProps(obj) {
     return Object.keys(out).length > 0 ? out : undefined;
 }
 
+function isTerminalProfileStatus(value) {
+  const u = String(value ?? '').toUpperCase();
+  return u === 'APPROVED' || u === 'REJECTED' || u === 'FAILED';
+}
+
 function shapePersistedErrors(errors) {
     if (!Array.isArray(errors)) return [];
     return errors.map(e => {
@@ -78,7 +83,9 @@ export async function persistIdVerification({
         }
     }
 
+    let previousProfileStatus = null;
     if (profile) {
+        previousProfileStatus = profile.status;
         profile.country = countryCodeUpper;
         profile.status = overallStatus.toUpperCase();
         const prevIdVerificationStatus = profile.idVerificationStatus;
@@ -127,6 +134,7 @@ export async function persistIdVerification({
         }
         await profile.save();
     } else {
+        previousProfileStatus = null;
         profile = await Profile.create({
             userId: authUserId,
             fullName: `${result.data?.firstName} ${result.data?.lastName}`.trim(),
@@ -151,6 +159,12 @@ export async function persistIdVerification({
             rejectionReasons
         });
     }
+
+    const nextStatusUpper = String(overallStatus ?? '').toUpperCase();
+    const shouldIncrementQuota =
+        Boolean(authUserId) &&
+        isTerminalProfileStatus(nextStatusUpper) &&
+        (previousProfileStatus == null || !isTerminalProfileStatus(previousProfileStatus));
 
     await IdCardValidation.create({
         profileId: profile._id,
@@ -187,7 +201,7 @@ export async function persistIdVerification({
         rejectionReasons
     });
 
-    return profile;
+    return { profile, clerkIdToIncrementQuota: shouldIncrementQuota ? authUserId : null };
 }
 
 export async function persistSelfieVerification({
@@ -201,9 +215,10 @@ export async function persistSelfieVerification({
 }) {
     const profile = await Profile.findById(profileId);
     if (!profile) {
-        return { profile: null };
+        return { profile: null, clerkIdToIncrementQuota: null };
     }
 
+    const previousProfileStatus = profile.status;
     profile.status = overallStatus.toUpperCase();
     profile.selfieVerificationStatus = result.status.toUpperCase();
     profile.idVerificationStatus = idCardStatusUpper;
@@ -216,6 +231,13 @@ export async function persistSelfieVerification({
         profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
     }
     await profile.save();
+
+    const nextStatusUpper = String(overallStatus ?? '').toUpperCase();
+    const ownerId = profile.userId;
+    const shouldIncrementQuota =
+        Boolean(ownerId) &&
+        isTerminalProfileStatus(nextStatusUpper) &&
+        !isTerminalProfileStatus(previousProfileStatus);
 
     await SelfieValidation.create({
         profileId: profile._id,
@@ -238,5 +260,5 @@ export async function persistSelfieVerification({
         rejectionReasons
     });
 
-    return { profile };
+    return { profile, clerkIdToIncrementQuota: shouldIncrementQuota ? ownerId : null };
 }

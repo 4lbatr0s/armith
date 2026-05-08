@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { useTheme } from './ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { ExternalLink } from './ExternalLink';
 
 export const Layout = ({ children }) => {
   const { user, isSignedIn, isLoaded } = useUser();
@@ -10,6 +11,11 @@ export const Layout = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'tr' : 'en';
@@ -31,8 +37,16 @@ export const Layout = ({ children }) => {
 
   const docsHref = process.env.REACT_APP_DOCUMENTATION_URL || '/docs';
 
+  const navLinkClass = (path, extra = '') =>
+    `${navClass(path)} ${extra}`.trim();
+
+  const verifyActive = isActive('/upload-id') || isActive('/upload-selfie');
+
   return (
     <div className="min-h-screen flex flex-col bg-pm-paper dark:bg-pm-void text-pm-ink dark:text-pm-ink-soft pm-grid-bg transition-colors duration-200">
+      <a href="#main" className="sr-only-focusable">
+        {t('layout.skip_to_content')}
+      </a>
       <header className="sticky top-0 z-50 border-b-2 border-pm-ink dark:border-white/15 bg-pm-surface/95 dark:bg-pm-surface-dark/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-4">
@@ -47,40 +61,35 @@ export const Layout = ({ children }) => {
             </Link>
 
             <div className="flex items-center gap-2 sm:gap-6 min-w-0">
-              <nav className="hidden sm:flex items-center gap-5">
-                <a
-                  href={docsHref}
-                  className="pm-link-nav"
-                  rel="noopener noreferrer"
-                >
+              <nav className="hidden sm:flex items-center gap-5" aria-label={t('layout.main_navigation')}>
+                <ExternalLink href={docsHref} className="pm-link-nav">
                   {t('layout.documentation')}
-                </a>
-                <Link to="/trust" className={navClass('/trust')}>
+                </ExternalLink>
+                <Link to="/trust" className={navLinkClass('/trust')} aria-current={isActive('/trust') ? 'page' : undefined}>
                   {t('layout.trust_security')}
                 </Link>
                 {!isSignedIn && (
                   <>
-                    <Link to="/" className={navClass('/')}>
+                    <Link to="/" className={navLinkClass('/')} aria-current={isActive('/') ? 'page' : undefined}>
                       {t('layout.home')}
                     </Link>
-                    <Link to="/pricing" className={navClass('/pricing')}>
+                    <Link to="/pricing" className={navLinkClass('/pricing')} aria-current={isActive('/pricing') ? 'page' : undefined}>
                       {t('layout.pricing')}
                     </Link>
                   </>
                 )}
                 {isSignedIn && (
                   <>
-                    <Link to="/admin" className={navClass('/admin')}>
+                    <Link to="/admin" className={navLinkClass('/admin')} aria-current={isActive('/admin') ? 'page' : undefined}>
                       {t('layout.dashboard')}
                     </Link>
-                    <Link to="/integrations" className={navClass('/integrations')}>
+                    <Link to="/integrations" className={navLinkClass('/integrations')} aria-current={isActive('/integrations') ? 'page' : undefined}>
                       {t('layout.integrations')}
                     </Link>
                     <Link
                       to="/upload-id"
-                      className={`pm-link-nav ${
-                        isActive('/upload-id') || isActive('/upload-selfie') ? 'pm-link-nav-active' : ''
-                      }`}
+                      className={`pm-link-nav ${verifyActive ? 'pm-link-nav-active' : ''}`}
+                      aria-current={verifyActive ? 'page' : undefined}
                     >
                       {t('layout.verify_identity')}
                     </Link>
@@ -91,23 +100,43 @@ export const Layout = ({ children }) => {
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 <button
                   type="button"
+                  onClick={() => setMobileNavOpen((o) => !o)}
+                  className="sm:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm border-2 border-transparent text-pm-muted hover:border-pm-ink/15 dark:hover:border-white/15 hover:text-pm-ink dark:hover:text-pm-ink-soft"
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="mobile-nav-panel"
+                  aria-label={mobileNavOpen ? t('layout.close_navigation') : t('layout.open_navigation')}
+                >
+                  {mobileNavOpen ? (
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  )}
+                </button>
+
+                <button
+                  type="button"
                   onClick={toggleLanguage}
-                  className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest border-2 border-transparent hover:border-pm-ink/20 dark:hover:border-white/20 rounded-sm text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm border-2 border-transparent px-2 text-xs font-bold uppercase tracking-widest text-pm-muted hover:border-pm-ink/20 dark:hover:border-white/20 hover:text-pm-ink dark:hover:text-pm-ink-soft"
+                  aria-label={t('layout.switch_language')}
                 >
                   {i18n.language === 'en' ? 'TR' : 'EN'}
                 </button>
                 <button
                   type="button"
                   onClick={toggleTheme}
-                  className="p-2 rounded-sm border-2 border-transparent hover:border-pm-ink/15 dark:hover:border-white/15 text-pm-muted hover:text-pm-ink dark:hover:text-pm-ink-soft"
-                  aria-label="Toggle theme"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm border-2 border-transparent text-pm-muted hover:border-pm-ink/15 dark:hover:border-white/15 hover:text-pm-ink dark:hover:text-pm-ink-soft"
+                  aria-label={t('layout.toggle_theme')}
                 >
                   {theme === 'dark' ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                   ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
                   )}
@@ -129,6 +158,7 @@ export const Layout = ({ children }) => {
                           ? 'bg-pm-accent text-white border-pm-accent'
                           : 'border-pm-ink/20 dark:border-white/20 hover:bg-pm-wash dark:hover:bg-white/10'
                       }`}
+                      aria-current={isActive('/profile') ? 'page' : undefined}
                     >
                       {t('layout.profile')}
                     </Link>
@@ -151,49 +181,57 @@ export const Layout = ({ children }) => {
               </div>
             </div>
           </div>
-          <div className="sm:hidden flex gap-4 pb-3 overflow-x-auto border-t border-pm-ink/10 dark:border-white/10 pt-2">
-            <a href={docsHref} className="pm-link-nav whitespace-nowrap" rel="noopener noreferrer">
-              {t('layout.documentation')}
-            </a>
-            <Link to="/trust" className={`${navClass('/trust')} whitespace-nowrap`}>
-              {t('layout.trust_security')}
-            </Link>
-            {!isSignedIn && (
-              <>
-                <Link to="/" className={navClass('/')}>
-                  {t('layout.home')}
-                </Link>
-                <Link to="/pricing" className={navClass('/pricing')}>
-                  {t('layout.pricing')}
-                </Link>
-              </>
-            )}
-            {isSignedIn && (
-              <>
-                <Link to="/admin" className={navClass('/admin')}>
-                  {t('layout.dashboard')}
-                </Link>
-                <Link to="/integrations" className={navClass('/integrations')}>
-                  {t('layout.integrations')}
-                </Link>
-                <Link to="/profile" className={navClass('/profile')}>
-                  {t('layout.profile')}
-                </Link>
-                <Link
-                  to="/upload-id"
-                  className={`pm-link-nav whitespace-nowrap ${
-                    isActive('/upload-id') || isActive('/upload-selfie') ? 'pm-link-nav-active' : ''
-                  }`}
-                >
-                  {t('layout.verify_identity')}
-                </Link>
-              </>
-            )}
-          </div>
+
+          {mobileNavOpen && (
+            <nav
+              id="mobile-nav-panel"
+              className="sm:hidden border-t border-pm-ink/10 dark:border-white/10 py-4 flex flex-col gap-3"
+              aria-label={t('layout.main_navigation')}
+            >
+              <ExternalLink href={docsHref} className="pm-link-nav py-1">
+                {t('layout.documentation')}
+              </ExternalLink>
+              <Link to="/trust" className={`${navLinkClass('/trust')} py-1`} aria-current={isActive('/trust') ? 'page' : undefined}>
+                {t('layout.trust_security')}
+              </Link>
+              {!isSignedIn && (
+                <>
+                  <Link to="/" className={`${navLinkClass('/')} py-1`} aria-current={isActive('/') ? 'page' : undefined}>
+                    {t('layout.home')}
+                  </Link>
+                  <Link to="/pricing" className={`${navLinkClass('/pricing')} py-1`} aria-current={isActive('/pricing') ? 'page' : undefined}>
+                    {t('layout.pricing')}
+                  </Link>
+                </>
+              )}
+              {isSignedIn && (
+                <>
+                  <Link to="/admin" className={`${navLinkClass('/admin')} py-1`} aria-current={isActive('/admin') ? 'page' : undefined}>
+                    {t('layout.dashboard')}
+                  </Link>
+                  <Link to="/integrations" className={`${navLinkClass('/integrations')} py-1`} aria-current={isActive('/integrations') ? 'page' : undefined}>
+                    {t('layout.integrations')}
+                  </Link>
+                  <Link to="/profile" className={`${navLinkClass('/profile')} py-1`} aria-current={isActive('/profile') ? 'page' : undefined}>
+                    {t('layout.profile')}
+                  </Link>
+                  <Link
+                    to="/upload-id"
+                    className={`pm-link-nav py-1 ${verifyActive ? 'pm-link-nav-active' : ''}`}
+                    aria-current={verifyActive ? 'page' : undefined}
+                  >
+                    {t('layout.verify_identity')}
+                  </Link>
+                </>
+              )}
+            </nav>
+          )}
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col w-full">{children}</main>
+      <main id="main" tabIndex={-1} className="flex-1 flex flex-col w-full outline-none">
+        {children}
+      </main>
 
       <footer className="border-t-2 border-pm-ink dark:border-white/15 bg-pm-surface dark:bg-pm-surface-dark mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

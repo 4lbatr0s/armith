@@ -9,7 +9,7 @@
     "dev": "tsx watch app.js",
     "test": "jest",
     "golden": "node scripts/golden-validation.mjs",
-    "test:ci": "node --test test/verification-pipeline.test.mjs test/outcome-semantics.test.mjs test/image-probe-ip-allow.test.mjs test/integration-webhook-events.test.mjs test/plan-features.test.mjs"
+    "test:ci": "node --test test/verification-pipeline.test.mjs test/outcome-semantics.test.mjs test/image-probe-ip-allow.test.mjs test/integration-webhook-events.test.mjs test/plan-features.test.mjs test/kyc-rate-limit-policy.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.893.0",

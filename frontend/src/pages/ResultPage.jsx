@@ -237,7 +237,7 @@ export const ResultPage = () => {
                 <div className="mt-4 flex items-center gap-4">
                   <div className="flex items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.idVerification?.approved ? 'bg-pm-accent-alt' :
-                        progress.idVerification?.completed ? 'bg-pm-accent' : 'bg-gray-300 dark:bg-gray-600'
+                        progress.idVerification?.completed ? 'bg-pm-accent' : 'bg-pm-wash dark:bg-white/15'
                       }`}>
                       {progress.idVerification?.approved ? (
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,15 +251,15 @@ export const ResultPage = () => {
                         <span className="text-white font-semibold">1</span>
                       )}
                     </div>
-                    <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t('result.step_id')}</span>
+                    <span className="ml-2 text-sm font-medium text-pm-ink dark:text-pm-ink-soft">{t('result.step_id')}</span>
                   </div>
 
-                  <div className={`flex-1 h-1 rounded ${progress.idVerification?.approved ? 'bg-pm-accent-alt/70' : 'bg-gray-300 dark:bg-gray-600'
+                  <div className={`flex-1 h-1 rounded ${progress.idVerification?.approved ? 'bg-pm-accent-alt/70' : 'bg-pm-wash dark:bg-white/15'
                     }`} />
 
                   <div className="flex items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${progress.selfieVerification?.approved ? 'bg-pm-accent-alt' :
-                        progress.selfieVerification?.completed ? 'bg-pm-accent' : 'bg-gray-300 dark:bg-gray-600'
+                        progress.selfieVerification?.completed ? 'bg-pm-accent' : 'bg-pm-wash dark:bg-white/15'
                       }`}>
                       {progress.selfieVerification?.approved ? (
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -273,7 +273,7 @@ export const ResultPage = () => {
                         <span className="text-white font-semibold">2</span>
                       )}
                     </div>
-                    <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t('result.step_selfie')}</span>
+                    <span className="ml-2 text-sm font-medium text-pm-ink dark:text-pm-ink-soft">{t('result.step_selfie')}</span>
                   </div>
                 </div>
               </div>
@@ -289,8 +289,8 @@ export const ResultPage = () => {
 
             {/* ID Card Images */}
             <div className="pm-panel overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center">
+              <div className="px-4 py-3 border-b border-pm-ink/15 dark:border-white/15">
+                <h3 className="font-semibold text-pm-ink dark:text-pm-ink-soft flex items-center">
                   <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
                   </svg>
@@ -327,8 +327,8 @@ export const ResultPage = () => {
 
             {/* Selfie Image */}
             <div className="pm-panel overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center">
+              <div className="px-4 py-3 border-b border-pm-ink/15 dark:border-white/15">
+                <h3 className="font-semibold text-pm-ink dark:text-pm-ink-soft flex items-center">
                   <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -361,9 +361,9 @@ export const ResultPage = () => {
             {/* Thresholds */}
             {Object.keys(thresholds).length > 0 && (
               <div className="pm-panel overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="font-semibold text-gray-900 dark:text-white flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="px-4 py-3 border-b border-pm-ink/15 dark:border-white/15">
+                  <h3 className="font-semibold text-pm-ink dark:text-pm-ink-soft flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-pm-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                     </svg>
                     {t('result.thresholds')}
@@ -416,9 +416,9 @@ export const ResultPage = () => {
 
             {/* ID Verification Card */}
             <div className="pm-panel overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div className="px-6 py-4 border-b border-pm-ink/15 dark:border-white/15 flex items-center justify-between">
                 <div className="flex items-center">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                  <h3 className="text-lg font-semibold text-pm-ink dark:text-pm-ink-soft flex items-center">
                     <span className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-3">
                       <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
@@ -442,7 +442,7 @@ export const ResultPage = () => {
                 <div className="p-6">
                   {/* Personal Information */}
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+                    <h4 className="text-sm font-medium text-pm-muted mb-3 uppercase tracking-wider">
                       {t('result.personal_info')}
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -460,11 +460,11 @@ export const ResultPage = () => {
                   {/* Address (if available) */}
                   {idResult.data.address && (
                     <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+                      <h4 className="text-sm font-medium text-pm-muted mb-3 uppercase tracking-wider">
                         {t('result.address')}
                       </h4>
-                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                        <p className="text-gray-900 dark:text-white">{idResult.data.address}</p>
+                      <div className="bg-pm-wash/60 dark:bg-white/5 rounded-sm border-2 border-pm-ink/10 dark:border-white/10 p-4">
+                        <p className="text-pm-ink dark:text-pm-ink-soft">{idResult.data.address}</p>
                       </div>
                     </div>
                   )}
@@ -472,10 +472,10 @@ export const ResultPage = () => {
                   {/* MRZ (if available) */}
                   {idResult.data.mrz && (
                     <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+                      <h4 className="text-sm font-medium text-pm-muted mb-3 uppercase tracking-wider">
                         {t('result.mrz')}
                       </h4>
-                      <div className="bg-gray-900 dark:bg-black rounded-lg p-4 overflow-x-auto mb-4">
+                      <div className="bg-pm-ink dark:bg-pm-void rounded-sm border-2 border-pm-ink/20 dark:border-white/15 p-4 overflow-x-auto mb-4 text-pm-ink-soft">
                         <code className="text-pm-accent-alt font-mono text-xs whitespace-pre">
                           {formatMRZ(idResult.data.mrz)}
                         </code>
@@ -493,13 +493,13 @@ export const ResultPage = () => {
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                             {idResult.data.mrzInfo.format && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_format')}:</span>
-                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.format}</span>
+                                <span className="text-pm-muted">{t('result.mrz_format')}:</span>
+                                <span className="ml-2 font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.format}</span>
                               </div>
                             )}
                             {idResult.data.mrzInfo.valid !== undefined && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_valid')}:</span>
+                                <span className="text-pm-muted">{t('result.mrz_valid')}:</span>
                                 <span className={`ml-2 font-semibold ${idResult.data.mrzInfo.valid ? 'text-pm-accent-alt dark:text-pm-accent-alt' : 'text-pm-accent dark:text-pm-accent'}`}>
                                   {idResult.data.mrzInfo.valid ? t('result.yes') : t('result.no')}
                                 </span>
@@ -507,44 +507,44 @@ export const ResultPage = () => {
                             )}
                             {idResult.data.mrzInfo.documentNumber && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_doc_number')}:</span>
-                                <span className="ml-2 font-mono font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.documentNumber}</span>
+                                <span className="text-pm-muted">{t('result.mrz_doc_number')}:</span>
+                                <span className="ml-2 font-mono font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.documentNumber}</span>
                               </div>
                             )}
                             {idResult.data.mrzInfo.dateOfBirth && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_dob')}:</span>
-                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.dateOfBirth}</span>
+                                <span className="text-pm-muted">{t('result.mrz_dob')}:</span>
+                                <span className="ml-2 font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.dateOfBirth}</span>
                               </div>
                             )}
                             {idResult.data.mrzInfo.expiryDate && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_expiry')}:</span>
-                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.expiryDate}</span>
+                                <span className="text-pm-muted">{t('result.mrz_expiry')}:</span>
+                                <span className="ml-2 font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.expiryDate}</span>
                               </div>
                             )}
                             {idResult.data.mrzInfo.nationality && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_nationality')}:</span>
-                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.nationality}</span>
+                                <span className="text-pm-muted">{t('result.mrz_nationality')}:</span>
+                                <span className="ml-2 font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.nationality}</span>
                               </div>
                             )}
                             {idResult.data.mrzInfo.sex && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_sex')}:</span>
-                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.sex}</span>
+                                <span className="text-pm-muted">{t('result.mrz_sex')}:</span>
+                                <span className="ml-2 font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.sex}</span>
                               </div>
                             )}
                             {idResult.data.mrzInfo.surname && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_surname')}:</span>
-                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.surname}</span>
+                                <span className="text-pm-muted">{t('result.mrz_surname')}:</span>
+                                <span className="ml-2 font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.surname}</span>
                               </div>
                             )}
                             {idResult.data.mrzInfo.givenNames && (
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">{t('result.mrz_given_names')}:</span>
-                                <span className="ml-2 font-semibold text-gray-900 dark:text-white">{idResult.data.mrzInfo.givenNames}</span>
+                                <span className="text-pm-muted">{t('result.mrz_given_names')}:</span>
+                                <span className="ml-2 font-semibold text-pm-ink dark:text-pm-ink-soft">{idResult.data.mrzInfo.givenNames}</span>
                               </div>
                             )}
                           </div>
@@ -556,7 +556,7 @@ export const ResultPage = () => {
                   {/* Confidence Scores */}
                   {idResult.confidence && (
                     <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+                      <h4 className="text-sm font-medium text-pm-muted mb-3 uppercase tracking-wider">
                         {t('result.confidence_scores')}
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -608,18 +608,18 @@ export const ResultPage = () => {
                 </div>
               ) : (
                 <div className="p-8 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="mx-auto h-12 w-12 text-pm-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="mt-2 text-gray-500 dark:text-gray-400">{t('result.id_not_verified')}</p>
+                  <p className="mt-2 text-pm-muted">{t('result.id_not_verified')}</p>
                 </div>
               )}
             </div>
 
             {/* Selfie Verification Card */}
             <div className="pm-panel overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+              <div className="px-6 py-4 border-b border-pm-ink/15 dark:border-white/15 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-pm-ink dark:text-pm-ink-soft flex items-center">
                   <span className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-3">
                     <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -649,24 +649,24 @@ export const ResultPage = () => {
                           )}
                         </div>
                         <div className="ml-4">
-                          <h4 className="text-xl font-bold text-gray-900 dark:text-white">
+                          <h4 className="text-xl font-bold text-pm-ink dark:text-pm-ink-soft">
                             {selfieResult.data.isMatch ? t('result.match_yes') : t('result.match_no')}
                           </h4>
-                          <p className="text-gray-500 dark:text-gray-400">{t('result.face_comparison_result')}</p>
+                          <p className="text-pm-muted">{t('result.face_comparison_result')}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-4xl font-bold text-gray-900 dark:text-white">
+                        <div className="text-4xl font-bold text-pm-ink dark:text-pm-ink-soft">
                           {selfieResult.data.matchConfidence || 0}%
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{t('result.match_confidence')}</p>
+                        <p className="text-sm text-pm-muted">{t('result.match_confidence')}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Selfie Analysis Grid */}
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+                    <h4 className="text-sm font-medium text-pm-muted mb-3 uppercase tracking-wider">
                       {t('result.selfie_analysis')}
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -726,7 +726,7 @@ export const ResultPage = () => {
 
                   {/* Confidence Scores */}
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+                    <h4 className="text-sm font-medium text-pm-muted mb-3 uppercase tracking-wider">
                       {t('result.confidence_scores')}
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -756,7 +756,7 @@ export const ResultPage = () => {
                   {/* Image Quality Issues */}
                   {selfieResult.data.imageQualityIssues?.length > 0 && (
                     <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
+                      <h4 className="text-sm font-medium text-pm-muted mb-3 uppercase tracking-wider">
                         {t('result.quality_issues')}
                       </h4>
                       <div className="flex flex-wrap gap-2">
@@ -782,10 +782,10 @@ export const ResultPage = () => {
                 </div>
               ) : (
                 <div className="p-8 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="mx-auto h-12 w-12 text-pm-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <p className="mt-2 text-gray-500 dark:text-gray-400">{t('result.selfie_not_verified')}</p>
+                  <p className="mt-2 text-pm-muted">{t('result.selfie_not_verified')}</p>
                 </div>
               )}
             </div>

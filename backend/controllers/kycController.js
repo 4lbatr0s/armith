@@ -215,8 +215,9 @@ export const verifyId = async (req, res) => {
         const overallStatus = deriveIdCheckpointStatus(result.status, resolved.verificationSteps);
 
         let profile;
+        let clerkIdToIncrementQuota = null;
         try {
-            profile = await persistIdVerification({
+            const idPersist = await persistIdVerification({
                 authUserId,
                 countryCodeUpper,
                 result,
@@ -225,6 +226,8 @@ export const verifyId = async (req, res) => {
                 rejectionReasons,
                 overallStatus
             });
+            profile = idPersist.profile;
+            clerkIdToIncrementQuota = idPersist.clerkIdToIncrementQuota;
         } catch (err) {
             if (err instanceof IdentityNumberConflictError) {
                 logger.warn({ authUserId, msg: err.message }, 'Identity number belongs to another user');
@@ -244,8 +247,8 @@ export const verifyId = async (req, res) => {
 
         logger.info({ profileId: profile._id, status: overallStatus }, 'ID verification completed');
 
-        if (authUserId) {
-            await incrementUserVerificationUsage(authUserId);
+        if (clerkIdToIncrementQuota) {
+            await incrementUserVerificationUsage(clerkIdToIncrementQuota);
         }
 
         emitVerificationTerminalWebhook({
@@ -406,6 +409,9 @@ export const verifySelfie = async (req, res) => {
                 logger.warn({ profileId }, 'Profile not found during selfie verification');
             } else {
                 selfiePersistedProfile = persisted.profile;
+                if (persisted.clerkIdToIncrementQuota) {
+                    await incrementUserVerificationUsage(persisted.clerkIdToIncrementQuota);
+                }
                 logger.info({ profileId, status: overallStatus }, 'Selfie verification completed and profile updated');
                 emitVerificationTerminalWebhook({
                     tenantUserId: authUserId,

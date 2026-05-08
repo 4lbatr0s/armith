@@ -1,8 +1,9 @@
 import { User } from '../models/index.js';
 
+/** Monthly app-enforced caps (Stripe metering is separate). Growth is metered with overage in product copy — do not hard-stop at the discounted tier band. */
 const PLAN_LIMITS = {
-  free: 100,
-  growth: 5000,
+  free: 20,
+  growth: null,
   enterprise: null
 };
 

@@ -2,15 +2,18 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
 import { apiService } from '../services/api';
+import { notify } from '../lib/notify';
 
 const WEBHOOK_EVENT_ORDER = [
   'verification.manual_review_queued',
+  'verification.manual_review_resolved',
   'verification.completed',
   'verification.failed'
 ];
 
 const EVENT_DESC_KEYS = {
   verification_manual_review_queued: 'integrations.event_manual_review_queued_body',
+  verification_manual_review_resolved: 'integrations.event_manual_review_resolved_body',
   verification_completed: 'integrations.event_completed_body',
   verification_failed: 'integrations.event_failed_body'
 };
@@ -45,8 +48,6 @@ export function WebhookOutboundSettings({ disableActions = false }) {
   const [secretDraft, setSecretDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState(null);
-
   const hydrate = useCallback((rawSettings) => {
     setForm(mapIntegration(rawSettings));
   }, []);
@@ -66,10 +67,6 @@ export function WebhookOutboundSettings({ disableActions = false }) {
     };
   }, [t, hydrate]);
 
-  const flushSuccess = () => {
-    setMessage(t('settings.integration_webhook_saved'));
-  };
-
   const toggleWebhookEvent = (evt) => {
     setForm((prev) => {
       const cur = new Set(prev.webhookEvents || []);
@@ -86,7 +83,6 @@ export function WebhookOutboundSettings({ disableActions = false }) {
     try {
       setSaving(true);
       setError(null);
-      setMessage(null);
       const payload = {
         integration: {
           webhookUrl: (form.webhookUrl ?? '').trim(),
@@ -98,7 +94,7 @@ export function WebhookOutboundSettings({ disableActions = false }) {
       const data = await apiService.updateSettings(payload);
       if (data?.settings) hydrate(data.settings);
       setSecretDraft('');
-      flushSuccess();
+      notify.success(t('settings.integration_webhook_saved'));
     } catch (err) {
       setError(err.message || t('settings.save_error'));
     } finally {
@@ -111,11 +107,10 @@ export function WebhookOutboundSettings({ disableActions = false }) {
     try {
       setSaving(true);
       setError(null);
-      setMessage(null);
       const data = await apiService.updateSettings({ integration: { webhookSecret: '' } });
       if (data?.settings) hydrate(data.settings);
       setSecretDraft('');
-      flushSuccess();
+      notify.success(t('settings.integration_webhook_saved'));
     } catch (err) {
       setError(err.message || t('settings.save_error'));
     } finally {
@@ -126,9 +121,6 @@ export function WebhookOutboundSettings({ disableActions = false }) {
   return (
     <div className="rounded-sm border-2 border-pm-ink/15 dark:border-white/20 px-4 py-5 space-y-4">
       {error && <div className="rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-3 py-2 text-sm">{error}</div>}
-      {message && (
-        <div className="rounded-sm border-2 border-pm-accent-alt/40 bg-pm-accent-alt/10 px-3 py-2 text-sm">{message}</div>
-      )}
       <div>
         <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">
           {t('settings.integration_webhook_title')}
@@ -150,7 +142,7 @@ export function WebhookOutboundSettings({ disableActions = false }) {
           onChange={(e) => setForm((prev) => ({ ...prev, webhookUrl: e.target.value }))}
           placeholder="https://api.example.com/webhooks/kyc"
           disabled={disableActions || saving}
-          className="w-full px-3 py-2 border rounded-sm bg-white dark:bg-gray-900 dark:text-white border-pm-ink/20 disabled:opacity-60"
+          className="w-full px-3 py-2 border rounded-sm bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft border-pm-ink/20 dark:border-white/20 disabled:opacity-60"
         />
       </div>
       <div>
@@ -196,7 +188,7 @@ export function WebhookOutboundSettings({ disableActions = false }) {
           onChange={(e) => setSecretDraft(e.target.value)}
           placeholder={t('settings.integration_webhook_secret_placeholder')}
           disabled={disableActions || saving}
-          className="w-full px-3 py-2 border rounded-sm bg-white dark:bg-gray-950 dark:text-white font-mono text-sm border-pm-ink/20 disabled:opacity-60"
+          className="w-full px-3 py-2 border rounded-sm bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft font-mono text-sm border-pm-ink/20 dark:border-white/20 disabled:opacity-60"
         />
       </div>
       <div className="flex flex-wrap gap-2">

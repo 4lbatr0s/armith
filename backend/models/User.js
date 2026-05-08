@@ -49,6 +49,11 @@ const userSchema = new mongoose.Schema(
                 type: Number,
                 default: null,
             },
+            /** Max KYC requests per burst window (see RATE_LIMIT_KYC_WINDOW_MS); overrides plan tier default. */
+            kycBurstRequestsPerWindow: {
+                type: Number,
+                default: null,
+            },
         },
         /** Applies to all API keys for this tenant when non-empty (Clerk user / dashboard account). */
         apiAllowedCidrs: {

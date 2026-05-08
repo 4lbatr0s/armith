@@ -1,6 +1,7 @@
 /** Outbound webhook event types configurable per tenant integration. Order is stable UI/API order. */
 export const OUTBOUND_WEBHOOK_EVENT_TYPES = Object.freeze([
   'verification.manual_review_queued',
+  'verification.manual_review_resolved',
   'verification.completed',
   'verification.failed'
 ]);

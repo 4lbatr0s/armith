@@ -12,8 +12,10 @@ import { flattenedThresholdPayload, applyFlatThresholdPatches } from '../thresho
 import { purgeVerificationStorageForProfile } from '../services/kyc/purgeVerificationObjects.js';
 import {
   emitManualReviewQueuedWebhook,
+  emitManualReviewResolvedWebhook,
   emitVerificationTerminalWebhook
 } from '../services/verificationWebhook.js';
+import { incrementUserVerificationUsage } from '../services/quotaService.js';
 import { mintCaptureSessionToken } from '../lib/captureSessionToken.js';
 import {
   normalizeOutboundWebhookSubscriptions,
@@ -86,7 +88,8 @@ function mapProfileDashboardRow(p) {
     manualReviewQueuedAt: p.manualReviewQueuedAt ?? null,
     manualReviewDeadlineAt: p.manualReviewDeadlineAt ?? null,
     manualReviewAssigneeLabel: p.manualReviewAssigneeLabel || '',
-    manualReviewAssignedAt: p.manualReviewAssignedAt ?? null
+    manualReviewAssignedAt: p.manualReviewAssignedAt ?? null,
+    manualReviewAuditTrail: Array.isArray(p.manualReviewAuditTrail) ? p.manualReviewAuditTrail : []
   };
 }
 
@@ -217,6 +220,8 @@ export const getWebhookDeliveries = async (req, res) => {
         attempts: d.attempts,
         succeeded: d.succeeded,
         errorMessage: d.errorMessage,
+        errorClass: d.errorClass || '',
+        responseSnippet: d.responseSnippet || '',
         createdAt: d.createdAt
       })),
       pagination: {
@@ -324,13 +329,40 @@ export const replayTerminalWebhook = async (req, res) => {
       });
     }
 
+    const useStoredDelivery =
+      req.query.useStoredDelivery === '1' || req.query.useStoredDelivery === 'true';
+    if (useStoredDelivery) {
+      const event = st === 'APPROVED' ? 'verification.completed' : 'verification.failed';
+      const last = await WebhookDelivery.findOne({
+        userId: ownerId,
+        profileId: profile._id,
+        event,
+        payload: { $type: 'object' }
+      })
+        .sort({ createdAt: -1 })
+        .select('payload');
+
+      if (last?.payload && typeof last.payload === 'object') {
+        emitVerificationTerminalWebhook({
+          tenantUserId: ownerId,
+          profile,
+          correlationId: req.correlationId,
+          forceEventType: event,
+          forcePayload: last.payload,
+          replaySource: 'stored',
+          bypassSubscriptionCheck: true
+        });
+        return res.json({ success: true, replaySource: 'stored' });
+      }
+    }
     emitVerificationTerminalWebhook({
       tenantUserId: ownerId,
       profile,
       correlationId: req.correlationId,
+      replaySource: 'live',
       bypassSubscriptionCheck: true
     });
-    res.json({ success: true });
+    res.json({ success: true, replaySource: 'live' });
   } catch (error) {
     console.error('Admin replay webhook error:', error);
     res.status(500).json({ status: STATUS.FAILED, errors: [ERRORS.INTERNAL_ERROR] });
@@ -426,6 +458,16 @@ export const enqueueManualReview = async (req, res) => {
     profile.manualReviewDeadlineAt = deadline;
     profile.manualReviewAssigneeLabel = assignee;
     profile.manualReviewAssignedAt = new Date();
+    profile.manualReviewAuditTrail = Array.isArray(profile.manualReviewAuditTrail)
+      ? profile.manualReviewAuditTrail
+      : [];
+    profile.manualReviewAuditTrail.push({
+      action: 'QUEUED',
+      at: new Date(),
+      actorUserId: ownerId,
+      assigneeLabel: assignee,
+      note: ''
+    });
     await profile.save();
     emitManualReviewQueuedWebhook({
       tenantUserId: ownerId,
@@ -490,6 +532,16 @@ export const resolveManualReview = async (req, res) => {
     profile.manualReviewDeadlineAt = null;
     profile.manualReviewAssigneeLabel = '';
     profile.manualReviewAssignedAt = null;
+    profile.manualReviewAuditTrail = Array.isArray(profile.manualReviewAuditTrail)
+      ? profile.manualReviewAuditTrail
+      : [];
+    profile.manualReviewAuditTrail.push({
+      action: d === 'APPROVED' ? 'RESOLVED_APPROVED' : 'RESOLVED_REJECTED',
+      at: new Date(),
+      actorUserId: ownerId,
+      assigneeLabel: '',
+      note: typeof note === 'string' ? note.trim().slice(0, 300) : ''
+    });
 
     if (d === 'APPROVED') {
       profile.status = 'APPROVED';
@@ -516,6 +568,13 @@ export const resolveManualReview = async (req, res) => {
           ];
     }
     await profile.save();
+    await incrementUserVerificationUsage(ownerId);
+    emitManualReviewResolvedWebhook({
+      tenantUserId: ownerId,
+      profile,
+      decision: d,
+      correlationId: req.correlationId
+    });
     emitVerificationTerminalWebhook({
       tenantUserId: ownerId,
       profile,

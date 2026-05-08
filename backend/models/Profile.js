@@ -91,7 +91,20 @@ const profileSchema = new mongoose.Schema(
         manualReviewQueuedAt: { type: Date, default: null },
         manualReviewDeadlineAt: { type: Date, default: null },
         manualReviewAssigneeLabel: { type: String, maxlength: 160, trim: true, default: '' },
-        manualReviewAssignedAt: { type: Date, default: null }
+        manualReviewAssignedAt: { type: Date, default: null },
+        manualReviewAuditTrail: [
+            {
+                action: {
+                    type: String,
+                    enum: ['QUEUED', 'RESOLVED_APPROVED', 'RESOLVED_REJECTED'],
+                    required: true
+                },
+                at: { type: Date, default: Date.now },
+                actorUserId: { type: String, default: '' },
+                assigneeLabel: { type: String, maxlength: 160, trim: true, default: '' },
+                note: { type: String, maxlength: 300, trim: true, default: '' }
+            }
+        ]
     },
     {
         timestamps: true,

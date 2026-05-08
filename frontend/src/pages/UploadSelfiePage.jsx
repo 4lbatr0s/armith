@@ -180,7 +180,7 @@ export const UploadSelfiePage = () => {
                     <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4">
                       <button
                         onClick={capturePhoto}
-                        className="bg-white rounded-full p-4 shadow-lg hover:bg-gray-100 transition-colors"
+                        className="bg-pm-surface rounded-full p-4 shadow-brutal border-2 border-pm-ink/20 dark:border-white/20 hover:bg-pm-wash transition-colors"
                       >
                         <div className="w-8 h-8 rounded-full border-4 border-pm-accent"></div>
                       </button>

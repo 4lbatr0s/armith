@@ -11,10 +11,10 @@ import {
 } from '../controllers/kycController.js';
 import { authenticateApiKeyOrUser } from '../middleware/authMiddleware.js';
 import { optionalKycIdempotencyForPostJson } from '../middleware/kycIdempotency.js';
-import { apiKeyKycRateLimiter } from '../middleware/apiKeyRateLimit.js';
+import { kycBurstRateLimiter, kycClientIpRateLimiter } from '../middleware/kycRateLimits.js';
 
 const router = express.Router();
-const kycAuth = [authenticateApiKeyOrUser, apiKeyKycRateLimiter];
+const kycAuth = [authenticateApiKeyOrUser, kycClientIpRateLimiter, kycBurstRateLimiter];
 
 // Public routes
 router.get('/countries', getSupportedCountries);

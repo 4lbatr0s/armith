@@ -120,8 +120,12 @@ export const apiService = {
   deleteVerification: (profileId) =>
     request(`/admin/verifications/${profileId}`, { method: 'DELETE' }),
 
-  replayTerminalWebhook: (profileId) =>
-    request(`/admin/webhooks/replay/${profileId}`, { method: 'POST' }),
+  replayTerminalWebhook: (profileId, opts = {}) => {
+    const params = new URLSearchParams();
+    if (opts.useStoredDelivery) params.set('useStoredDelivery', '1');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return request(`/admin/webhooks/replay/${profileId}${suffix}`, { method: 'POST' });
+  },
 
   listManualReviews: (page = 1, limit = 10) => {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });

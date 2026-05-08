@@ -44,7 +44,7 @@ export const PricingPage = () => {
               <ul className="space-y-3 text-sm">
                 <li className="flex gap-3">
                   <Check />
-                  <span>100 {t('pricing.verifications_mo')}</span>
+                  <span>20 {t('pricing.verifications_mo')}</span>
                 </li>
                 <li className="flex gap-3">
                   <Check />
@@ -64,8 +64,8 @@ export const PricingPage = () => {
               featured
               title={t('pricing.growth')}
               desc={t('pricing.growth_desc')}
-              price="$49"
-              suffix={t('pricing.month')}
+              price="$0.15"
+              suffix={t('pricing.per_verification')}
               cta={
                 <Link to="/auth" className="block">
                   <Button className="w-full">{t('home.get_started')}</Button>
@@ -75,15 +75,15 @@ export const PricingPage = () => {
                 <ul className="space-y-3 text-sm">
                   <li className="flex gap-3">
                     <Check />
-                    <span>5,000 {t('pricing.verifications_mo')}</span>
+                    <span>{t('pricing.growth_up_to_150')}</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <Check />
+                    <span>{t('pricing.growth_after_150')}</span>
                   </li>
                   <li className="flex gap-3">
                     <Check />
                     <span>{t('pricing.priority_support')}</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <Check />
-                    <span>{t('pricing.advanced_analytics')}</span>
                   </li>
                 </ul>
               }

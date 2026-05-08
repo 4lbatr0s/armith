@@ -64,7 +64,7 @@ export const AuthPage = () => {
           </button>
         </div>
 
-        <div className="pm-panel p-4 sm:p-6 flex justify-center [&_.cl-card]:shadow-none [&_.cl-card]:border-0">
+        <div className="w-full flex justify-center px-0 py-2 sm:py-4">
           {mode === 'sign-in' ? (
             <SignIn
               routing="path"

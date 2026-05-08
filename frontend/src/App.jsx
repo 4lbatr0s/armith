@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
+import { buildClerkAppearance } from './lib/clerkAppearance';
 import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
 import { PricingPage } from './pages/PricingPage';
@@ -12,9 +13,11 @@ import { AdminPage } from './pages/AdminPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { Layout } from './components/Layout';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { ApiTokenProvider } from './components/ApiTokenProvider';
 import './index.css';
-import { ThemeProvider } from './components/ThemeContext';
+import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { ToasterHost } from './components/ToasterHost';
 
 const CLERK_PUBLISHABLE_KEY = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
 const CLERK_SIGN_IN_URL = process.env.REACT_APP_CLERK_SIGN_IN_URL || '/auth/sign-in';
@@ -80,10 +83,15 @@ const DocsRedirectRoute = () => {
   return null;
 };
 
-export const App = () => {
+/** Router + Clerk beneath theme so `appearance` tracks light/dark (`html.dark`). */
+const AppRoutes = () => {
+  const { theme } = useTheme();
+  const appearance = useMemo(() => buildClerkAppearance(theme), [theme]);
+
   return (
     <ClerkProvider
       publishableKey={CLERK_PUBLISHABLE_KEY}
+      appearance={appearance}
       signInUrl={CLERK_SIGN_IN_URL}
       signUpUrl={CLERK_SIGN_UP_URL}
       signInForceRedirectUrl={CLERK_SIGN_IN_FORCE_REDIRECT_URL}
@@ -92,9 +100,10 @@ export const App = () => {
       signUpFallbackRedirectUrl={CLERK_SIGN_UP_FALLBACK_REDIRECT_URL}
     >
       <ApiTokenProvider>
-        <ThemeProvider>
         <Router>
+          <ToasterHost />
           <Layout>
+            <ErrorBoundary>
             <Routes>
               {/* Public pages before `/` and `*` */}
               <Route path="/trust" element={<TrustSupportPage />} />
@@ -151,12 +160,18 @@ export const App = () => {
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </ErrorBoundary>
           </Layout>
         </Router>
-        </ThemeProvider>
       </ApiTokenProvider>
     </ClerkProvider>
   );
 };
+
+export const App = () => (
+  <ThemeProvider>
+    <AppRoutes />
+  </ThemeProvider>
+);
 
 export default App;

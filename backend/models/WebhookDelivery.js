@@ -10,8 +10,16 @@ const WebhookDeliverySchema = new mongoose.Schema(
         profileId: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile', index: true },
         event: { type: String, required: true },
         deliveryId: { type: String, required: true },
+        payload: { type: mongoose.Schema.Types.Mixed, default: null },
+        replaySource: {
+            type: String,
+            enum: ['live', 'stored'],
+            default: 'live'
+        },
         httpStatus: { type: Number },
         errorMessage: { type: String },
+        errorClass: { type: String, default: '' },
+        responseSnippet: { type: String, default: '' },
         attempts: { type: Number, default: 0 },
         succeeded: { type: Boolean, default: false }
     },

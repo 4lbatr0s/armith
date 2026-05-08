@@ -2,6 +2,7 @@ import React, { Fragment, useCallback, useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { apiService } from '../services/api';
 import { useTranslation } from 'react-i18next';
+import { notify } from '../lib/notify';
 
 function splitAllowlistInput(text) {
   const chunks = [];
@@ -21,7 +22,6 @@ export function ApiKeysPanel() {
   const [apiKeysLoading, setApiKeysLoading] = useState(false);
   const [apiKeyName, setApiKeyName] = useState('');
   const [apiKeyToken, setApiKeyToken] = useState(null);
-  const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [expandedAllowlistKey, setExpandedAllowlistKey] = useState(null);
@@ -54,7 +54,7 @@ export function ApiKeysPanel() {
       setError(null);
       const lines = splitAllowlistInput(accountAllowlistDraft);
       await apiService.updateAccountApiIpAllowlist(lines);
-      setMessage(t('integrations.account_ip_saved'));
+      notify.success(t('integrations.account_ip_saved'));
       await loadAll();
     } catch (err) {
       setError(err.message || t('profile.security.allowlist_error'));
@@ -77,7 +77,7 @@ export function ApiKeysPanel() {
       setApiKeyName('');
       setApiKeyToken(data.token);
       await loadAll();
-      setMessage(t('profile.security.create_success'));
+      notify.success(t('profile.security.create_success'));
     } catch (err) {
       setError(err.message || t('profile.security.create_error'));
     } finally {
@@ -93,7 +93,7 @@ export function ApiKeysPanel() {
       setError(null);
       await apiService.revokeApiKey(id);
       setApiKeys((prev) => prev.map((key) => (key.id === id ? { ...key, revokedAt: new Date().toISOString() } : key)));
-      setMessage(t('profile.security.revoke_success'));
+      notify.success(t('profile.security.revoke_success'));
     } catch (err) {
       setError(err.message || t('profile.security.revoke_error'));
     } finally {
@@ -105,7 +105,6 @@ export function ApiKeysPanel() {
     const list = Array.isArray(item.allowedCidrs) ? item.allowedCidrs : [];
     setAllowlistDraft(list.join('\n'));
     setExpandedAllowlistKey(item.id);
-    setMessage(null);
     setError(null);
   };
 
@@ -116,7 +115,7 @@ export function ApiKeysPanel() {
       const lines = splitAllowlistInput(allowlistDraft);
       await apiService.updateApiKeyAllowlist(keyId, lines);
       setExpandedAllowlistKey(null);
-      setMessage(t('profile.security.allowlist_saved'));
+      notify.success(t('profile.security.allowlist_saved'));
       await loadAll();
     } catch (err) {
       setError(err.message || t('profile.security.allowlist_error'));
@@ -144,7 +143,7 @@ export function ApiKeysPanel() {
           onChange={(e) => setAccountAllowlistDraft(e.target.value)}
           rows={5}
           disabled={saving || apiKeysLoading}
-          className="w-full font-mono text-sm px-3 py-2 border rounded-sm bg-white dark:bg-gray-950 dark:text-white border-pm-ink/20"
+          className="w-full font-mono text-sm px-3 py-2 border rounded-sm bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft border-pm-ink/20"
           placeholder={t('profile.security.allowlist_placeholder')}
         />
         <Button type="button" onClick={saveAccountAllowlist} disabled={saving || apiKeysLoading}>
@@ -157,8 +156,6 @@ export function ApiKeysPanel() {
       )}
 
       {error && <div className="rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 px-4 py-3 text-sm">{error}</div>}
-      {message && <div className="rounded-sm border-2 border-pm-accent-alt/40 bg-pm-accent-alt/10 px-4 py-3 text-sm">{message}</div>}
-
       {apiKeyToken && (
         <div className="rounded-sm border-2 border-pm-accent/40 bg-pm-accent/10 p-4">
           <p className="text-xs uppercase tracking-widest text-pm-muted mb-2">{t('profile.security.one_time')}</p>
@@ -183,7 +180,7 @@ export function ApiKeysPanel() {
           value={apiKeyName}
           onChange={(e) => setApiKeyName(e.target.value)}
           placeholder={t('profile.security.name_placeholder')}
-          className="flex-1 px-3 py-2 border rounded-sm bg-white dark:bg-gray-900 dark:text-white"
+          className="flex-1 px-3 py-2 border rounded-sm bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft border-pm-ink/20 dark:border-white/20"
           maxLength={100}
         />
         <Button onClick={handleCreateApiKey} disabled={saving}>

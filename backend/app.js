@@ -9,6 +9,7 @@ import logger from './lib/logger.js';
 import routes from './routes/index.js';
 import { connectDB } from './lib/mongodb.js';
 import { correlationIdMiddleware } from './middleware/correlationIdMiddleware.js';
+import { startLifecycleSchedulers } from './services/lifecycleScheduler.js';
 
 dotenv.config();
 
@@ -141,6 +142,7 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
+  startLifecycleSchedulers();
   logger.info({
     msg: 'KYC Flow API server started',
     port: PORT,

@@ -2,6 +2,8 @@
 
 Single planning doc under `docs/`. **`[P]`** = product/legal/process; **`[E]`** = engineering. **§2** = agent/multi-agent/tooling (defer). Historical roadmap / runbook corpus was trimmed from the repo—**this file lists only work that is not closed yet.**
 
+**Working docs (decision / stub):** [Retention checklist](RETENTION_DECISION_CHECKLIST.md) · [Billable-unit guide](BILLABLE_UNIT_DECISION_GUIDE.md) · [SLO / on-call stub](SLO_AND_ONCALL_STUB.md)
+
 ---
 
 ## 1. Open work (everything except §2 agents)
@@ -10,9 +12,8 @@ Single planning doc under `docs/`. **`[P]`** = product/legal/process; **`[E]`** 
 
 | Priority | Item | Source (historical) |
 |----------|------|----------------------|
-| [E] | **Object-storage lifecycle beyond delete-opt-in** — scheduled purge / batch jobs for aged R2 keys once retention windows are fixed (coordinate with Mongo profile lifecycle). Cron placeholder / operator wiring TBD (`R2_LIFECYCLE_CRON` etc.). | Retention backlog |
+| [E] | **Object-storage lifecycle policy finalization** — dry-run scheduler/operator wiring exists (`R2_LIFECYCLE_CRON`, interval envs); destructive purge policy remains blocked on retention durations. | Retention backlog |
 | [P][E] | **Mongo lifecycle beyond webhook TTL** — profile/archival or broader TTL execution **blocked on business retention durations** (webhook TTL path already exists via env). | BILLING_AND_RETENTION (removed) |
-| [E] | **Manual review** — optional richer audit trail / additional webhook event types beyond current queue semantics. | Phase F backlog |
 
 ### Billing & commerce
 
@@ -26,13 +27,6 @@ Single planning doc under `docs/`. **`[P]`** = product/legal/process; **`[E]`** 
 | Priority | Item | Source (historical) |
 |----------|------|----------------------|
 | [P][E] | **Replace `[bracket]` SLO numbers** once traffic baselined; paging/on-call wording. | RUNBOOK_SLO (removed) |
-| [E] | **Synthetic uptime probes** — point external monitor at **`GET /health`** (vendor config + README Observability notes). | RUNBOOK_SLO (removed) |
-
-### Integrator ergonomics & API parity
-
-| Priority | Item | Source (historical) |
-|----------|------|----------------------|
-| [E] | **Webhook replay enhancements** — optional replay using stored **`WebhookDelivery`** payload vs current path. | PUBLIC_API_ERRORS (removed) |
 
 ---
 
