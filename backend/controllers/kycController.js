@@ -164,6 +164,9 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
 
 export const generateUploadUrl = async (req, res) => {
     try {
+
+        console.log('req.body', req.body.userId);
+        console.log('tenantMongoUserId', req.authContext?.mongoUserId);
         const tenantMongoUserId = req.authContext?.mongoUserId;
         if (!tenantMongoUserId) {
             return res.status(401).json({

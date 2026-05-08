@@ -1,6 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
 import { apiService } from '../services/api';
 import { Button } from '../components/ui/button';
 
@@ -11,7 +10,6 @@ export const UploadSelfiePage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isDemoMode = searchParams.get('mode') === 'demo';
-  const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('select'); // 'select', 'camera', 'upload'
@@ -92,10 +90,8 @@ export const UploadSelfiePage = () => {
     setError(null);
 
     try {
-      const userId = user?.id;
-      
       // 1. Upload Selfie
-      const uploadData = await apiService.generateUploadUrl(selfieFile.type, userId, 'selfie');
+      const uploadData = await apiService.generateUploadUrl(selfieFile.type, null, 'selfie');
       await apiService.uploadFile(selfieFile, uploadData.uploadUrl, uploadData.contentType);
 
       // 2. Get ID photo URL and verification ID from previous step
