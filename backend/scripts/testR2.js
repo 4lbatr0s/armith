@@ -38,9 +38,15 @@ async function testStorageService() {
     const healthCheck = await storageService.healthCheck();
     console.log('   Health Check:', JSON.stringify(healthCheck, null, 2));
 
-    // Test 4: Generate presigned upload URL
+    // Test 4: Generate presigned upload URL (tenant-scoped)
     console.log('\n4️⃣ Testing presigned upload URL generation...');
-    const uploadResult = await storageService.generatePresignedUploadUrl('image/jpeg');
+    const scriptTenantId =
+      process.env.SCRIPT_STORAGE_TENANT_ID || 'local-r2-script-tenant';
+    const uploadResult = await storageService.generatePresignedUploadUrl(
+      'image/jpeg',
+      scriptTenantId,
+      null
+    );
     console.log('   Upload URL generated:', uploadResult.uploadUrl ? '✅ Yes' : '❌ No');
     console.log('   File name:', uploadResult.fileName);
     console.log('   Download URL (presigned):', uploadResult.downloadUrl ? '✅ Yes' : '❌ No');

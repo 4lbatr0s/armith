@@ -21,6 +21,9 @@ const mapApiKey = (apiKey) => ({
 export const getApiKeys = async (req, res) => {
   try {
     const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const [apiKeys, user] = await Promise.all([
       listApiKeysByUserId(userId),
       User.findOne({ clerkId: userId }).lean()

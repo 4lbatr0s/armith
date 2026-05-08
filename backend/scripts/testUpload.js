@@ -27,9 +27,15 @@ async function testFileUpload() {
       return;
     }
 
-    // Test 2: Generate presigned upload URL
+    // Test 2: Generate presigned upload URL (tenant-scoped; use env or fixture for local scripts)
     console.log('\n2️⃣ Generating presigned upload URL...');
-    const uploadResult = await storageService.generatePresignedUploadUrl('image/jpeg');
+    const scriptTenantId =
+      process.env.SCRIPT_STORAGE_TENANT_ID || 'local-r2-script-tenant';
+    const uploadResult = await storageService.generatePresignedUploadUrl(
+      'image/jpeg',
+      scriptTenantId,
+      null
+    );
     
     console.log('   📤 UPLOAD URL:');
     console.log(`   ${uploadResult.uploadUrl}`);

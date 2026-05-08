@@ -94,22 +94,28 @@ class StorageService {
    * @param {string} userId - User ID for organizing files
    * @param {string} documentType - Type of document: 'id-front', 'id-back', 'selfie'
    */
-  async generatePresignedUploadUrl(fileType = 'image/jpeg', userId = null, documentType = null) {
+  /**
+   * @param {string} fileType MIME e.g. image/jpeg
+   * @param {string} tenantUserId Authenticated tenant (Clerk id); required for scoped keys under users/{tenantUserId}/...
+   * @param {string | null} [documentType] id-front | id-back | selfie — if omitted, uses random object name under tenant prefix
+   */
+  async generatePresignedUploadUrl(fileType = 'image/jpeg', tenantUserId = null, documentType = null) {
     if (!this.isAvailable()) {
       throw new Error('R2 storage service is not available');
+    }
+    if (!tenantUserId || typeof tenantUserId !== 'string' || !tenantUserId.trim()) {
+      throw new Error('tenantUserId is required for presigned upload');
     }
 
     try {
       // Generate filename based on user and document type
       const fileExtension = fileType.split('/')[1] || 'jpg';
+      const safeTenant = tenantUserId.trim();
       let fileName;
-      
-      if (userId && documentType) {
-        // User-specific path: users/{userId}/{documentType}.{ext}
-        fileName = `users/${userId}/${documentType}.${fileExtension}`;
+      if (documentType) {
+        fileName = `users/${safeTenant}/${documentType}.${fileExtension}`;
       } else {
-        // Fallback to random UUID
-        fileName = `kyc-uploads/${uuidv4()}.${fileExtension}`;
+        fileName = `users/${safeTenant}/${uuidv4()}.${fileExtension}`;
       }
       
       const contentType = this.getContentType(fileType);

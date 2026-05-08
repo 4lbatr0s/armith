@@ -47,43 +47,4 @@ router.get('/status', (req, res) => {
   }
 });
 
-/**
- * POST /auth/webhook
- * Clerk webhook endpoint
- */
-router.post('/webhook', async (req, res) => {
-  try {
-    const { type, data } = req.body;
-
-    if (type === 'user.created' || type === 'user.updated') {
-      const clerkUser = data;
-      await User.findOneAndUpdate(
-        { clerkId: clerkUser.id },
-        {
-          email: clerkUser.email_addresses?.[0]?.email_address,
-          emailVerified: clerkUser.email_addresses?.[0]?.verification?.status === 'verified',
-          lastLoginAt: new Date(),
-          providerData: {
-            firstName: clerkUser.first_name,
-            lastName: clerkUser.last_name,
-            imageUrl: clerkUser.image_url
-          }
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-      console.log(`User ${type}:`, clerkUser.id);
-    }
-
-    if (type === 'user.deleted') {
-      await User.deleteOne({ clerkId: data.id });
-      console.log('User deleted:', data.id);
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 export default router;

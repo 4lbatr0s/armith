@@ -30,6 +30,12 @@ import { emitVerificationTerminalWebhook } from '../services/verificationWebhook
 import { outcomeSemanticsForTerminalResponse } from '../services/kyc/webhookOutcomeSemantics.js';
 import { getPolicyPackForCountry } from '../thresholds/policyPack.js';
 import { validatePresignMime, getImageConstraintsForApi } from '../lib/kycImageConstraints.js';
+import {
+    normalizeObjectKey,
+    isStorageKeyOwnedByTenant,
+    isLegacyKycUploadsKey,
+    legacyKycUploadsDownloadAllowed
+} from '../lib/storageKeyAuthz.js';
 
 function deriveSessionLifecycle({
     verificationRules,
@@ -100,14 +106,47 @@ export const getLLMStatus = async (_req, res) => {
 
 export const generateSecureDownloadUrlEndpoint = async (req, res) => {
     try {
+        const tenantUserId = req.authContext?.userId;
+        if (!tenantUserId) {
+            return res.status(401).json({
+                status: STATUS.FAILED,
+                errors: [{ code: 'UNAUTHORIZED', message: 'Authentication required for download URL.' }]
+            });
+        }
         const { fileName } = req.body;
-        if (!fileName) {
+        if (!fileName || typeof fileName !== 'string') {
             return res.status(400).json({
                 status: STATUS.FAILED,
                 errors: [{ code: 'MISSING_FILENAME', message: 'File name is required' }]
             });
         }
-        const downloadData = await storageService.generateSecureDownloadUrl(fileName);
+        let key = normalizeObjectKey(fileName);
+        if (!key && typeof fileName === 'string' && fileName.includes('://')) {
+            const extracted = storageService.extractKeyFromUrl(fileName);
+            key = extracted ? normalizeObjectKey(extracted) : null;
+        }
+        if (!key) {
+            return res.status(400).json({
+                status: STATUS.FAILED,
+                errors: [{ code: 'INVALID_FILENAME', message: 'Invalid or unsafe storage key.' }]
+            });
+        }
+        const owned = isStorageKeyOwnedByTenant(key, tenantUserId);
+        const legacy =
+            isLegacyKycUploadsKey(key) && legacyKycUploadsDownloadAllowed();
+        if (!owned && !legacy) {
+            return res.status(403).json({
+                status: STATUS.FAILED,
+                errors: [
+                    {
+                        code: 'STORAGE_ACCESS_DENIED',
+                        message:
+                            'This object key is outside your tenant prefix. Enable KYC_STORAGE_ALLOW_LEGACY_KYC_UPLOADS_DOWNLOAD only if you still use legacy kyc-uploads paths.'
+                    }
+                ]
+            });
+        }
+        const downloadData = await storageService.generateSecureDownloadUrl(key);
         res.json({ success: true, downloadUrl: downloadData.downloadUrl, expiresIn: downloadData.expiresIn });
     } catch (error) {
         logger.error({ error, fileName: req.body.fileName }, 'Secure download URL generation error');
@@ -117,7 +156,23 @@ export const generateSecureDownloadUrlEndpoint = async (req, res) => {
 
 export const generateUploadUrl = async (req, res) => {
     try {
-        const { fileType, userId, documentType } = req.body;
+        const tenantUserId = req.authContext?.userId;
+        if (!tenantUserId) {
+            return res.status(401).json({
+                status: STATUS.FAILED,
+                errors: [{ code: 'UNAUTHORIZED', message: 'Tenant identity required for upload URL.' }]
+            });
+        }
+        const { fileType, userId: bodyUserId, documentType } = req.body;
+        if (bodyUserId != null && bodyUserId !== '') {
+            const b = String(bodyUserId).trim();
+            if (b && b !== String(tenantUserId)) {
+                return res.status(400).json({
+                    status: STATUS.FAILED,
+                    errors: [{ code: 'INVALID_USER_ID', message: 'userId must match the authenticated tenant.' }]
+                });
+            }
+        }
         const validDocumentTypes = ['id-front', 'id-back', 'selfie'];
         if (documentType && !validDocumentTypes.includes(documentType)) {
             return res.status(400).json({
@@ -132,7 +187,11 @@ export const generateUploadUrl = async (req, res) => {
                 errors: [ERRORS.UNSUPPORTED_IMAGE_TYPE]
             });
         }
-        const uploadData = await storageService.generatePresignedUploadUrl(mimeCheck.mime, userId, documentType);
+        const uploadData = await storageService.generatePresignedUploadUrl(
+            mimeCheck.mime,
+            tenantUserId,
+            typeof documentType === 'string' ? documentType : null
+        );
         res.json({
             success: true,
             ...uploadData,
@@ -500,7 +559,12 @@ async function respondWithKycStatus(req, res, profileId) {
                     errors: [ERRORS.PROFILE_ACCESS_DENIED]
                 });
             }
-        } else if (profile.userId && authUserId && profile.userId !== authUserId) {
+        } else if (!profile.userId) {
+            return res.status(403).json({
+                status: STATUS.FAILED,
+                errors: [ERRORS.PROFILE_ACCESS_DENIED]
+            });
+        } else if (authUserId && profile.userId !== authUserId) {
             return res.status(403).json({
                 status: STATUS.FAILED,
                 errors: [ERRORS.PROFILE_ACCESS_DENIED]

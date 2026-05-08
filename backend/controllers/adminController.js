@@ -25,6 +25,14 @@ import {
 const MAX_INTEGRATION_WEBHOOK_URL = 2048;
 const MAX_INTEGRATION_WEBHOOK_SECRET = 512;
 
+const PROFILE_QUERY_STATUSES = new Set([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'FAILED',
+  'UNDER_REVIEW'
+]);
+
 /**
  * Payload for GET/PUT `/admin/settings` — never exposes `integrationWebhookSecret`.
  */
@@ -123,23 +131,30 @@ export const getVerifications = async (req, res) => {
 
     const { page = 1, limit = 10, status } = req.query;
 
-    const skip = (page - 1) * limit;
+    const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
+    const limitRaw = parseInt(String(limit), 10);
+    const limitNum = Math.min(100, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 10));
 
-    const filter = { userId: ownerId, ...(status ? { status } : {}) };
+    const skip = (pageNum - 1) * limitNum;
+
+    const filter = { userId: ownerId };
+    if (typeof status === 'string' && status.trim() && PROFILE_QUERY_STATUSES.has(status.trim().toUpperCase())) {
+      filter.status = status.trim().toUpperCase();
+    }
 
     const [profiles, total] = await Promise.all([
-      Profile.find(filter).skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 }),
+      Profile.find(filter).skip(skip).limit(limitNum).sort({ createdAt: -1 }),
       Profile.countDocuments(filter)
     ]);
 
     res.json({
       users: profiles.map(mapProfileDashboardRow),
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(total / limit),
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
         totalUsers: total,
         hasNext: skip + profiles.length < total,
-        hasPrev: page > 1
+        hasPrev: pageNum > 1
       }
     });
   } catch (error) {
@@ -748,7 +763,10 @@ export const updateSettings = async (req, res) => {
 
     const config = await KycConfiguration.findOne({ userId, environment: 'production' });
     if (!config) {
-      return res.status(404).json({ error: 'Configuration not found' });
+      return res.status(404).json({
+        status: STATUS.FAILED,
+        errors: [{ textCode: 'NOT_FOUND', message: 'Configuration not found' }]
+      });
     }
 
     let integrationTouched = false;

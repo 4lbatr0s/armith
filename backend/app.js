@@ -10,6 +10,7 @@ import routes from './routes/index.js';
 import { connectDB } from './lib/mongodb.js';
 import { correlationIdMiddleware } from './middleware/correlationIdMiddleware.js';
 import { startLifecycleSchedulers } from './services/lifecycleScheduler.js';
+import { clerkWebhookHandler } from './controllers/clerkWebhookController.js';
 
 dotenv.config();
 
@@ -99,6 +100,13 @@ app.use(
 
 // Cookie parser
 app.use(cookieParser());
+
+// Clerk user webhooks — raw body required for Svix signature verification (before JSON parser).
+app.post(
+  '/auth/webhook',
+  express.raw({ type: ['application/json', 'application/json; charset=utf-8'], limit: '512kb' }),
+  clerkWebhookHandler
+);
 
 // Body parser
 app.use(express.json({ limit: '10mb' }));
