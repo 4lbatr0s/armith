@@ -24,7 +24,7 @@ export const AdminPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
-  const [verifications, setVerifications] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
@@ -81,7 +81,9 @@ export const AdminPage = () => {
       ]);
 
       setStats(statsData);
-      setVerifications(verificationsData.users);
+      const profileRows =
+        Array.isArray(verificationsData.profiles) ? verificationsData.profiles : verificationsData.users;
+      setProfiles(Array.isArray(profileRows) ? profileRows : []);
       setWebhookFailuresOverview(webhookFailResponse.deliveries || []);
     } catch (err) {
       console.error('Failed to load admin data:', err);
@@ -390,7 +392,7 @@ export const AdminPage = () => {
             isLoading={isLoading}
             stats={stats}
             webhookFailuresOverview={webhookFailuresOverview}
-            verifications={verifications}
+            profiles={profiles}
             page={page}
             setPage={setPage}
             onOpenWebhooksTab={() => setActiveTab('webhooks')}

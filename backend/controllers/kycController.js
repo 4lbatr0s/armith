@@ -70,6 +70,11 @@ function deriveSessionLifecycle({
     return { phase: 'pending', terminal: false };
 }
 
+function profileReadableByAuthenticatedUser(profile, authUserId) {
+    if (!profile || !authUserId) return false;
+    return profile.userId === authUserId || profile.merchantUserId === authUserId;
+}
+
 export const getSupportedCountries = async (_req, res) => {
     res.json({
         countries: [
@@ -232,6 +237,7 @@ export const verifyId = async (req, res) => {
         const countryCodeUpper = countryCode.toUpperCase();
         
         const authUserId = req.authContext?.userId || req.auth?.userId;
+        const authMode = req.authContext?.mode ?? 'userAuth';
 
         if (authUserId) {
             const quota = await checkUserVerificationQuota(authUserId);
@@ -288,6 +294,7 @@ export const verifyId = async (req, res) => {
         try {
             const idPersist = await persistIdVerification({
                 authUserId,
+                authMode,
                 countryCodeUpper,
                 result,
                 frontImageUrl,
@@ -399,18 +406,21 @@ export const verifySelfie = async (req, res) => {
         const profileId = profileIdFromBody || verificationId;
 
         const authUserId = req.authContext?.userId || req.auth?.userId;
+        const authMode = req.authContext?.mode ?? 'userAuth';
         const kycConfigDoc = authUserId ? await getOrCreateUserKycConfig(authUserId) : null;
 
         let countryHint = 'TR';
         if (profileId) {
-            const profileDoc = await Profile.findById(profileId).select('country userId').lean();
+            const profileDoc = await Profile.findById(profileId)
+                .select('country userId merchantUserId')
+                .lean();
             if (!profileDoc) {
                 return res.status(404).json({
                     status: STATUS.FAILED,
                     errors: [{ code: ERRORS.INVALID_REQUEST.code, message: 'Profile not found.' }]
                 });
             }
-            if (authUserId && profileDoc.userId && profileDoc.userId !== authUserId) {
+            if (authUserId && !profileReadableByAuthenticatedUser(profileDoc, authUserId)) {
                 return res.status(403).json({
                     status: STATUS.FAILED,
                     errors: [ERRORS.PROFILE_ACCESS_DENIED]
@@ -477,6 +487,8 @@ export const verifySelfie = async (req, res) => {
             });
 
             const persisted = await persistSelfieVerification({
+                authUserId,
+                authMode,
                 profileId,
                 idPhotoUrl,
                 selfieUrls,
@@ -576,18 +588,8 @@ async function respondWithKycStatus(req, res, profileId) {
                     errors: [ERRORS.PROFILE_ACCESS_DENIED]
                 });
             }
-            if (!profile.userId || profile.userId !== authUserId) {
-                return res.status(403).json({
-                    status: STATUS.FAILED,
-                    errors: [ERRORS.PROFILE_ACCESS_DENIED]
-                });
-            }
-        } else if (!profile.userId) {
-            return res.status(403).json({
-                status: STATUS.FAILED,
-                errors: [ERRORS.PROFILE_ACCESS_DENIED]
-            });
-        } else if (authUserId && profile.userId !== authUserId) {
+        }
+        if (!profileReadableByAuthenticatedUser(profile, authUserId)) {
             return res.status(403).json({
                 status: STATUS.FAILED,
                 errors: [ERRORS.PROFILE_ACCESS_DENIED]

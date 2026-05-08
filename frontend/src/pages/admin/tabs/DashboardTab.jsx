@@ -19,7 +19,7 @@ export function DashboardTab({
   isLoading,
   stats,
   webhookFailuresOverview,
-  verifications,
+  profiles,
   page,
   setPage,
   onOpenWebhooksTab,
@@ -186,8 +186,8 @@ export function DashboardTab({
 
         <div className="pm-panel overflow-hidden sm:rounded-sm transition-colors duration-200">
           <div className="px-4 py-5 sm:px-6 border-b-2 border-pm-ink/10 dark:border-white/10">
-        <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">{t('dashboard.recent_verifications')}</h3>
-        <p className="mt-1 max-w-2xl text-xs font-semibold uppercase tracking-widest text-pm-muted">{t('dashboard.recent_verifications_desc')}</p>
+        <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">{t('dashboard.recent_profiles')}</h3>
+        <p className="mt-1 max-w-2xl text-xs font-semibold uppercase tracking-widest text-pm-muted">{t('dashboard.recent_profiles_desc')}</p>
           </div>
           <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-pm-ink/10 dark:divide-white/10">
@@ -205,8 +205,8 @@ export function DashboardTab({
             </tr>
           </thead>
           <tbody className="bg-pm-surface dark:bg-pm-surface-dark divide-y divide-pm-ink/10 dark:divide-white/10">
-            {verifications.length > 0 ? (
-              verifications.map((verification) => {
+            {profiles.length > 0 ? (
+              profiles.map((verification) => {
                 const rowId = String(verification.id);
                 const ost = String(verification.status ?? '').toUpperCase();
                 const canReplayTerminal = ['APPROVED', 'REJECTED', 'FAILED'].includes(ost);
@@ -323,7 +323,7 @@ export function DashboardTab({
             ) : (
               <tr>
                 <td colSpan="9" className="px-6 py-10 text-center text-pm-muted text-sm uppercase tracking-widest">
-                      {t('dashboard.no_verifications')}
+                      {t('dashboard.no_profiles')}
                 </td>
               </tr>
             )}
@@ -338,7 +338,7 @@ export function DashboardTab({
             <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} variant="outline" className="dark:bg-pm-surface-dark dark:text-pm-ink-soft dark:border-white/20">
           {t('dashboard.previous')}
         </Button>
-            <Button onClick={() => setPage(p => p + 1)} disabled={verifications.length < 10} variant="outline" className="dark:bg-pm-surface-dark dark:text-pm-ink-soft dark:border-white/20">
+            <Button onClick={() => setPage(p => p + 1)} disabled={profiles.length < 10} variant="outline" className="dark:bg-pm-surface-dark dark:text-pm-ink-soft dark:border-white/20">
           {t('dashboard.next')}
         </Button>
           </div>
@@ -353,7 +353,7 @@ export function DashboardTab({
                 <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} variant="outline" className="rounded-l-md dark:bg-pm-surface-dark dark:text-pm-ink-soft dark:border-white/20">
               {t('dashboard.previous')}
             </Button>
-                <Button onClick={() => setPage(p => p + 1)} disabled={verifications.length < 10} variant="outline" className="rounded-r-md dark:bg-pm-surface-dark dark:text-pm-ink-soft dark:border-white/20">
+                <Button onClick={() => setPage(p => p + 1)} disabled={profiles.length < 10} variant="outline" className="rounded-r-md dark:bg-pm-surface-dark dark:text-pm-ink-soft dark:border-white/20">
               {t('dashboard.next')}
             </Button>
           </nav>

@@ -4,6 +4,12 @@ import { apiService } from '../services/api';
 import { useTranslation } from 'react-i18next';
 import { notify } from '../lib/notify';
 
+const ACCOUNT_IP_MAX_RULES = 24;
+
+function newAccountIpRow(value = '') {
+  return { id: crypto.randomUUID(), value };
+}
+
 function splitAllowlistInput(text) {
   const chunks = [];
   for (const part of String(text ?? '').split(/[\n,;]+/)) {
@@ -26,7 +32,8 @@ export function ApiKeysPanel() {
   const [saving, setSaving] = useState(false);
   const [expandedAllowlistKey, setExpandedAllowlistKey] = useState(null);
   const [allowlistDraft, setAllowlistDraft] = useState('');
-  const [accountAllowlistDraft, setAccountAllowlistDraft] = useState('');
+  /** Editable rows for account-wide IP rules (saved via PUT account-api-ip-allowlist). */
+  const [accountIpRows, setAccountIpRows] = useState(() => []);
 
   const loadAll = useCallback(async () => {
     try {
@@ -36,7 +43,7 @@ export function ApiKeysPanel() {
       setPerKeyIpAllowlist(Boolean(keysData.features?.perKeyIpAllowlist));
       const u = profileData?.data?.user;
       const ac = Array.isArray(u?.apiAllowedCidrs) ? u.apiAllowedCidrs : [];
-      setAccountAllowlistDraft(ac.join('\n'));
+      setAccountIpRows(ac.map((rule) => newAccountIpRow(String(rule))));
     } catch (err) {
       setError(err.message || t('profile.security.load_error'));
     } finally {
@@ -48,11 +55,26 @@ export function ApiKeysPanel() {
     loadAll();
   }, [loadAll]);
 
+  const addAccountIpRow = () => {
+    setAccountIpRows((prev) => {
+      if (prev.length >= ACCOUNT_IP_MAX_RULES) return prev;
+      return [...prev, newAccountIpRow('')];
+    });
+  };
+
+  const updateAccountIpRow = (id, value) => {
+    setAccountIpRows((prev) => prev.map((row) => (row.id === id ? { ...row, value } : row)));
+  };
+
+  const removeAccountIpRow = (id) => {
+    setAccountIpRows((prev) => prev.filter((row) => row.id !== id));
+  };
+
   const saveAccountAllowlist = async () => {
     try {
       setSaving(true);
       setError(null);
-      const lines = splitAllowlistInput(accountAllowlistDraft);
+      const lines = accountIpRows.map((r) => r.value.trim()).filter(Boolean);
       await apiService.updateAccountApiIpAllowlist(lines);
       notify.success(t('integrations.account_ip_saved'));
       await loadAll();
@@ -138,14 +160,52 @@ export function ApiKeysPanel() {
       <div className="pm-panel px-4 py-5 border-2 border-pm-accent-alt/30 space-y-3">
         <h3 className="font-display text-lg font-bold text-pm-ink dark:text-pm-ink-soft">{t('integrations.account_ip_heading')}</h3>
         <p className="text-sm text-pm-muted leading-relaxed">{t('integrations.account_ip_desc')}</p>
-        <textarea
-          value={accountAllowlistDraft}
-          onChange={(e) => setAccountAllowlistDraft(e.target.value)}
-          rows={5}
-          disabled={saving || apiKeysLoading}
-          className="w-full font-mono text-sm px-3 py-2 border rounded-sm bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft border-pm-ink/20"
-          placeholder={t('profile.security.allowlist_placeholder')}
-        />
+        <p className="text-xs text-pm-muted">{t('integrations.account_ip_list_hint')}</p>
+
+        {accountIpRows.length === 0 ? (
+          <p className="text-sm text-pm-muted italic">{t('integrations.account_ip_empty')}</p>
+        ) : (
+          <ul className="space-y-2 list-none p-0 m-0">
+            {accountIpRows.map((row) => (
+              <li key={row.id} className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <input
+                  type="text"
+                  value={row.value}
+                  onChange={(e) => updateAccountIpRow(row.id, e.target.value)}
+                  disabled={saving || apiKeysLoading}
+                  className="flex-1 min-w-0 font-mono text-sm px-3 py-2 border rounded-sm bg-pm-surface dark:bg-pm-surface-dark text-pm-ink dark:text-pm-ink-soft border-pm-ink/20"
+                  placeholder={t('profile.security.allowlist_placeholder_line')}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => removeAccountIpRow(row.id)}
+                  disabled={saving || apiKeysLoading}
+                >
+                  {t('integrations.account_ip_remove')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addAccountIpRow}
+            disabled={saving || apiKeysLoading || accountIpRows.length >= ACCOUNT_IP_MAX_RULES}
+          >
+            {t('integrations.account_ip_add')}
+          </Button>
+          <span className="text-xs text-pm-muted">
+            {t('integrations.account_ip_rule_count', { current: accountIpRows.length, max: ACCOUNT_IP_MAX_RULES })}
+          </span>
+        </div>
+
         <Button type="button" onClick={saveAccountAllowlist} disabled={saving || apiKeysLoading}>
           {t('integrations.account_ip_save')}
         </Button>

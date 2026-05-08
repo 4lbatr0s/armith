@@ -1,7 +1,7 @@
 import { Profile, IdCardValidation, SelfieValidation } from '../../models/index.js';
 import { STATUS, formatStructuredError } from '../../kyc/config.js';
 
-/** Thrown when (country + identityNumber) exists on another userId than the authenticated user. */
+/** Thrown when (country + identityNumber) belongs to another tenant (merchant Clerk id differs). */
 export class IdentityNumberConflictError extends Error {
     constructor(message = 'This identity number is already linked to another account.') {
         super(message);
@@ -22,8 +22,27 @@ function omitNullProps(obj) {
 }
 
 function isTerminalProfileStatus(value) {
-  const u = String(value ?? '').toUpperCase();
-  return u === 'APPROVED' || u === 'REJECTED' || u === 'FAILED';
+    const u = String(value ?? '').toUpperCase();
+    return u === 'APPROVED' || u === 'REJECTED' || u === 'FAILED';
+}
+
+/** Tenant owner Clerk id persisted on Profile; optional override for SPA where end-user JWT ≠ dashboard operator Clerk id */
+function resolveProfileMerchantClerkId(authUserId, authMode) {
+    if (!authUserId) return null;
+    const o = String(process.env.APP_DEFAULT_MERCHANT_CLERK_ID ?? '').trim();
+    if (authMode === 'userAuth' && o.length > 0) return o;
+    return authUserId;
+}
+
+function applyMerchantAndSubjectIds(profileLike, authUserId, authMode) {
+    if (!profileLike || !authUserId) return;
+    const merchantId = resolveProfileMerchantClerkId(authUserId, authMode);
+    if (merchantId) profileLike.merchantUserId = merchantId;
+    if (authMode !== 'apiKey') {
+        if (!profileLike.userId || profileLike.userId === authUserId) {
+            profileLike.userId = authUserId;
+        }
+    }
 }
 
 function applyIntegrationTenantFields(profile, tenant) {
@@ -73,6 +92,7 @@ export function deduplicateReasons(existing, newReasons) {
 
 export async function persistIdVerification({
     authUserId,
+    authMode = 'userAuth',
     countryCodeUpper,
     result,
     frontImageUrl,
@@ -82,23 +102,36 @@ export async function persistIdVerification({
     integrationTenant
 }) {
     const idNum = normalizeIdentityNumber(result.data?.identityNumber);
+    const merchantScopeId = authUserId ? resolveProfileMerchantClerkId(authUserId, authMode) : null;
     let profile = null;
 
-    // Logged-in: one profile row per (userId + identityNumber). Do not reuse "any" profile for this user.
     if (authUserId && idNum) {
         profile = await Profile.findOne({ userId: authUserId, identityNumber: idNum });
+        if (!profile && merchantScopeId) {
+            profile = await Profile.findOne({
+                merchantUserId: merchantScopeId,
+                identityNumber: idNum,
+            });
+        }
     }
 
-    // Match by national id + country when no user-scoped row yet (guest flow or first link).
     if (!profile && idNum) {
         const existing = await Profile.findOne({
             country: countryCodeUpper,
             identityNumber: idNum,
         });
-        if (existing) {
-            if (authUserId && existing.userId && existing.userId !== authUserId) {
-                throw new IdentityNumberConflictError();
+        if (existing && merchantScopeId) {
+            const existingMerchant =
+                typeof existing.merchantUserId === 'string'
+                    ? existing.merchantUserId.trim()
+                    : '';
+            if (existingMerchant && existingMerchant !== merchantScopeId) {
+                throw new IdentityNumberConflictError(
+                    'This identity number is already registered under another tenant.'
+                );
             }
+        }
+        if (existing) {
             profile = existing;
         }
     }
@@ -111,11 +144,10 @@ export async function persistIdVerification({
         const prevIdVerificationStatus = profile.idVerificationStatus;
         profile.idVerificationStatus = result.status.toUpperCase();
 
-        if (authUserId && !profile.userId) {
-            profile.userId = authUserId;
+        if (authUserId) {
+            applyMerchantAndSubjectIds(profile, authUserId, authMode);
         }
 
-        // Refresh extraction + images on approve, or while ID was never approved (retry same TCKN / same profile).
         const shouldRefreshIdSnapshot =
             result.status === STATUS.APPROVED || prevIdVerificationStatus !== 'APPROVED';
 
@@ -157,7 +189,6 @@ export async function persistIdVerification({
     } else {
         previousProfileStatus = null;
         const newProfilePayload = {
-            userId: authUserId,
             fullName: `${result.data?.firstName} ${result.data?.lastName}`.trim(),
             firstName: result.data?.firstName,
             lastName: result.data?.lastName,
@@ -179,6 +210,9 @@ export async function persistIdVerification({
             lastVerificationAttempt: new Date(),
             rejectionReasons
         };
+        if (authUserId) {
+            applyMerchantAndSubjectIds(newProfilePayload, authUserId, authMode);
+        }
         applyIntegrationTenantFields(newProfilePayload, integrationTenant);
         profile = await Profile.create(newProfilePayload);
     }
@@ -228,6 +262,8 @@ export async function persistIdVerification({
 }
 
 export async function persistSelfieVerification({
+    authUserId,
+    authMode = 'userAuth',
     profileId,
     idPhotoUrl,
     selfieUrls,
@@ -254,13 +290,17 @@ export async function persistSelfieVerification({
     if (rejectionReasons.length > 0) {
         profile.rejectionReasons = deduplicateReasons(profile.rejectionReasons, rejectionReasons);
     }
+    if (authUserId) {
+        applyMerchantAndSubjectIds(profile, authUserId, authMode);
+    }
     applyIntegrationTenantFields(profile, integrationTenant);
     await profile.save();
 
     const nextStatusUpper = String(overallStatus ?? '').toUpperCase();
-    const ownerId = profile.userId;
+    const quotaUserId =
+        authUserId || profile.merchantUserId || profile.userId || null;
     const shouldIncrementQuota =
-        Boolean(ownerId) &&
+        Boolean(quotaUserId) &&
         isTerminalProfileStatus(nextStatusUpper) &&
         !isTerminalProfileStatus(previousProfileStatus);
 
@@ -285,5 +325,5 @@ export async function persistSelfieVerification({
         rejectionReasons
     });
 
-    return { profile, clerkIdToIncrementQuota: shouldIncrementQuota ? ownerId : null };
+    return { profile, clerkIdToIncrementQuota: shouldIncrementQuota ? quotaUserId : null };
 }

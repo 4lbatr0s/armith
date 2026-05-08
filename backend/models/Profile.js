@@ -11,6 +11,11 @@ const profileSchema = new mongoose.Schema(
             type: String,
             index: true,
         },
+        /** Clerk ID of tenant (dashboard/API key owner). Outbound webhooks use the same semantics as tenantUserId. */
+        merchantUserId: {
+            type: String,
+            index: true,
+        },
         fullName: String,
         firstName: String,
         lastName: String,

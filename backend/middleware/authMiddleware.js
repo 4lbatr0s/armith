@@ -28,6 +28,20 @@ export const getUserId = (req) => {
   return req.authContext?.userId || getAuth(req)?.userId || null;
 };
 
+/** Account-wide list (`User.apiAllowedCidrs`); empty ⇒ allow any IP. */
+function ipAllowedForAccount(req, tenant) {
+  const accountRules = Array.isArray(tenant?.apiAllowedCidrs) ? tenant.apiAllowedCidrs : [];
+  if (accountRules.length === 0) return true;
+  return ipAllowedByRules(getClientIp(req), accountRules);
+}
+
+function denyAccountIp(res) {
+  return res.status(403).json({
+    error: 'IP address not allowed for this account',
+    code: 'ACCOUNT_IP_FORBIDDEN'
+  });
+}
+
 const extractApiKeyToken = (req) => {
   const headerValue = req.headers['x-api-key'];
   if (typeof headerValue === 'string' && headerValue.trim().length > 0) {
@@ -66,6 +80,10 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
       if (!claims) {
         return res.status(401).json({ error: 'Invalid or expired capture session token' });
       }
+      const captureTenant = await User.findOne({ clerkId: claims.tenantUserId }).lean();
+      if (!ipAllowedForAccount(req, captureTenant)) {
+        return denyAccountIp(res);
+      }
       req.authContext = {
         mode: 'captureSession',
         userId: claims.tenantUserId,
@@ -82,16 +100,9 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
         return res.status(401).json({ error: 'Invalid API key' });
       }
 
-      const ip = getClientIp(req);
       const tenant = await User.findOne({ clerkId: apiKey.userId }).lean();
-      const accountRules = Array.isArray(tenant?.apiAllowedCidrs) ? tenant.apiAllowedCidrs : [];
-      if (accountRules.length > 0) {
-        if (!ipAllowedByRules(ip, accountRules)) {
-          return res.status(403).json({
-            error: 'IP address not allowed for this account',
-            code: 'ACCOUNT_IP_FORBIDDEN'
-          });
-        }
+      if (!ipAllowedForAccount(req, tenant)) {
+        return denyAccountIp(res);
       }
 
       const keyRules = Array.isArray(apiKey.allowedCidrs) ? apiKey.allowedCidrs : [];
@@ -116,6 +127,11 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
     const auth = getAuth(req);
     if (!auth?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const sessionTenant = await User.findOne({ clerkId: auth.userId }).lean();
+    if (!ipAllowedForAccount(req, sessionTenant)) {
+      return denyAccountIp(res);
     }
 
     req.auth = auth;

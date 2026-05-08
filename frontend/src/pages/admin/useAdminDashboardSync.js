@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 /**
- * Load dashboard stats/verifications only while the Dashboard tab is active.
+ * Load dashboard stats and Profile list while the Dashboard tab is active.
  * Avoids blocking other tabs with `isLoading` when opening e.g. `?tab=settings` first.
  */
 export function useAdminDashboardSync(activeTab, fetchData, setIsLoading) {

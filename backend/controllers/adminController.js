@@ -38,6 +38,36 @@ const PROFILE_QUERY_STATUSES = new Set([
   'UNDER_REVIEW'
 ]);
 
+function envFlagTruthy(v) {
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes';
+}
+
+/**
+ * Mongo filter for dashboards: profiles linked as subject/user or tenant merchant, plus any profile id
+ * that has an outbound webhook row keyed to this Clerk userId (billing tenant — common for API key flows).
+ * `permissiveList`: when ADMIN_DASHBOARD_LIST_ALL_PROFILES is truthy, returns {} (single-tenant operators only).
+ */
+async function tenantDashboardProfileFilter(ownerId, { permissiveList = false } = {}) {
+  if (permissiveList && envFlagTruthy(process.env.ADMIN_DASHBOARD_LIST_ALL_PROFILES)) {
+    return {};
+  }
+  const orParts = [{ merchantUserId: ownerId }, { userId: ownerId }];
+  try {
+    const webhookProfileIds = await WebhookDelivery.distinct('profileId', {
+      userId: ownerId,
+      profileId: { $exists: true, $ne: null }
+    });
+    const ids = webhookProfileIds.filter((id) => id != null && id !== '');
+    if (ids.length > 0) {
+      orParts.push({ _id: { $in: ids } });
+    }
+  } catch (e) {
+    console.warn('tenantDashboardProfileFilter webhook distinct failed:', e?.message);
+  }
+  return { $or: orParts };
+}
+
 /**
  * Payload for GET/PUT `/admin/settings` — never exposes `integrationWebhookSecret`.
  */
@@ -144,22 +174,28 @@ export const getVerifications = async (req, res) => {
 
     const skip = (pageNum - 1) * limitNum;
 
-    const filter = { userId: ownerId };
-    if (typeof status === 'string' && status.trim() && PROFILE_QUERY_STATUSES.has(status.trim().toUpperCase())) {
-      filter.status = status.trim().toUpperCase();
-    }
+    const scope = await tenantDashboardProfileFilter(ownerId, { permissiveList: true });
+    const filter =
+      typeof status === 'string' &&
+      status.trim() &&
+      PROFILE_QUERY_STATUSES.has(status.trim().toUpperCase())
+        ? { ...scope, status: status.trim().toUpperCase() }
+        : { ...scope };
 
     const [profiles, total] = await Promise.all([
       Profile.find(filter).skip(skip).limit(limitNum).sort({ createdAt: -1 }),
-      Profile.countDocuments(filter)
+      Profile.countDocuments(filter),
     ]);
 
+    const rows = profiles.map(mapProfileDashboardRow);
     res.json({
-      users: profiles.map(mapProfileDashboardRow),
+      profiles: rows,
+      users: rows,
       pagination: {
         currentPage: pageNum,
         totalPages: Math.ceil(total / limitNum),
         totalUsers: total,
+        totalProfiles: total,
         hasNext: skip + profiles.length < total,
         hasPrev: pageNum > 1
       }
@@ -183,7 +219,7 @@ export const getStats = async (req, res) => {
       });
     }
 
-    const base = { userId: ownerId };
+    const base = await tenantDashboardProfileFilter(ownerId, { permissiveList: true });
     const [total, approved, rejected, pending, underReviewCount, activeApiKeys] = await Promise.all([
       Profile.countDocuments(base),
       Profile.countDocuments({ ...base, status: 'APPROVED' }),
@@ -278,7 +314,11 @@ export const deleteOwnedVerification = async (req, res) => {
       });
     }
 
-    const profile = await Profile.findOne({ _id: profileId, userId: ownerId });
+    const strictScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: false });
+    const profile = await Profile.findOne({
+      _id: profileId,
+      ...strictScope,
+    });
     if (!profile) {
       return res.status(404).json({
         status: STATUS.FAILED,
@@ -330,7 +370,11 @@ export const replayTerminalWebhook = async (req, res) => {
       });
     }
 
-    const profile = await Profile.findOne({ _id: profileId, userId: ownerId });
+    const replayScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: false });
+    const profile = await Profile.findOne({
+      _id: profileId,
+      ...replayScope,
+    });
     if (!profile) {
       return res.status(404).json({
         status: STATUS.FAILED,
@@ -404,7 +448,8 @@ export const listManualReviewQueue = async (req, res) => {
     const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
     const lim = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (pageNum - 1) * lim;
-    const filter = { userId: ownerId, status: 'UNDER_REVIEW' };
+    const mrScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: true });
+    const filter = { ...mrScope, status: 'UNDER_REVIEW' };
 
     const [profiles, total] = await Promise.all([
       Profile.find(filter).skip(skip).limit(lim).sort({ updatedAt: -1 }),
@@ -445,7 +490,11 @@ export const enqueueManualReview = async (req, res) => {
       });
     }
 
-    const profile = await Profile.findOne({ _id: profileId, userId: ownerId });
+    const enqueueScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: false });
+    const profile = await Profile.findOne({
+      _id: profileId,
+      ...enqueueScope,
+    });
     if (!profile) {
       return res.status(404).json({
         status: STATUS.FAILED,
@@ -535,7 +584,11 @@ export const resolveManualReview = async (req, res) => {
       });
     }
 
-    const profile = await Profile.findOne({ _id: profileId, userId: ownerId });
+    const resolveScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: false });
+    const profile = await Profile.findOne({
+      _id: profileId,
+      ...resolveScope,
+    });
     if (!profile) {
       return res.status(404).json({
         status: STATUS.FAILED,
@@ -641,7 +694,11 @@ export const mintVerificationCaptureSessionHandler = async (req, res) => {
       });
     }
 
-    const profile = await Profile.findOne({ _id: profileId, userId: ownerId });
+    const mintScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: false });
+    const profile = await Profile.findOne({
+      _id: profileId,
+      ...mintScope,
+    });
     if (!profile) {
       return res.status(404).json({
         status: STATUS.FAILED,
@@ -685,7 +742,8 @@ export const getKeyedErrorSummary = async (req, res) => {
     }
 
     const limitDocs = Math.min(400, Number(req.query.limit) || 250);
-    const profileIds = await Profile.find({ userId: ownerId }).distinct('_id');
+    const errInsightScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: true });
+    const profileIds = await Profile.find(errInsightScope).distinct('_id');
 
     const [idVals, selfieVals] = await Promise.all([
       IdCardValidation.find({ profileId: { $in: profileIds } })
