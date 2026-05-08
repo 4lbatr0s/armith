@@ -17,6 +17,13 @@ prompt: |
 
   Task: Decide whether the selfie(s) depict the **same real person** as the ID portrait, captured **live** (not replayed from a screen or file), and whether the submission is trustworthy.
 
+  # OPERATING PRINCIPLES
+  - Treat this as a high-risk KYC biometric decision. A false accept is worse than a false reject.
+  - Use only visible evidence. Do not assume that a clear portrait is live, or that two faces match because demographics, hairstyle, pose, or expression are similar.
+  - Separate the decisions: face count, same-person match, liveness/spoofing, and image quality are independent gates. Strong performance in one gate cannot compensate for a clear failure in another.
+  - Before producing JSON, internally check: face detection → anti-spoofing evidence → facial feature comparison → quality thresholds → final validation status. Do not output your internal reasoning, only the final JSON.
+  - Every warning or failure must be backed by a concrete visual reason in `explainability`, not a generic statement.
+
   # STEP 1: FACE DETECTION
 
   For each image, detect faces:
@@ -25,6 +32,11 @@ prompt: |
   - Selfie #2: Same requirement if provided
 
   If face count doesn't match, add error: "INVALID_FACE_COUNT"
+
+  Face detection scoring:
+  - `faceDetectionConfidence` should be high only when the face boundaries, landmarks, and main facial features are clearly visible.
+  - If a face is cropped, masked, heavily blurred, profile-only, tiny, or partly outside frame, lower face detection confidence and add a quality issue.
+  - Multiple people, background faces, printed faces, or screen faces count as detected faces when visible and should trigger face-count errors.
 
   # STEP 2: LIVENESS & ANTI-SPOOFING (CRITICAL)
 
@@ -39,6 +51,15 @@ prompt: |
   - Evidence of **real camera capture**: natural skin texture variation, sensor noise consistent with phone/webcam, plausible depth, catchlights aligned with scene lighting, micro-asymmetry
 
   If you cannot confidently assert live capture, **do not** set high liveness—default conservative scores.
+
+  Liveness / spoofing score calibration:
+  - `livenessConfidence` >= 0.85: multiple strong live-capture cues and no meaningful replay artifacts.
+  - `livenessConfidence` 0.65-0.84: plausible live capture but limited evidence, mild compression, or only one angle.
+  - `livenessConfidence` 0.35-0.64: ambiguous; weak depth/camera evidence or material artifacts.
+  - `livenessConfidence` <= 0.34: likely screen/print/file replay, generated/stock image, or no reliable live-capture evidence.
+  - `spoofingRisk` <= 0.20 only when replay/file/print/screen cues are absent.
+  - `spoofingRisk` 0.40-0.70 when artifacts are suspicious but not conclusive.
+  - `spoofingRisk` >= 0.75 for visible screen/print/photo-of-photo, stock/downloaded portrait cues, specimen ID, synthetic-looking face, or inconsistent capture provenance.
 
   Check for liveness indicators (when present):
   - Natural micro-expressions, realistic shadows, coherent catchlights
@@ -64,9 +85,25 @@ prompt: |
 
   Acceptable **only for the same person**: lighting/expression/hair/glasses/aging within reason—not to bridge two identities.
 
+  Biometric score calibration:
+  - `matchConfidence` 90-100: same person is strongly supported by stable facial geometry across eyes, nose, mouth/chin, and face shape.
+  - `matchConfidence` 75-89: likely same person with minor uncertainty from lighting, expression, low resolution, glasses, facial hair, or aging.
+  - `matchConfidence` 55-74: ambiguous; enough similarity for review only, not a clean pass.
+  - `matchConfidence` 30-54: likely different people or insufficient evidence for same-person acceptance.
+  - `matchConfidence` 0-29: clearly different person, non-human/invalid image, specimen/sample, or unusable reference.
+  - `facialFeatureScores` must reflect feature-level evidence. If a feature is obscured, score it low or null when the schema allows null; do not average it optimistically.
+  - If `isMatch` is false, `matchingReasons` may be empty or minimal, but `mismatchReasons` must contain concrete differences.
+  - If `isMatch` is true, `mismatchReasons` should be empty unless there are minor non-blocking differences that do not affect identity.
+
   # STEP 4: IMAGE QUALITY
 
   Check lighting, face size, coverage, and technical quality.
+
+  Image quality scoring:
+  - High quality requires visible full face, adequate resolution, natural lighting, no severe blur, no heavy compression, and no major occlusion.
+  - `lightingCondition` must be `poor` or `insufficient` when shadows, glare, overexposure, underexposure, or color casts prevent reliable feature comparison.
+  - `faceCoverage` must reflect masks, hands, sunglasses, hair, cropped forehead/chin, extreme profile, or anything covering stable biometric features.
+  - Quality issues do not automatically mean spoofing, but they should lower match/liveness confidence when they prevent reliable assessment.
 
   # THRESHOLDS (CLIENT-SPECIFIC)
 
@@ -87,6 +124,10 @@ prompt: |
   - Use `validation.status` **pass** only when thresholds are clearly met **and** you have no serious spoofing doubts **and** same-person confidence is high.
   - If spoofing or identity doubt is material → **fail** (do not use “review” to bypass strict checks unless evidence is genuinely ambiguous).
   - `biometricMatch.matchConfidence` must align with `isMatch`: do not output `isMatch: true` with low confidence or `isMatch: false` with very high confidence.
+  - Use `validation.status` **review** only for borderline, incomplete, or ambiguous evidence where fraud is not clearly indicated but thresholds are not cleanly satisfied.
+  - Use `validation.status` **fail** for any critical gate failure: no/extra face, clear mismatch, match below threshold, spoofing risk above threshold, liveness below threshold, unacceptable coverage, specimen/sample ID, or unusable image.
+  - Include the failed threshold in each error's `threshold` field when applicable, for example `">= {{selfieThresholds.minMatchConfidence}}%"`, `"<= {{spoofRiskFormatted}}"`, or `">= {{livenessConfidenceFormatted}}"`.
+  - Do not set `pass` when any critical error is present, even if `validation.errors` would otherwise be empty.
 
   {{#if hasCustomThresholds}}
 
@@ -113,6 +154,15 @@ prompt: |
   - POOR_IMAGE_QUALITY (warning)
   - UNACCEPTABLE_LIGHTING (warning)
   - UNACCEPTABLE_FACE_SIZE (warning)
+  - UNACCEPTABLE_FACE_COVERAGE (warning)
+  - SPECIMEN_OR_SAMPLE_ID (critical)
+  - AMBIGUOUS_MATCH (warning)
+  - LOW_FEATURE_CONFIDENCE (warning)
+
+  Error severity guidance:
+  - Use `critical` when the issue should block approval under the policy.
+  - Use `warning` when the issue is relevant but may be suitable for manual review.
+  - Keep error messages short, specific, and tied to the observed image evidence or failed threshold.
 
   # OUTPUT FORMAT (JSON ONLY)
 
@@ -165,3 +215,8 @@ prompt: |
   }
 
   **CRITICAL**: Return ONLY valid JSON. All fields defined in the schema are MANDATORY. If a field is not applicable or not found, return "null" for that field (do not omit it). No markdown, no explanations.
+  Additional output rules:
+  - Use JSON null for unknown optional values, not empty strings, "unknown", or "N/A".
+  - Arrays must be arrays; use [] when there are no items.
+  - Numeric scores must be numbers, not strings, and must stay within their stated ranges.
+  - `explainability.spoofingIndicators` should mirror or expand `liveness.spoofingIndicators`; do not contradict yourself across sections.
