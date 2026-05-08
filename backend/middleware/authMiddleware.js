@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { requireAuth, getAuth } from '@clerk/express';
 import { authenticateApiKeyToken } from '../services/apiKeyService.js';
 import { getClientIp } from '../lib/clientIp.js';
@@ -22,12 +23,12 @@ export const optionalAuth = (req, res, next) => {
     next();
 };
 
-/**
- * Get current user ID from request
- */
-export const getUserId = (req) => {
-  return req.authContext?.userId || getAuth(req)?.userId || null;
-};
+/** Mongo `users._id` (hex) after `authenticateApiKeyOrUser` */
+export const getMongoUserId = (req) => req.authContext?.mongoUserId ?? null;
+
+/** Clerk `user_*` session id — only for Clerk-specific integration; persisted models use Mongo ids. */
+export const getClerkUserId = (req) =>
+  req.authContext?.clerkUserId ?? getAuth(req)?.userId ?? null;
 
 /** Account-wide list (`User.apiAllowedCidrs`); empty ⇒ allow any IP. */
 function ipAllowedForAccount(req, tenant) {
@@ -81,15 +82,21 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
       if (!claims) {
         return res.status(401).json({ error: 'Invalid or expired capture session token' });
       }
-      const captureTenant = await getOrCreateUsageUser(claims.tenantUserId);
+      const tenantClaim = String(claims.tenantUserId ?? '');
+      const captureTenant = mongoose.Types.ObjectId.isValid(tenantClaim)
+        ? await User.findById(tenantClaim)
+        : await getOrCreateUsageUser(tenantClaim);
+      if (!captureTenant?._id) {
+        return res.status(401).json({ error: 'Invalid or expired capture session token' });
+      }
       if (!ipAllowedForAccount(req, captureTenant)) {
         return denyAccountIp(res);
       }
       req.authContext = {
         mode: 'captureSession',
-        userId: claims.tenantUserId,
+        clerkUserId: captureTenant.clerkId ?? null,
         mongoUserId: captureTenant._id.toString(),
-        captureProfileId: claims.profileId
+        captureProfileId: claims.profileId,
       };
       return next();
     }
@@ -102,7 +109,17 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
         return res.status(401).json({ error: 'Invalid API key' });
       }
 
-      const tenant = await getOrCreateUsageUser(apiKey.userId);
+      const storedKeyUser = typeof apiKey.userId === 'string' ? apiKey.userId.trim() : '';
+      let tenant = null;
+      if (mongoose.Types.ObjectId.isValid(storedKeyUser)) {
+        tenant = await User.findById(storedKeyUser);
+      }
+      if (!tenant && storedKeyUser.startsWith('user_')) {
+        tenant = await getOrCreateUsageUser(storedKeyUser);
+      }
+      if (!tenant?._id) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
       if (!ipAllowedForAccount(req, tenant)) {
         return denyAccountIp(res);
       }
@@ -120,7 +137,7 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
 
       req.authContext = {
         mode: 'apiKey',
-        userId: apiKey.userId,
+        clerkUserId: tenant.clerkId ?? null,
         mongoUserId: tenant._id.toString(),
         apiKeyId: apiKey._id.toString(),
       };
@@ -141,7 +158,7 @@ export const authenticateApiKeyOrUser = async (req, res, next) => {
     req.auth = auth;
     req.authContext = {
       mode: 'userAuth',
-      userId: auth.userId,
+      clerkUserId: auth.userId,
       mongoUserId: sessionTenant._id.toString(),
     };
 

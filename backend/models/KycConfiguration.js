@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 
 const kycConfigurationSchema = new mongoose.Schema(
     {
+        /** Mongo `users._id` (hex) — never Clerk. */
         userId: {
             type: String,
             required: true,

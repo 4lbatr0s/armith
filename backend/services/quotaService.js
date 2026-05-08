@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { User } from '../models/index.js';
 
 /** Monthly app-enforced caps (Stripe metering is separate). Growth is metered with overage in product copy — do not hard-stop at the discounted tier band. */
@@ -54,8 +55,16 @@ export const getOrCreateUsageUser = async (clerkId) => {
   return ensureUsagePeriod(user);
 };
 
-export const checkUserVerificationQuota = async (clerkId) => {
-  const user = await getOrCreateUsageUser(clerkId);
+/** @param {string | undefined | null} mongoUserId Hex ObjectId string for `users` collection */
+export const checkUserVerificationQuota = async (mongoUserId) => {
+  if (!mongoUserId || !mongoose.Types.ObjectId.isValid(mongoUserId)) {
+    return { allowed: false, used: 0, limit: 0, planTier: 'free', user: null };
+  }
+  let user = await User.findById(mongoUserId);
+  if (!user) {
+    return { allowed: false, used: 0, limit: 0, planTier: 'free', user: null };
+  }
+  user = await ensureUsagePeriod(user);
   const limit = getLimitForUser(user);
   const used = user.verificationUsage?.currentPeriodCount || 0;
   const isUnlimited = limit == null;
@@ -70,9 +79,13 @@ export const checkUserVerificationQuota = async (clerkId) => {
   };
 };
 
-export const incrementUserVerificationUsage = async (clerkId) => {
-  const user = await getOrCreateUsageUser(clerkId);
-  user.verificationUsage.currentPeriodCount = (user.verificationUsage?.currentPeriodCount || 0) + 1;
+/** @param {string | undefined | null} mongoUserId Hex ObjectId string for `users` collection */
+export const incrementUserVerificationUsage = async (mongoUserId) => {
+  if (!mongoUserId || !mongoose.Types.ObjectId.isValid(mongoUserId)) return null;
+  const user = await User.findById(mongoUserId);
+  if (!user) return null;
+  user.verificationUsage = user.verificationUsage || {};
+  user.verificationUsage.currentPeriodCount = (user.verificationUsage.currentPeriodCount || 0) + 1;
   await user.save();
   return user.verificationUsage.currentPeriodCount;
 };

@@ -2,29 +2,29 @@ import rateLimit from 'express-rate-limit';
 import { getClientIp } from '../lib/clientIp.js';
 import {
   KYC_BURST_WINDOW_MS,
-  resolveKycBurstLimitForClerkId,
+  resolveKycBurstLimitForMongoUserId,
   resolveKycPerIpLimit
 } from '../services/kycRateLimitPolicy.js';
 
 /**
  * Per-tenant burst cap on authenticated KYC routes.
- * Key: API key id (key material) or dashboard/capture session user id — same numeric limit from plan + User.limitsOverride.
+ * Key: API key id (key material) or Mongo tenant user — same numeric limit from plan + User.limitsOverride.
  */
 export const kycBurstRateLimiter = rateLimit({
   windowMs: KYC_BURST_WINDOW_MS,
   standardHeaders: true,
   legacyHeaders: false,
   identifier: 'kyc-tenant-burst',
-  skip: (req) => req.method === 'OPTIONS' || !req.authContext?.userId,
+  skip: (req) => req.method === 'OPTIONS' || !req.authContext?.mongoUserId,
   keyGenerator: (req) => {
     const mode = req.authContext?.mode;
-    const uid = req.authContext.userId;
+    const mongoUid = req.authContext.mongoUserId;
     if (mode === 'apiKey' && req.authContext.apiKeyId) {
       return `kyc-burst:ak:${req.authContext.apiKeyId}`;
     }
-    return `kyc-burst:tu:${uid}`;
+    return `kyc-burst:tu:${mongoUid}`;
   },
-  limit: async (req) => resolveKycBurstLimitForClerkId(req.authContext.userId),
+  limit: async (req) => resolveKycBurstLimitForMongoUserId(req.authContext.mongoUserId),
   message: {
     success: false,
     error: 'KYC rate limit exceeded for this account or API key.',
@@ -41,7 +41,7 @@ export const kycClientIpRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   identifier: 'kyc-client-ip',
-  skip: (req) => req.method === 'OPTIONS' || !req.authContext?.userId,
+  skip: (req) => req.method === 'OPTIONS' || !req.authContext?.mongoUserId,
   keyGenerator: (req) => {
     const ip = getClientIp(req) || 'unknown';
     return `kyc-ip:${ip}`;

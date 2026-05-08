@@ -80,24 +80,25 @@ export function resolveKycPerIpLimit(clientIp) {
   return DEFAULT_KYC_PER_IP_LIMIT;
 }
 
-export async function resolveKycBurstLimitForClerkId(clerkId) {
-  if (!clerkId || typeof clerkId !== 'string') {
+/** @param {string} mongoUserId Hex `users._id` */
+export async function resolveKycBurstLimitForMongoUserId(mongoUserId) {
+  if (!mongoUserId || typeof mongoUserId !== 'string') {
     return TIER_BURST_DEFAULT.free;
   }
   const now = Date.now();
   if (CACHE_TTL_MS > 0) {
-    const hit = cache.get(clerkId);
+    const hit = cache.get(mongoUserId);
     if (hit && hit.exp > now) {
       return hit.limit;
     }
   }
 
-  const user = await User.findOne({ clerkId }).select('planTier limitsOverride').lean();
+  const user = await User.findById(mongoUserId).select('planTier limitsOverride').lean();
 
   const limit = computeKycBurstLimitFromUserLean(user);
 
   if (CACHE_TTL_MS > 0) {
-    cache.set(clerkId, { limit, exp: now + CACHE_TTL_MS });
+    cache.set(mongoUserId, { limit, exp: now + CACHE_TTL_MS });
     if (cache.size > 5000) {
       for (const [k, v] of cache) {
         if (v.exp <= now) cache.delete(k);

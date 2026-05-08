@@ -7,12 +7,17 @@ import mongoose from 'mongoose';
 
 const profileSchema = new mongoose.Schema(
     {
-        /** Mongo `users` document _id (hex string); not a Clerk user id */
+        /** Mongo `users._id` (hex) — verified subject/applicant identity in our DB; never Clerk. */
         userId: {
             type: String,
             index: true,
         },
-        /** Clerk ID of tenant (dashboard/API key owner). Outbound webhooks use the same semantics as tenantUserId. */
+        /** Mongo `users._id` (hex) — dashboard/API account that owns billing & webhooks; never Clerk. */
+        ownerUserId: {
+            type: String,
+            index: true,
+        },
+        /** @deprecated Legacy tenant key; historically Clerk user_* — prefer `ownerUserId`. Indexed for migration queries only. */
         merchantUserId: {
             type: String,
             index: true,

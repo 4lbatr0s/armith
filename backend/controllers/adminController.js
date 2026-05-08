@@ -51,26 +51,45 @@ function envFlagTruthy(v) {
   return s === '1' || s === 'true' || s === 'yes';
 }
 
+/** `userId` on ApiKey | KycConfiguration | WebhookDelivery is Mongo `users._id` — match legacy Clerk-valued rows as well */
+function storedTenantUserClause(mongoHex, clerkOwnerId) {
+  const ids = [...new Set([mongoHex, clerkOwnerId].filter(Boolean))];
+  if (ids.length === 0) return { userId: '__no_stored_docs__' };
+  if (ids.length === 1) return { userId: ids[0] };
+  return { userId: { $in: ids } };
+}
+
+async function mongoHexForDashboardClerk(clerkOwnerId) {
+  if (!clerkOwnerId || typeof clerkOwnerId !== 'string') return null;
+  const doc = await User.findOne({ clerkId: clerkOwnerId }).select('_id').lean();
+  return doc?._id != null ? String(doc._id) : null;
+}
+
+function webhookMongoFromProfile(profile, dashboardMongoFallback) {
+  const o = profile?.ownerUserId;
+  if (o != null && mongoose.Types.ObjectId.isValid(String(o).trim())) return String(o).trim();
+  return dashboardMongoFallback;
+}
+
 /**
- * Mongo filter for dashboards: profiles linked as subject/user or tenant merchant, plus any profile id
- * that has an outbound webhook row keyed to this Clerk userId (billing tenant — common for API key flows).
- * `permissiveList`: when ADMIN_DASHBOARD_LIST_ALL_PROFILES is truthy, returns {} (single-tenant operators only).
+ * Mongo filter for dashboards: profiles scoped to tenant Mongo account (`ownerUserId`) or legacy `merchantUserId`,
+ * optional subject linkage on `userId`, plus webhook-scoped ids.
  */
 async function tenantDashboardProfileFilter(ownerId, { permissiveList = false } = {}) {
   if (permissiveList && envFlagTruthy(process.env.ADMIN_DASHBOARD_LIST_ALL_PROFILES)) {
     return {};
   }
-  const mongoAccount = await User.findOne({ clerkId: ownerId }).select('_id').lean();
-  const mongoHex = mongoAccount?._id != null ? String(mongoAccount._id) : null;
-  /** userId stores Mongo User._id (hex); `{ userId: ownerId }` matches legacy Clerk-in-userId rows */
+  const mongoHex = await mongoHexForDashboardClerk(ownerId);
   const orParts = [
+    ...(mongoHex ? [{ ownerUserId: mongoHex }] : []),
+    ...(mongoHex ? [{ merchantUserId: mongoHex }] : []),
     { merchantUserId: ownerId },
     ...(mongoHex ? [{ userId: mongoHex }] : []),
     { userId: ownerId },
   ];
   try {
     const webhookProfileIds = await WebhookDelivery.distinct('profileId', {
-      userId: ownerId,
+      ...storedTenantUserClause(mongoHex, ownerId),
       profileId: { $exists: true, $ne: null }
     });
     const ids = webhookProfileIds.filter((id) => id != null && id !== '');
@@ -234,6 +253,7 @@ export const getStats = async (req, res) => {
       });
     }
 
+    const mongoHex = await mongoHexForDashboardClerk(ownerId);
     const base = await tenantDashboardProfileFilter(ownerId, { permissiveList: true });
     const [total, approved, rejected, pending, underReviewCount, activeApiKeys] = await Promise.all([
       Profile.countDocuments(base),
@@ -241,7 +261,7 @@ export const getStats = async (req, res) => {
       Profile.countDocuments({ ...base, status: 'REJECTED' }),
       Profile.countDocuments({ ...base, status: 'PENDING' }),
       Profile.countDocuments({ ...base, status: 'UNDER_REVIEW' }),
-      ApiKey.countDocuments({ userId: ownerId, revokedAt: null })
+      ApiKey.countDocuments({ revokedAt: null, ...storedTenantUserClause(mongoHex, ownerId) })
     ]);
 
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
@@ -272,12 +292,14 @@ export const getWebhookDeliveries = async (req, res) => {
       });
     }
 
+    const mongoHex = await mongoHexForDashboardClerk(ownerId);
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
     const failedOnly = req.query.failedOnly === '1' || req.query.failedOnly === 'true';
-    const filter = failedOnly ? { userId: ownerId, succeeded: false } : { userId: ownerId };
+    const baseUser = storedTenantUserClause(mongoHex, ownerId);
+    const filter = failedOnly ? { ...baseUser, succeeded: false } : { ...baseUser };
     const [rows, total] = await Promise.all([
       WebhookDelivery.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       WebhookDelivery.countDocuments(filter)
@@ -385,6 +407,7 @@ export const replayTerminalWebhook = async (req, res) => {
       });
     }
 
+    const mongoHexReplay = await mongoHexForDashboardClerk(ownerId);
     const replayScope = await tenantDashboardProfileFilter(ownerId, { permissiveList: false });
     const profile = await Profile.findOne({
       _id: profileId,
@@ -396,6 +419,8 @@ export const replayTerminalWebhook = async (req, res) => {
         errors: [{ textCode: 'NOT_FOUND', message: 'Profile not found' }]
       });
     }
+
+    const webhookTenantMongo = webhookMongoFromProfile(profile, mongoHexReplay);
 
     const st = String(profile.status ?? '').toUpperCase();
     if (!['APPROVED', 'REJECTED', 'FAILED'].includes(st)) {
@@ -415,7 +440,7 @@ export const replayTerminalWebhook = async (req, res) => {
     if (useStoredDelivery) {
       const event = st === 'APPROVED' ? 'verification.completed' : 'verification.failed';
       const last = await WebhookDelivery.findOne({
-        userId: ownerId,
+        ...storedTenantUserClause(mongoHexReplay, ownerId),
         profileId: profile._id,
         event,
         payload: { $type: 'object' }
@@ -425,7 +450,7 @@ export const replayTerminalWebhook = async (req, res) => {
 
       if (last?.payload && typeof last.payload === 'object') {
         emitVerificationTerminalWebhook({
-          tenantUserId: ownerId,
+          tenantMongoUserId: webhookTenantMongo,
           profile,
           correlationId: req.correlationId,
           forceEventType: event,
@@ -437,7 +462,7 @@ export const replayTerminalWebhook = async (req, res) => {
       }
     }
     emitVerificationTerminalWebhook({
-      tenantUserId: ownerId,
+      tenantMongoUserId: webhookTenantMongo,
       profile,
       correlationId: req.correlationId,
       replaySource: 'live',
@@ -555,8 +580,9 @@ export const enqueueManualReview = async (req, res) => {
       note: ''
     });
     await profile.save();
+    const ownerMongoEnqueue = await mongoHexForDashboardClerk(ownerId);
     emitManualReviewQueuedWebhook({
-      tenantUserId: ownerId,
+      tenantMongoUserId: webhookMongoFromProfile(profile, ownerMongoEnqueue),
       profile,
       correlationId: req.correlationId
     });
@@ -658,15 +684,19 @@ export const resolveManualReview = async (req, res) => {
           ];
     }
     await profile.save();
-    await incrementUserVerificationUsage(ownerId);
+    const ownerMongoResolved = await mongoHexForDashboardClerk(ownerId);
+    const webhookTenant = webhookMongoFromProfile(profile, ownerMongoResolved);
+    if (ownerMongoResolved) {
+      await incrementUserVerificationUsage(ownerMongoResolved);
+    }
     emitManualReviewResolvedWebhook({
-      tenantUserId: ownerId,
+      tenantMongoUserId: webhookTenant,
       profile,
       decision: d,
       correlationId: req.correlationId
     });
     emitVerificationTerminalWebhook({
-      tenantUserId: ownerId,
+      tenantMongoUserId: webhookTenant,
       profile,
       correlationId: req.correlationId
     });
@@ -721,11 +751,19 @@ export const mintVerificationCaptureSessionHandler = async (req, res) => {
       });
     }
 
+    const ownerMongoMint = await mongoHexForDashboardClerk(ownerId);
+    if (!ownerMongoMint) {
+      return res.status(404).json({
+        status: STATUS.FAILED,
+        errors: [{ textCode: 'NOT_FOUND', message: 'Tenant account not synced yet.' }]
+      });
+    }
+
     const ttlParsed = Number(body.ttlSeconds);
     const ttl = Number.isFinite(ttlParsed) && ttlParsed > 0 ? ttlParsed : undefined;
     const issued = mintCaptureSessionToken({
       secret,
-      tenantUserId: ownerId,
+      tenantMongoUserId: ownerMongoMint,
       profileId: String(profile._id),
       ttlSeconds: ttl
     });
@@ -804,13 +842,28 @@ export const getKeyedErrorSummary = async (req, res) => {
  */
 export const getSettings = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
-    let config = await KycConfiguration.findOne({ userId, environment: 'production' }).select(
-      '+integrationWebhookSecret'
-    );
+    const clerkId = req.auth?.userId;
+    if (!clerkId) {
+      return res.status(401).json({
+        status: STATUS.FAILED,
+        errors: [{ textCode: 'UNAUTHORIZED', message: 'Unauthorized' }]
+      });
+    }
+    const mongoHex = await mongoHexForDashboardClerk(clerkId);
+    if (!mongoHex) {
+      return res.status(404).json({
+        status: STATUS.FAILED,
+        errors: [{ textCode: 'NOT_FOUND', message: 'User account not found. Sign in again.' }]
+      });
+    }
+
+    let config = await KycConfiguration.findOne({
+      ...storedTenantUserClause(mongoHex, clerkId),
+      environment: 'production'
+    }).select('+integrationWebhookSecret');
 
     if (!config) {
-      const defaultConfig = createDefaultConfig(userId);
+      const defaultConfig = createDefaultConfig(mongoHex);
       config = await KycConfiguration.create(defaultConfig);
       config = await KycConfiguration.findById(config._id).select('+integrationWebhookSecret');
     }
@@ -830,7 +883,10 @@ export const getSettings = async (req, res) => {
  */
 export const updateSettings = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
+    const clerkId = req.auth?.userId;
+    const mongoHexUpd = clerkId ? await mongoHexForDashboardClerk(clerkId) : null;
+    const accountClauseUpd =
+      mongoHexUpd != null ? storedTenantUserClause(mongoHexUpd, clerkId) : { userId: '__none__' };
     const body = typeof req.body === 'object' && req.body ? req.body : {};
     const { verificationRules, thresholds } = body;
 
@@ -841,7 +897,7 @@ export const updateSettings = async (req, res) => {
           ? body.integration
           : null;
 
-    const config = await KycConfiguration.findOne({ userId, environment: 'production' });
+    const config = await KycConfiguration.findOne({ ...accountClauseUpd, environment: 'production' });
     if (!config) {
       return res.status(404).json({
         status: STATUS.FAILED,
@@ -935,11 +991,20 @@ export const updateSettings = async (req, res) => {
  */
 export const resetSettings = async (req, res) => {
   try {
-    const userId = req.auth?.userId;
-    const defaultConfig = createDefaultConfig(userId);
+    const clerkId = req.auth?.userId;
+    const mongoHexReset = clerkId ? await mongoHexForDashboardClerk(clerkId) : null;
+    const accountClauseReset =
+      mongoHexReset != null ? storedTenantUserClause(mongoHexReset, clerkId) : { userId: '__none__' };
+    const defaultConfig = mongoHexReset ? createDefaultConfig(mongoHexReset) : null;
+    if (!defaultConfig) {
+      return res.status(401).json({
+        status: STATUS.FAILED,
+        errors: [{ textCode: 'UNAUTHORIZED', message: 'Unauthorized' }]
+      });
+    }
 
     const config = await KycConfiguration.findOneAndUpdate(
-      { userId, environment: 'production' },
+      { ...accountClauseReset, environment: 'production' },
       defaultConfig,
       { upsert: true, new: true }
     );

@@ -51,7 +51,7 @@ function enrichWebhookPayloadData(profile, cfg, payload) {
 }
 
 async function deliverWebhook({
-  tenantUserId,
+  tenantMongoUserId,
   profileId,
   eventType,
   payload,
@@ -98,7 +98,7 @@ async function deliverWebhook({
       lastStatus = httpRes.status;
       if (httpRes.ok) {
         await WebhookDelivery.create({
-          userId: tenantUserId,
+          userId: tenantMongoUserId,
           profileId,
           event: eventType,
           deliveryId,
@@ -121,7 +121,7 @@ async function deliverWebhook({
   }
 
   await WebhookDelivery.create({
-    userId: tenantUserId,
+    userId: tenantMongoUserId,
     profileId,
     event: eventType,
     deliveryId,
@@ -144,7 +144,7 @@ async function deliverWebhook({
  * Fire-and-forget HMAC-signed webhook when a profile reaches APPROVED | REJECTED | FAILED.
  */
 export function emitVerificationTerminalWebhook({
-  tenantUserId,
+  tenantMongoUserId,
   profile,
   correlationId = null,
   forceEventType = null,
@@ -152,7 +152,7 @@ export function emitVerificationTerminalWebhook({
   replaySource = 'live',
   bypassSubscriptionCheck = false
 }) {
-    if (!tenantUserId || !profile) return;
+    if (!tenantMongoUserId || !profile) return;
 
     const st = String(profile.status ?? '').toUpperCase();
     if (!['APPROVED', 'REJECTED', 'FAILED'].includes(st)) return;
@@ -160,7 +160,7 @@ export function emitVerificationTerminalWebhook({
     void (async () => {
         try {
             const cfg = await KycConfiguration.findOne({
-                userId: tenantUserId,
+                userId: tenantMongoUserId,
                 environment: 'production'
             }).select('+integrationWebhookSecret integrationWebhookUrl integrationWebhookEvents');
 
@@ -202,7 +202,7 @@ export function emitVerificationTerminalWebhook({
                 : enrichWebhookPayloadData(profile, cfg, basePayload);
 
             await deliverWebhook({
-              tenantUserId,
+              tenantMongoUserId,
               profileId: profile._id,
               eventType,
               payload,
@@ -218,15 +218,19 @@ export function emitVerificationTerminalWebhook({
 }
 
 /** Non-terminal: human queue (logged like terminal deliveries). */
-export function emitManualReviewQueuedWebhook({ tenantUserId, profile, correlationId }) {
-    if (!tenantUserId || !profile) return;
+export function emitManualReviewQueuedWebhook({
+  tenantMongoUserId,
+  profile,
+  correlationId
+}) {
+    if (!tenantMongoUserId || !profile) return;
     const pst = String(profile.status ?? '').toUpperCase();
     if (pst !== 'UNDER_REVIEW') return;
 
     void (async () => {
         try {
             const cfg = await KycConfiguration.findOne({
-                userId: tenantUserId,
+                userId: tenantMongoUserId,
                 environment: 'production'
             }).select('+integrationWebhookSecret integrationWebhookUrl integrationWebhookEvents');
 
@@ -250,7 +254,7 @@ export function emitManualReviewQueuedWebhook({ tenantUserId, profile, correlati
               }
             });
             await deliverWebhook({
-              tenantUserId,
+              tenantMongoUserId,
               profileId: profile._id,
               eventType: payload.type,
               payload,
@@ -266,19 +270,19 @@ export function emitManualReviewQueuedWebhook({ tenantUserId, profile, correlati
 
 /** Non-terminal: manual review resolved event after admin decision is persisted. */
 export function emitManualReviewResolvedWebhook({
-  tenantUserId,
+  tenantMongoUserId,
   profile,
   decision,
   correlationId
 }) {
-  if (!tenantUserId || !profile) return;
+  if (!tenantMongoUserId || !profile) return;
   const resolved = String(decision ?? '').toUpperCase();
   if (!['APPROVED', 'REJECTED'].includes(resolved)) return;
 
   void (async () => {
     try {
       const cfg = await KycConfiguration.findOne({
-        userId: tenantUserId,
+        userId: tenantMongoUserId,
         environment: 'production'
       }).select('+integrationWebhookSecret integrationWebhookUrl integrationWebhookEvents');
 
@@ -301,7 +305,7 @@ export function emitManualReviewResolvedWebhook({
         }
       });
       await deliverWebhook({
-        tenantUserId,
+        tenantMongoUserId,
         profileId: profile._id,
         eventType,
         payload,

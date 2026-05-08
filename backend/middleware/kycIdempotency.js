@@ -33,8 +33,8 @@ function tenantFromAuth(authContext) {
     if (authContext.mode === 'apiKey' && authContext.apiKeyId) {
         return `ak:${authContext.apiKeyId}`;
     }
-    if (authContext.userId) {
-        return `u:${authContext.userId}`;
+    if (authContext.mongoUserId) {
+        return `u:${authContext.mongoUserId}`;
     }
     return 'anon';
 }

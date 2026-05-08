@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const apiKeySchema = new mongoose.Schema(
   {
+    /** Mongo `users._id` (hex) of the issuing account — never Clerk. */
     userId: {
       type: String,
       required: true,

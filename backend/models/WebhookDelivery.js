@@ -6,6 +6,7 @@ const WEBHOOK_TTL_SEC =
 
 const WebhookDeliverySchema = new mongoose.Schema(
     {
+        /** Mongo `users._id` (hex) of tenant receiving/sending webhook — never Clerk. */
         userId: { type: String, required: true, index: true },
         profileId: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile', index: true },
         event: { type: String, required: true },

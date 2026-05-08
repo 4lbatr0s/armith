@@ -29,8 +29,9 @@ function sign(secret, bodyB64) {
 
 /**
  * Bearer token `{bodyB64}.{sig}` — tenant-bound read access to **`GET /kyc/status/:profileId`** and **`GET /kyc/sessions/:id`**.
+ * `tenant` claim is **`users._id` hex**. Legacy tokens may carry Clerk `user_*` (accepted by verify middleware).
  */
-export function mintCaptureSessionToken({ secret, tenantUserId, profileId, ttlSeconds }) {
+export function mintCaptureSessionToken({ secret, tenantMongoUserId, profileId, ttlSeconds }) {
     if (!secret || typeof secret !== 'string' || secret.length < 16) return null;
 
     const now = Math.floor(Date.now() / 1000);
@@ -41,7 +42,7 @@ export function mintCaptureSessionToken({ secret, tenantUserId, profileId, ttlSe
     const ttl = Math.min(TTL_MAX_CAP, requested);
     const payload = {
         v: 1,
-        tenant: String(tenantUserId ?? ''),
+        tenant: String(tenantMongoUserId ?? ''),
         pid: String(profileId ?? ''),
         iat: now,
         exp: now + ttl

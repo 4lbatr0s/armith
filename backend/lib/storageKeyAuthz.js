@@ -1,5 +1,6 @@
 /**
- * Tenant-scoped object keys under R2: `users/{clerkTenantId}/...`
+ * Tenant-scoped object keys under R2: `users/{Mongo users._id}/...`
+ * Older deployments may still use `users/{clerk_user_*}/`; both are honored when validating access.
  * Legacy path `kyc-uploads/` retained only when env allows (transition).
  */
 
@@ -13,12 +14,20 @@ export function normalizeObjectKey(raw) {
 
 /**
  * @param {string} key normalized object key
- * @param {string} tenantUserId Clerk user id for the authenticated tenant (API key / session / capture tenant)
+ * @param {string | null} [tenantMongoUserId] Mongo `users._id` hex
+ * @param {string | null} [tenantClerkUserId] Legacy path prefix Clerk `user_*`
  */
-export function isStorageKeyOwnedByTenant(key, tenantUserId) {
-  if (!tenantUserId || typeof tenantUserId !== 'string') return false;
-  const prefix = `users/${tenantUserId}/`;
-  return key.startsWith(prefix);
+export function isStorageKeyOwnedByTenant(key, tenantMongoUserId, tenantClerkUserId = null) {
+  if (!key || typeof key !== 'string') return false;
+  if (tenantMongoUserId && typeof tenantMongoUserId === 'string' && tenantMongoUserId.trim()) {
+    const p = `users/${tenantMongoUserId.trim()}/`;
+    if (key.startsWith(p)) return true;
+  }
+  if (tenantClerkUserId && typeof tenantClerkUserId === 'string' && tenantClerkUserId.trim()) {
+    const p = `users/${tenantClerkUserId.trim()}/`;
+    if (key.startsWith(p)) return true;
+  }
+  return false;
 }
 
 /**
