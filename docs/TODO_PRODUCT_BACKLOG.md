@@ -12,8 +12,8 @@ Single planning doc under `docs/`. **`[P]`** = product/legal/process; **`[E]`** 
 
 | Priority | Item | Source (historical) |
 |----------|------|----------------------|
-| [E] | **Object-storage lifecycle policy finalization** — dry-run scheduler/operator wiring exists (`R2_LIFECYCLE_CRON`, interval envs); destructive purge policy remains blocked on retention durations. | Retention backlog |
-| [P][E] | **Mongo lifecycle beyond webhook TTL** — profile/archival or broader TTL execution **blocked on business retention durations** (webhook TTL path already exists via env). | BILLING_AND_RETENTION (removed) |
+| [P] | **R2 destructive purge enablement** — Engineering shipped exemption-aware, multi-prefix age purge (`R2_LIFECYCLE_PREFIXES`, `legalHold`, unresolved manual-review skip). **Product/legal** still signs retention windows + prefix list before `R2_LIFECYCLE_PURGE_ENABLED=1` in production. | Retention backlog |
+| [P][E] | **Mongo destructive lifecycle** — Read-only terminal-profile age report shipped (`MONGO_PROFILE_AGE_DAYS` + `MONGO_LIFECYCLE_CRON`). Profile archival / hard delete / broader TTL **still blocked on business retention durations** (webhook TTL path remains via `WEBHOOK_DELIVERY_TTL_SECONDS`). | BILLING_AND_RETENTION (removed) |
 
 ### Billing & commerce
 
@@ -26,7 +26,7 @@ Single planning doc under `docs/`. **`[P]`** = product/legal/process; **`[E]`** 
 
 | Priority | Item | Source (historical) |
 |----------|------|----------------------|
-| [P][E] | **Replace `[bracket]` SLO numbers** once traffic baselined; paging/on-call wording. | RUNBOOK_SLO (removed) |
+| [P][E] | **Baseline & tune SLOs** — Starter numbers live in [`docs/SLO_AND_ONCALL_STUB.md`](SLO_AND_ONCALL_STUB.md); replace with measured targets after traffic baseline; add paging integrations and contractual SLAs as needed. | RUNBOOK_SLO (removed) |
 
 ---
 

@@ -1,5 +1,6 @@
 import logger from '../lib/logger.js';
 import { runR2RetentionPurgeTick } from './lifecycleR2Retention.js';
+import { runMongoProfileRetentionReport } from './lifecycleMongoRetention.js';
 
 function parseIntervalMinutes(raw, fallbackMinutes) {
   const parsed = Number(raw);
@@ -39,6 +40,7 @@ async function runMongoLifecycleTick() {
   } else {
     logger.info('Mongo lifecycle dry-run tick — WEBHOOK_DELIVERY_TTL_SECONDS not set (<60 omitted); broader profile TTL/archival deferred (see docs/RETENTION_DECISION_CHECKLIST.md)');
   }
+  await runMongoProfileRetentionReport();
 }
 
 function startIntervalJob(name, minutes, fn) {
@@ -50,7 +52,7 @@ function startIntervalJob(name, minutes, fn) {
 
 /**
  * Lifecycle scheduler wiring.
- * R2 purge is opt-in (`R2_LIFECYCLE_PURGE_ENABLED`) and capped per tick until retention policy sign-off (`docs/RETENTION_DECISION_CHECKLIST.md`).
+ * R2 purge is opt-in (`R2_LIFECYCLE_PURGE_ENABLED`) and capped per tick; objects linked on `legalHold` or unresolved manual review are skipped (`docs/RETENTION_DECISION_CHECKLIST.md`).
  */
 export function startLifecycleSchedulers() {
   const stoppers = [];

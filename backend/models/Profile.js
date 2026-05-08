@@ -88,6 +88,9 @@ const profileSchema = new mongoose.Schema(
         notes: String, // Admin notes about this profile
         tags: [String], // Tags for categorization/filtering
 
+        /** When true, R2 retention purge skips objects linked on this profile (litigation / subpoena). */
+        legalHold: { type: Boolean, default: false, index: true },
+
         manualReviewQueuedAt: { type: Date, default: null },
         manualReviewDeadlineAt: { type: Date, default: null },
         manualReviewAssigneeLabel: { type: String, maxlength: 160, trim: true, default: '' },
